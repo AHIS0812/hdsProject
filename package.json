@@ -1,0 +1,20 @@
+{
+  "name": "ai-screen-draft",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AI Screen Draft — 캔버스 스케치 → 사내 표준 화면/코드 생성 (1개월 PoC)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/server/index.js",
+    "start": "node src/server/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "express": "^4.21.2"
+  }
+}

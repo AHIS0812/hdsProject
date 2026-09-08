@@ -1,0 +1,11 @@
+{
+  "bannedComponents": [],
+  "fallbacks": {
+    "default": "input",
+    "unknownContainer": "area"
+  },
+  "buttonRoleHints": {
+    "primary": ["저장", "요청", "확정", "선택", "등록"],
+    "search": ["조회", "검색"]
+  }
+}

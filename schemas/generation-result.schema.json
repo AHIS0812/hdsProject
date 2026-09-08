@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hdsproject/schemas/generation-result.schema.json",
+  "title": "생성결과 (담당 1 → 담당 2)",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": { "enum": ["ok", "needs_input", "error"] },
+    "preview": {
+      "type": "object",
+      "required": ["html"],
+      "properties": { "html": { "type": "string" } }
+    },
+    "code": {
+      "type": "object",
+      "properties": {
+        "websquareXml": { "type": "string" },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "content"],
+            "properties": {
+              "path": { "type": "string" },
+              "content": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "ir": { "type": "object" },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question"],
+        "properties": {
+          "id": { "type": "string" },
+          "targetId": { "type": "string" },
+          "question": { "type": "string" },
+          "options": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "retries": { "type": "integer", "minimum": 0 },
+        "elapsedMs": { "type": "integer", "minimum": 0 },
+        "fallbacksApplied": { "type": "array" },
+        "unresolved": { "type": "array", "items": { "type": "string" } },
+        "usedDeterministicFallback": { "type": "boolean" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "log": { "type": "string" },
+        "details": {}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ok" } } },
+      "then": { "required": ["preview", "code"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "needs_input" } } },
+      "then": { "required": ["questions"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "error" } } },
+      "then": { "required": ["error"] }
+    }
+  ]
+}

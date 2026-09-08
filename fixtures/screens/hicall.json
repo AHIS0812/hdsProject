@@ -1,0 +1,54 @@
+{
+  "screens": [
+    {
+      "id": "SCR-C-000512",
+      "name": "상담 이력 조회",
+      "template": "list",
+      "updatedAt": "2026-08-11",
+      "canvas": { "w": 960, "h": 600 },
+      "shapes": [
+        { "id": "s1", "type": "area", "x": 30, "y": 30, "w": 900, "h": 70, "label": "조회 영역" },
+        { "id": "s2", "type": "label", "x": 50, "y": 54, "w": 80, "h": 24, "label": "고객번호", "required": true },
+        { "id": "s3", "type": "input", "x": 140, "y": 52, "w": 170, "h": 28 },
+        { "id": "s4", "type": "label", "x": 340, "y": 54, "w": 60, "h": 24, "label": "기간" },
+        { "id": "s5", "type": "date", "x": 410, "y": 52, "w": 130, "h": 28 },
+        { "id": "s6", "type": "button", "x": 740, "y": 52, "w": 80, "h": 28, "label": "조회" },
+        { "id": "s7", "type": "title", "x": 30, "y": 125, "w": 200, "h": 26, "label": "상담 이력" },
+        { "id": "s8", "type": "list", "x": 30, "y": 165, "w": 900, "h": 320, "label": "목록", "items": "순번,일시,채널,상담원,분류,결과" }
+      ]
+    },
+    {
+      "id": "SCR-C-000778",
+      "name": "고객 정보 팝업",
+      "template": "popup",
+      "updatedAt": "2026-06-02",
+      "canvas": { "w": 960, "h": 600 },
+      "shapes": [
+        { "id": "s1", "type": "title", "x": 30, "y": 30, "w": 240, "h": 26, "label": "고객 정보" },
+        { "id": "s2", "type": "area", "x": 30, "y": 70, "w": 900, "h": 80, "label": "검색 영역" },
+        { "id": "s3", "type": "label", "x": 50, "y": 96, "w": 80, "h": 24, "label": "검색어" },
+        { "id": "s4", "type": "input", "x": 140, "y": 94, "w": 220, "h": 28 },
+        { "id": "s5", "type": "button", "x": 830, "y": 94, "w": 80, "h": 28, "label": "검색" },
+        { "id": "s6", "type": "list", "x": 30, "y": 175, "w": 900, "h": 240, "label": "검색 결과", "items": "선택,고객번호,성명,생년,연락처" },
+        { "id": "s7", "type": "button", "x": 730, "y": 440, "w": 90, "h": 30, "label": "선택" },
+        { "id": "s8", "type": "button", "x": 830, "y": 440, "w": 90, "h": 30, "label": "닫기" }
+      ]
+    },
+    {
+      "id": "SCR-C-000934",
+      "name": "콜 배정 현황",
+      "template": "list",
+      "updatedAt": "2026-09-01",
+      "canvas": { "w": 960, "h": 600 },
+      "shapes": [
+        { "id": "s1", "type": "area", "x": 30, "y": 30, "w": 900, "h": 70, "label": "조회 영역" },
+        { "id": "s2", "type": "label", "x": 50, "y": 54, "w": 80, "h": 24, "label": "조회조건", "required": true },
+        { "id": "s3", "type": "input", "x": 140, "y": 52, "w": 170, "h": 28 },
+        { "id": "s4", "type": "button", "x": 740, "y": 52, "w": 80, "h": 28, "label": "조회" },
+        { "id": "s5", "type": "button", "x": 830, "y": 52, "w": 80, "h": 28, "label": "초기화" },
+        { "id": "s6", "type": "title", "x": 30, "y": 125, "w": 200, "h": 26, "label": "배정 현황" },
+        { "id": "s7", "type": "list", "x": 30, "y": 165, "w": 900, "h": 300, "label": "목록", "items": "순번,상담원,대기콜,진행콜,평균응대" }
+      ]
+    }
+  ]
+}

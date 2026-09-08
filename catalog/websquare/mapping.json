@@ -1,0 +1,15 @@
+{
+  "$comment": "요소 타입 → WebSquare 매핑 규칙. 개발지시서 §7. 시스템별 차이는 override.<systemId>.json 로.",
+  "default": {
+    "input":  { "tag": "w2:inputBox",  "attrs": { "id": "ipb{n}" }, "requiredClass": "w2input_essential" },
+    "select": { "tag": "w2:selectBox", "attrs": { "id": "sel{n}", "dataList": "dl{n}" } },
+    "date":   { "tag": "w2:calendar",  "attrs": { "id": "cal{n}", "displayFormat": "yyyy-MM-dd" } },
+    "check":  { "tag": "w2:checkbox",  "attrs": { "id": "chk{n}", "label": "{label}" } },
+    "text":   { "tag": "w2:textarea",  "attrs": { "id": "txa{n}" } },
+    "list":   { "tag": "w2:gridView",  "attrs": { "id": "grd{n}", "dataList": "dl{n}" }, "columnTag": "w2:gridColumn" },
+    "button": { "tag": "w2:trigger",   "attrs": { "id": "btn{n}", "value": "{label}", "onclick": "fn_{n}" } },
+    "label":  { "tag": "w2:textbox",   "attrs": { "id": "lbl{n}", "value": "{label}" } },
+    "title":  { "tag": "w2:textbox",   "attrs": { "id": "ttl{n}", "value": "{label}" } },
+    "area":   { "tag": "w2:group",     "attrs": { "id": "grp{n}" } }
+  }
+}

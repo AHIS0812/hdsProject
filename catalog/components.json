@@ -1,0 +1,15 @@
+{
+  "$comment": "PoC용 사내 UI 표준 컴포넌트 카탈로그 (최소). 개발지시서 §9, T-4. componentKey 는 확정 전 임시.",
+  "components": [
+    { "componentKey": "std.input", "name": "입력칸", "websquare": "w2:inputBox", "params": ["id", "essential"], "snippet": "snippets/input.html" },
+    { "componentKey": "std.select", "name": "선택", "websquare": "w2:selectBox", "params": ["id", "dataList"], "snippet": "snippets/select.html" },
+    { "componentKey": "std.date", "name": "날짜", "websquare": "w2:calendar", "params": ["id", "displayFormat"], "snippet": "snippets/date.html" },
+    { "componentKey": "std.check", "name": "체크", "websquare": "w2:checkbox", "params": ["id", "label"], "snippet": "snippets/check.html" },
+    { "componentKey": "std.textarea", "name": "긴 글", "websquare": "w2:textarea", "params": ["id"], "snippet": "snippets/textarea.html" },
+    { "componentKey": "std.grid", "name": "표", "websquare": "w2:gridView", "params": ["id", "dataList", "columns"], "snippet": "snippets/grid.html" },
+    { "componentKey": "std.button", "name": "버튼", "websquare": "w2:trigger", "params": ["id", "value", "onclick"], "snippet": "snippets/button.html" },
+    { "componentKey": "std.label", "name": "글자", "websquare": "w2:textbox", "params": ["id", "value"], "snippet": "snippets/label.html" },
+    { "componentKey": "std.section", "name": "섹션 제목", "websquare": "w2:textbox", "params": ["id", "value"], "snippet": "snippets/section.html" },
+    { "componentKey": "std.group", "name": "묶음", "websquare": "w2:group", "params": ["id"], "snippet": "snippets/group.html" }
+  ]
+}

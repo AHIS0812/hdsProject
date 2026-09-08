@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hdsproject/schemas/screen-draft.schema.json",
+  "title": "화면정의 payload (담당 2 → 담당 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["systemId", "mode", "canvas", "shapes"],
+  "properties": {
+    "systemId": { "type": "string", "minLength": 1 },
+    "systemName": { "type": "string" },
+    "mode": { "enum": ["new", "edit"] },
+    "template": { "enum": ["list", "detail", "form", "popup"] },
+    "baseScreen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" }
+      }
+    },
+    "screenName": { "type": "string" },
+    "note": { "type": "string" },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "kind"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["excel", "ppt", "image", "other"] },
+          "url": { "type": "string" }
+        }
+      }
+    },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["w", "h"],
+      "properties": {
+        "w": { "type": "number", "exclusiveMinimum": 0 },
+        "h": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "shapes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/shape" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "new" } } },
+      "then": { "required": ["template"] }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "edit" } } },
+      "then": { "required": ["baseScreen"] }
+    }
+  ],
+  "$defs": {
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "x", "y", "w", "h"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "enum": ["title", "label", "input", "select", "date", "check", "text", "list", "button", "area"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number", "exclusiveMinimum": 0 },
+        "h": { "type": "number", "exclusiveMinimum": 0 },
+        "label": { "type": "string" },
+        "items": { "type": "string" },
+        "required": { "type": "boolean" }
+      }
+    }
+  }
+}

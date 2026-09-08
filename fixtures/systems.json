@@ -1,0 +1,12 @@
+{
+  "systems": [
+    { "id": "portal", "name": "하이포탈", "sub": "영업 포탈" },
+    { "id": "hicall", "name": "하이콜", "sub": "컨택센터" },
+    { "id": "hiclaim", "name": "하이클레임", "sub": "보상 처리" },
+    { "id": "hicontract", "name": "하이계약", "sub": "계약 관리" },
+    { "id": "hipay", "name": "하이페이", "sub": "수납 · 정산" },
+    { "id": "hiadmin", "name": "하이어드민", "sub": "관리자" },
+    { "id": "hireport", "name": "하이리포트", "sub": "통계 · 리포트" },
+    { "id": "himobile", "name": "하이모바일", "sub": "모바일 창구" }
+  ]
+}

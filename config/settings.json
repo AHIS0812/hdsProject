@@ -1,0 +1,6 @@
+{
+  "port": 3000,
+  "autofixMaxRetries": 3,
+  "generateTimeoutMs": 180000,
+  "canvas": { "w": 960, "h": 600 }
+}

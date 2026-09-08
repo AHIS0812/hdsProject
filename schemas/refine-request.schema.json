@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hdsproject/schemas/refine-request.schema.json",
+  "title": "수정 요청 (담당 2 → 담당 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["basePayload"],
+  "properties": {
+    "basePayload": { "$ref": "https://hdsproject/schemas/screen-draft.schema.json" },
+    "baseIr": { "type": "object" },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["questionId", "value"],
+        "properties": {
+          "questionId": { "type": "string" },
+          "value": { "type": "string" }
+        }
+      }
+    },
+    "instruction": { "type": "string" }
+  }
+}
