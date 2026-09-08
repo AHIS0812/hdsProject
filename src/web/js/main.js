@@ -78,25 +78,39 @@ document.querySelector('.tools').addEventListener('click', (e) => {
 });
 
 // ── 작업 구분 (신규 / 변경) ───────────────────────────────
+function applyMode() {
+  $('editBlock').classList.toggle('hidden', workMode !== 'edit');
+  $('tplH').textContent = workMode === 'edit' ? '화면 유형' : '어떤 화면인가요?';
+}
 document.querySelectorAll('#modeSeg div').forEach((el) => {
   el.addEventListener('click', () => {
     document.querySelectorAll('#modeSeg div').forEach((x) => x.classList.remove('on'));
     el.classList.add('on');
     workMode = el.dataset.mode;
-    $('newBlock').classList.toggle('hidden', workMode !== 'new');
-    $('editBlock').classList.toggle('hidden', workMode !== 'edit');
+    applyMode();
     autosave();
   });
 });
 
-// ── 화면 유형 템플릿 (신규 모드) ──────────────────────────
+// ── 화면 유형 ─────────────────────────────────────────────
+function highlightTpl(key) {
+  document.querySelectorAll('.tpl').forEach((x) => x.classList.toggle('on', x.dataset.tpl === key));
+}
 document.querySelectorAll('.tpl').forEach((el) => {
   el.addEventListener('click', () => {
-    if (editor.count() && !confirm('화면 종류를 바꾸면 지금 그린 내용이 사라집니다. 계속할까요?')) return;
-    document.querySelectorAll('.tpl').forEach((x) => x.classList.remove('on'));
-    el.classList.add('on');
-    currentTpl = el.dataset.tpl;
-    editor.setShapes(templateShapes(currentTpl));
+    const key = el.dataset.tpl;
+    if (workMode === 'new') {
+      // 신규: 유형 선택 = 프리셋 로드
+      if (editor.count() && !confirm('화면 종류를 바꾸면 지금 그린 내용이 사라집니다. 계속할까요?')) return;
+      currentTpl = key;
+      highlightTpl(key);
+      editor.setShapes(templateShapes(key));
+    } else {
+      // 변경: 유형 재분류만 (캔버스 유지)
+      currentTpl = key;
+      highlightTpl(key);
+      toast(`화면 유형을 "${el.querySelector('.nm').textContent.trim()}" 로 지정했습니다`);
+    }
     autosave();
   });
 });
@@ -131,6 +145,11 @@ const scrCombo = makeCombo($('scrBox'), {
       const def = await api.getScreen(scr.id);
       editor.setShapes(def.shapes || []);
       scrNm.value = def.name || scr.name;
+      // 화면 유형도 선택한 화면에 맞춰 자동 반영
+      if (def.template) {
+        currentTpl = def.template;
+        highlightTpl(def.template);
+      }
       syncAbL();
       autosave();
     } catch (e) {
@@ -186,7 +205,7 @@ function payload() {
     canvas: { ...CANVAS },
     shapes: editor.toPayloadShapes(),
   };
-  if (workMode === 'new') p.template = currentTpl;
+  if (currentTpl) p.template = currentTpl;
   if (workMode === 'edit' && scr) p.baseScreen = { id: scr.id, name: scr.name };
   const note = noteEl.value.trim();
   if (note) p.note = note;
@@ -234,14 +253,14 @@ function restore() {
   attachments = Array.isArray(saved.attachments) ? saved.attachments : [];
   drawFiles();
 
-  if (saved.mode === 'edit') document.querySelector('#modeSeg [data-mode="edit"]').click();
+  if (saved.mode === 'edit') {
+    workMode = 'edit';
+    document.querySelectorAll('#modeSeg div').forEach((x) => x.classList.toggle('on', x.dataset.mode === 'edit'));
+    applyMode();
+  }
   if (saved.template) {
-    const tile = document.querySelector(`.tpl[data-tpl="${saved.template}"]`);
-    if (tile) {
-      document.querySelectorAll('.tpl').forEach((x) => x.classList.remove('on'));
-      tile.classList.add('on');
-      currentTpl = saved.template;
-    }
+    currentTpl = saved.template;
+    highlightTpl(saved.template);
   }
   if (Array.isArray(saved.shapes) && saved.shapes.length) editor.setShapes(saved.shapes);
   return { systemId: saved.systemId };

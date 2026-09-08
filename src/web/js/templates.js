@@ -3,7 +3,7 @@
 
 import { NAME } from './constants.js';
 
-export const TEMPLATE_KEYS = ['list', 'detail', 'form', 'popup'];
+export const TEMPLATE_KEYS = ['list', 'detail', 'form', 'popup', 'main'];
 
 function build(defs) {
   return defs.map(([t, x, y, w, h, label, cols, req]) => ({
@@ -61,6 +61,18 @@ const PRESETS = {
     ['list', 30, 175, 900, 240, '검색 결과', '선택,코드,명칭,비고'],
     ['button', 730, 440, 90, 30, '선택'],
     ['button', 830, 440, 90, 30, '닫기'],
+  ]),
+  main: () => build([
+    ['title', 30, 24, 240, 26, '메인화면'],
+    ['area', 30, 66, 440, 150, '요약'],
+    ['label', 52, 100, 120, 22, '항목1'],
+    ['label', 300, 100, 150, 22, '0'],
+    ['label', 52, 142, 120, 22, '항목2'],
+    ['label', 300, 142, 150, 22, '0'],
+    ['area', 490, 66, 440, 150, '공지'],
+    ['text', 504, 100, 412, 100, ''],
+    ['title', 30, 236, 200, 26, '최근 내역'],
+    ['list', 30, 272, 900, 290, '', '순번,항목1,항목2,항목3'],
   ]),
 };
 

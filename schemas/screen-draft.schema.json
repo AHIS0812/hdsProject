@@ -9,7 +9,7 @@
     "systemId": { "type": "string", "minLength": 1 },
     "systemName": { "type": "string" },
     "mode": { "enum": ["new", "edit"] },
-    "template": { "enum": ["list", "detail", "form", "popup"] },
+    "template": { "enum": ["list", "detail", "form", "popup", "main"] },
     "baseScreen": {
       "type": "object",
       "additionalProperties": false,
