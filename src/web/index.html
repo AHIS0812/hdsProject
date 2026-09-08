@@ -34,6 +34,8 @@
 <body>
 <main>
   <h1>AI Screen Draft <span class="tag">SCAFFOLDING</span></h1>
+  <p id="serverBanner" hidden style="background:#FFF0EC;color:#cf222e;border:1px solid #ffc9bd;
+     border-radius:8px;padding:10px 12px;font-size:12px;font-weight:600;margin:0 0 14px;"></p>
   <p class="lead">
     이 페이지는 스캐폴딩 스모크 테스트용 임시 화면입니다.
     실제 캔버스 에디터는 <strong>담당 2</strong>가 <code>src/web/</code> 아래에
@@ -91,14 +93,45 @@
     ],
   };
 
-  window.check = async (url, key) => {
-    const el = document.getElementById('metaOut');
+  const SERVE_HINT =
+    '응답이 JSON이 아닙니다 (HTML 수신).\n' +
+    '→ 이 페이지는 반드시 `npm run dev` 로 띄운 Express 서버(http://localhost:3000)에서 열어야 합니다.\n' +
+    '  file:// 로 직접 열거나 VS Code Live Server / 다른 정적 서버로 열면 /api/* 가 동작하지 않습니다.\n' +
+    '  포트 충돌 시 .env 의 PORT 를 바꾸고 그 포트로 접속하세요.';
+
+  /** fetch + JSON 파싱. 실패 시 원인을 사람이 읽을 수 있게 던진다. */
+  async function apiJson(url, opts) {
+    let r;
     try {
-      const r = await fetch(url);
-      el.innerHTML = `<span class="ok">${r.status}</span> ${url}\n` +
-        JSON.stringify(await r.json(), null, 2);
+      r = await fetch(url, opts);
     } catch (e) {
-      el.innerHTML = `<span class="bad">실패</span> ${e}`;
+      throw new Error(`네트워크 실패 (${url}) — 서버가 안 떠 있을 수 있습니다.\n${e}`);
+    }
+    const text = await r.text();
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(`[${r.status}] ${url}\n${SERVE_HINT}\n\n--- 받은 본문 앞부분 ---\n${text.slice(0, 200)}`);
+    }
+    return { status: r.status, ok: r.ok, body: JSON.parse(text) };
+  }
+
+  /** <pre> 에 상태 배지 + 본문을 안전하게(HTML 파싱 없이) 렌더한다. */
+  function report(el, ok, headline, text) {
+    el.textContent = '';
+    const badge = document.createElement('span');
+    badge.className = ok ? 'ok' : 'bad';
+    badge.textContent = ok ? 'OK' : '실패';
+    el.append(badge, document.createTextNode(' ' + headline + '\n\n' + text));
+  }
+
+  window.check = async (url) => {
+    const el = document.getElementById('metaOut');
+    el.textContent = '요청 중…';
+    try {
+      const { status, ok, body } = await apiJson(url);
+      report(el, ok, `${status} ${url}`, JSON.stringify(body, null, 2));
+    } catch (e) {
+      report(el, false, url, e.message);
     }
   };
 
@@ -106,16 +139,14 @@
     const el = document.getElementById('genOut');
     el.textContent = '요청 중…';
     try {
-      const r = await fetch('/api/generate', {
+      const { status, ok, body } = await apiJson('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(TEST_PAYLOAD),
       });
-      const cls = r.ok ? 'ok' : 'bad';
-      el.innerHTML = `<span class="${cls}">${r.status}</span> POST /api/generate\n` +
-        JSON.stringify(await r.json(), null, 2);
+      report(el, ok, `${status} POST /api/generate`, JSON.stringify(body, null, 2));
     } catch (e) {
-      el.innerHTML = `<span class="bad">실패</span> ${e}`;
+      report(el, false, 'POST /api/generate', e.message);
     }
   };
 
@@ -125,53 +156,54 @@
   const editOut = document.getElementById('editOut');
   let loadedScreen = null; // { id, name, systemId, template, canvas, shapes }
 
+  function setOptions(sel, first, list) {
+    sel.replaceChildren(new Option(first, ''));
+    for (const [value, label] of list) sel.append(new Option(label, value));
+  }
+
   async function populateSystems() {
-    try {
-      const { systems } = await (await fetch('/api/systems')).json();
-      sysSel.innerHTML = '<option value="">시스템 선택</option>' +
-        systems.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-    } catch (e) {
-      editOut.innerHTML = `<span class="bad">시스템 목록 로드 실패</span> ${e}`;
-    }
+    const { body } = await apiJson('/api/systems');
+    setOptions(sysSel, '시스템 선택', body.systems.map((s) => [s.id, s.name]));
   }
 
   async function populateScreens(systemId) {
     loadedScreen = null;
-    if (!systemId) {
-      scrSel.innerHTML = '<option value="">먼저 시스템 선택</option>';
-      return;
+    if (!systemId) { setOptions(scrSel, '먼저 시스템 선택', []); return; }
+    try {
+      const { body } = await apiJson(`/api/screens?system=${encodeURIComponent(systemId)}`);
+      setOptions(
+        scrSel,
+        body.screens.length ? '화면 선택' : '등록된 화면 없음',
+        body.screens.map((s) => [s.id, `${s.name} (${s.template})`]),
+      );
+    } catch (e) {
+      report(editOut, false, '화면 목록 로드 실패', e.message);
     }
-    const { screens } = await (await fetch(`/api/screens?system=${encodeURIComponent(systemId)}`)).json();
-    scrSel.innerHTML = screens.length
-      ? screens.map((s) => `<option value="${s.id}">${s.name} (${s.template})</option>`).join('')
-      : '<option value="">등록된 화면 없음</option>';
   }
 
   sysSel.addEventListener('change', () => populateScreens(sysSel.value));
 
   window.loadScreen = async () => {
     const id = scrSel.value;
-    if (!id) { editOut.innerHTML = '<span class="bad">화면을 선택하세요</span>'; return; }
+    if (!id) { report(editOut, false, '화면을 선택하세요', ''); return; }
     editOut.textContent = '불러오는 중…';
     try {
-      const r = await fetch(`/api/screens/${encodeURIComponent(id)}`);
-      loadedScreen = await r.json();
-      const cls = r.ok ? 'ok' : 'bad';
-      editOut.innerHTML = `<span class="${cls}">${r.status}</span> GET /api/screens/${id}\n` +
-        `→ ${loadedScreen.name} · shapes ${loadedScreen.shapes?.length ?? 0}개\n\n` +
-        JSON.stringify(loadedScreen, null, 2);
+      const { status, ok, body } = await apiJson(`/api/screens/${encodeURIComponent(id)}`);
+      loadedScreen = body;
+      report(editOut, ok,
+        `${status} GET /api/screens/${id}  →  ${body.name} · shapes ${body.shapes?.length ?? 0}개`,
+        JSON.stringify(body, null, 2));
     } catch (e) {
       loadedScreen = null;
-      editOut.innerHTML = `<span class="bad">실패</span> ${e}`;
+      report(editOut, false, `GET /api/screens/${id}`, e.message);
     }
   };
 
   window.testEditGenerate = async () => {
-    if (!loadedScreen) { editOut.innerHTML = '<span class="bad">먼저 화면을 불러오세요</span>'; return; }
-    const sysName = sysSel.options[sysSel.selectedIndex]?.text;
+    if (!loadedScreen) { report(editOut, false, '먼저 화면을 불러오세요', ''); return; }
     const payload = {
       systemId: loadedScreen.systemId,
-      systemName: sysName,
+      systemName: sysSel.options[sysSel.selectedIndex]?.text,
       mode: 'edit',
       baseScreen: { id: loadedScreen.id, name: loadedScreen.name },
       screenName: loadedScreen.name,
@@ -180,21 +212,32 @@
     };
     editOut.textContent = '요청 중…';
     try {
-      const r = await fetch('/api/generate', {
+      const { status, ok, body } = await apiJson('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const cls = r.ok ? 'ok' : 'bad';
-      editOut.innerHTML = `<span class="${cls}">${r.status}</span> POST /api/generate (mode: edit)\n` +
-        `보낸 payload: ${JSON.stringify(payload).length} bytes\n\n` +
-        JSON.stringify(await r.json(), null, 2);
+      report(editOut, ok,
+        `${status} POST /api/generate (mode: edit) — 보낸 payload ${JSON.stringify(payload).length} bytes`,
+        JSON.stringify(body, null, 2));
     } catch (e) {
-      editOut.innerHTML = `<span class="bad">실패</span> ${e}`;
+      report(editOut, false, 'POST /api/generate (mode: edit)', e.message);
     }
   };
 
-  populateSystems();
+  // 시작 시 서버 확인 — 우리 Express 서버가 아니면 상단 배너로 안내
+  (async () => {
+    const banner = document.getElementById('serverBanner');
+    try {
+      await apiJson('/api/health');
+      await populateSystems();
+    } catch {
+      banner.hidden = false;
+      banner.textContent =
+        '⚠ API 서버에 연결되지 않았습니다. `npm run dev` 로 띄운 http://localhost:3000 에서 이 페이지를 여세요. ' +
+        '(파일 직접 열기 / Live Server 불가. 포트 충돌이면 .env 의 PORT 변경)';
+    }
+  })();
 </script>
 </body>
 </html>
