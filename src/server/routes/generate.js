@@ -37,6 +37,10 @@ router.post('/generate', (req, res) => {
       error: { message: 'payload 가 screen-draft 스키마를 위반했습니다.', details: errors },
     });
   }
+  // 스캐폴딩 개발용 트리거: 보충 설명에 "질문" 이 있으면 needs_input 흐름을 테스트
+  if ((req.body.note || '').includes('질문')) {
+    return res.json({ ...fixture('results/needs-input.json', { status: 'needs_input', questions: [] }) });
+  }
   res.json(mockResult(req.body));
 });
 
@@ -48,7 +52,12 @@ router.post('/refine', (req, res) => {
       error: { message: 'refine 요청이 스키마를 위반했습니다.', details: errors },
     });
   }
-  res.json(mockResult(req.body?.basePayload));
+  const result = mockResult(req.body?.basePayload);
+  result.report = {
+    ...result.report,
+    refinedWith: { answers: req.body?.answers || [], instruction: req.body?.instruction || null },
+  };
+  res.json(result);
 });
 
 export default router;
