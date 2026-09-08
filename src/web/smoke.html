@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Screen Draft — 스캐폴딩</title>
+<style>
+  :root { --or:#F5821F; --nv:#0F3B7C; --line:#E3E6EC; --ink:#141A22; --sub:#6E7787; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Pretendard","맑은 고딕",system-ui,sans-serif; color:var(--ink);
+         background:#EDEFF3; padding:28px; line-height:1.6; }
+  main { max-width:820px; margin:0 auto; background:#fff; border-radius:16px; padding:26px 28px;
+         box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.07); }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; color:#fff; background:var(--or);
+         border-radius:6px; padding:2px 8px; vertical-align:2px; margin-left:6px; }
+  p.lead { color:var(--sub); margin:0 0 20px; font-size:13px; }
+  section { border-top:1px solid var(--line); padding:16px 0; }
+  h2 { font-size:13px; color:var(--sub); margin:0 0 10px; }
+  button { height:34px; padding:0 14px; border-radius:9px; border:1px solid var(--line);
+           background:#fff; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  button.pri { background:var(--nv); border-color:var(--nv); color:#fff; }
+  pre { background:#0E1520; color:#D6DEEA; border-radius:10px; padding:14px 16px; overflow:auto;
+        font-size:12px; line-height:1.7; max-height:340px; }
+  .ok { color:#1a7f37; font-weight:700; } .bad { color:#cf222e; font-weight:700; }
+  ul { margin:6px 0; padding-left:18px; font-size:13px; color:var(--sub); }
+  code { background:#F2F4F7; border-radius:4px; padding:1px 5px; font-size:12px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  label { font-size:12px; color:var(--sub); display:flex; gap:6px; align-items:center; }
+  select { height:34px; border:1px solid var(--line); border-radius:8px; padding:0 8px;
+           font-family:inherit; font-size:13px; background:#fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>AI Screen Draft <span class="tag">API SMOKE</span></h1>
+  <p id="serverBanner" hidden style="background:#FFF0EC;color:#cf222e;border:1px solid #ffc9bd;
+     border-radius:8px;padding:10px 12px;font-size:12px;font-weight:600;margin:0 0 14px;"></p>
+  <p class="lead" style="margin-bottom:6px"><strong>이건 API 스모크 테스트 페이지입니다.</strong>
+     실제 에디터는 <a href="/">/</a> (src/web/index.html).</p>
+  <p class="lead">
+    <code>/api/*</code> 엔드포인트를 백엔드(담당 1) 없이 확인하는 용도입니다.
+    캔버스 에디터는 <a href="/"><code>/</code></a> 에 있습니다.
+  </p>
+
+  <section>
+    <h2>1. 서버 상태</h2>
+    <button onclick="check('/api/health', 'health')">GET /api/health</button>
+    <button onclick="check('/api/systems', 'systems')">GET /api/systems</button>
+    <pre id="metaOut">아직 호출하지 않음</pre>
+  </section>
+
+  <section>
+    <h2>2. 신규화면 — /api/generate mock 응답 (T-1 완료 조건)</h2>
+    <button class="pri" onclick="testGenerate()">테스트 payload 로 생성 요청 (mode: new)</button>
+    <pre id="genOut">아직 호출하지 않음</pre>
+  </section>
+
+  <section>
+    <h2>3. 변경화면 — 시스템/화면 선택 → 불러오기 → 변경 생성</h2>
+    <div class="row">
+      <label>시스템 <select id="sysSel"><option value="">…</option></select></label>
+      <label>화면 <select id="scrSel"><option value="">먼저 시스템 선택</option></select></label>
+      <button onclick="loadScreen()">GET /api/screens/:id (불러오기)</button>
+      <button class="pri" onclick="testEditGenerate()">변경 생성 요청 (mode: edit)</button>
+    </div>
+    <pre id="editOut">아직 호출하지 않음</pre>
+  </section>
+
+  <section>
+    <h2>다음 작업</h2>
+    <ul>
+      <li>담당 1: <code>src/pipeline/*</code>, <code>src/llm/*</code> 구현 (A-2 ~ A-10)</li>
+      <li>담당 2: <code>src/web/</code> 캔버스 에디터 (U-1 ~ U-11)</li>
+      <li>공통: <code>schemas/</code>, <code>fixtures/</code>, <code>catalog/</code> 채우기 (T-2 ~ T-4)</li>
+    </ul>
+  </section>
+</main>
+
+<script type="module">
+  const TEST_PAYLOAD = {
+    systemId: 'portal',
+    systemName: '하이포탈',
+    mode: 'new',
+    template: 'list',
+    screenName: '스캐폴딩 테스트 화면',
+    canvas: { w: 960, h: 600 },
+    shapes: [
+      { type: 'area', x: 30, y: 30, w: 900, h: 70, label: '조회 영역' },
+      { type: 'label', x: 50, y: 54, w: 80, h: 24, label: '조회조건', required: true },
+      { type: 'input', x: 140, y: 52, w: 170, h: 28 },
+      { type: 'button', x: 740, y: 52, w: 80, h: 28, label: '조회' },
+      { type: 'list', x: 30, y: 125, w: 900, h: 300, label: '목록', items: '순번,항목1,항목2' },
+    ],
+  };
+
+  const SERVE_HINT =
+    '응답이 JSON이 아닙니다 (HTML 수신).\n' +
+    '→ 이 페이지는 반드시 `npm run dev` 로 띄운 Express 서버(http://localhost:3000)에서 열어야 합니다.\n' +
+    '  file:// 로 직접 열거나 VS Code Live Server / 다른 정적 서버로 열면 /api/* 가 동작하지 않습니다.\n' +
+    '  포트 충돌 시 .env 의 PORT 를 바꾸고 그 포트로 접속하세요.';
+
+  /** fetch + JSON 파싱. 실패 시 원인을 사람이 읽을 수 있게 던진다. */
+  async function apiJson(url, opts) {
+    let r;
+    try {
+      r = await fetch(url, opts);
+    } catch (e) {
+      throw new Error(`네트워크 실패 (${url}) — 서버가 안 떠 있을 수 있습니다.\n${e}`);
+    }
+    const text = await r.text();
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      throw new Error(`[${r.status}] ${url}\n${SERVE_HINT}\n\n--- 받은 본문 앞부분 ---\n${text.slice(0, 200)}`);
+    }
+    return { status: r.status, ok: r.ok, body: JSON.parse(text) };
+  }
+
+  /** <pre> 에 상태 배지 + 본문을 안전하게(HTML 파싱 없이) 렌더한다. */
+  function report(el, ok, headline, text) {
+    el.textContent = '';
+    const badge = document.createElement('span');
+    badge.className = ok ? 'ok' : 'bad';
+    badge.textContent = ok ? 'OK' : '실패';
+    el.append(badge, document.createTextNode(' ' + headline + '\n\n' + text));
+  }
+
+  window.check = async (url) => {
+    const el = document.getElementById('metaOut');
+    el.textContent = '요청 중…';
+    try {
+      const { status, ok, body } = await apiJson(url);
+      report(el, ok, `${status} ${url}`, JSON.stringify(body, null, 2));
+    } catch (e) {
+      report(el, false, url, e.message);
+    }
+  };
+
+  window.testGenerate = async () => {
+    const el = document.getElementById('genOut');
+    el.textContent = '요청 중…';
+    try {
+      const { status, ok, body } = await apiJson('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(TEST_PAYLOAD),
+      });
+      report(el, ok, `${status} POST /api/generate`, JSON.stringify(body, null, 2));
+    } catch (e) {
+      report(el, false, 'POST /api/generate', e.message);
+    }
+  };
+
+  // ── 3. 변경화면 모드 ────────────────────────────────────────────
+  const sysSel = document.getElementById('sysSel');
+  const scrSel = document.getElementById('scrSel');
+  const editOut = document.getElementById('editOut');
+  let loadedScreen = null; // { id, name, systemId, template, canvas, shapes }
+
+  function setOptions(sel, first, list) {
+    sel.replaceChildren(new Option(first, ''));
+    for (const [value, label] of list) sel.append(new Option(label, value));
+  }
+
+  async function populateSystems() {
+    const { body } = await apiJson('/api/systems');
+    setOptions(sysSel, '시스템 선택', body.systems.map((s) => [s.id, s.name]));
+  }
+
+  async function populateScreens(systemId) {
+    loadedScreen = null;
+    if (!systemId) { setOptions(scrSel, '먼저 시스템 선택', []); return; }
+    try {
+      const { body } = await apiJson(`/api/screens?system=${encodeURIComponent(systemId)}`);
+      setOptions(
+        scrSel,
+        body.screens.length ? '화면 선택' : '등록된 화면 없음',
+        body.screens.map((s) => [s.id, `${s.name} (${s.template})`]),
+      );
+    } catch (e) {
+      report(editOut, false, '화면 목록 로드 실패', e.message);
+    }
+  }
+
+  sysSel.addEventListener('change', () => populateScreens(sysSel.value));
+
+  window.loadScreen = async () => {
+    const id = scrSel.value;
+    if (!id) { report(editOut, false, '화면을 선택하세요', ''); return; }
+    editOut.textContent = '불러오는 중…';
+    try {
+      const { status, ok, body } = await apiJson(`/api/screens/${encodeURIComponent(id)}`);
+      loadedScreen = body;
+      report(editOut, ok,
+        `${status} GET /api/screens/${id}  →  ${body.name} · shapes ${body.shapes?.length ?? 0}개`,
+        JSON.stringify(body, null, 2));
+    } catch (e) {
+      loadedScreen = null;
+      report(editOut, false, `GET /api/screens/${id}`, e.message);
+    }
+  };
+
+  window.testEditGenerate = async () => {
+    if (!loadedScreen) { report(editOut, false, '먼저 화면을 불러오세요', ''); return; }
+    const payload = {
+      systemId: loadedScreen.systemId,
+      systemName: sysSel.options[sysSel.selectedIndex]?.text,
+      mode: 'edit',
+      baseScreen: { id: loadedScreen.id, name: loadedScreen.name },
+      screenName: loadedScreen.name,
+      canvas: loadedScreen.canvas || { w: 960, h: 600 },
+      shapes: loadedScreen.shapes || [],
+    };
+    editOut.textContent = '요청 중…';
+    try {
+      const { status, ok, body } = await apiJson('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      report(editOut, ok,
+        `${status} POST /api/generate (mode: edit) — 보낸 payload ${JSON.stringify(payload).length} bytes`,
+        JSON.stringify(body, null, 2));
+    } catch (e) {
+      report(editOut, false, 'POST /api/generate (mode: edit)', e.message);
+    }
+  };
+
+  // 시작 시 서버 확인 — 우리 Express 서버가 아니면 상단 배너로 안내
+  (async () => {
+    const banner = document.getElementById('serverBanner');
+    try {
+      await apiJson('/api/health');
+      await populateSystems();
+    } catch {
+      banner.hidden = false;
+      banner.textContent =
+        '⚠ API 서버에 연결되지 않았습니다. `npm run dev` 로 띄운 http://localhost:3000 에서 이 페이지를 여세요. ' +
+        '(파일 직접 열기 / Live Server 불가. 포트 충돌이면 .env 의 PORT 변경)';
+    }
+  })();
+</script>
+</body>
+</html>

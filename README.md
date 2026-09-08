@@ -20,17 +20,20 @@ npm run dev
 
 `npm run dev` 는 `node --watch` 로 서버를 띄우고 파일 변경 시 자동 재시작한다.
 
-## 현재 상태 (스캐폴딩)
+## 현재 상태
 
 동작:
 - Express 서버 + 정적 서빙
+- **캔버스 에디터** (`/`) — 배치/이동/리사이즈/스냅/undo·redo/줌/컨텍스트 툴바/단축키,
+  신규·변경 모드, 시스템·화면 콤보박스, "화면 생성" → 결과 모달 3탭. localStorage 임시저장.
+- API 스모크 페이지 (`/smoke.html`) — `/api/*` 를 백엔드 없이 확인
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` mock
 - 생성 API: `POST /api/generate`, `POST /api/refine` — **스키마 검증은 실제**, 결과는 `fixtures/results` mock
 
 미구현 (다음 작업):
 - `src/pipeline/*` (Stage A/B, autofix, 결정론적 변환기) — 담당 1
 - `src/llm/*` (Claude/OpenAI provider) — 담당 1
-- `src/web/` 캔버스 에디터 — 담당 2 (샘플 프로토타입 계승)
+- 에디터 잔여 항목: 첨부 실제 업로드(U-11), 질문 응답 UI(U-9), 유형별 보드 크기(U-12)
 
 ## 구조
 
@@ -40,7 +43,10 @@ src/
   pipeline/  Stage A/B, autofix, deterministic (담당 1) — 현재 stub
   llm/       provider 추상화 (담당 1) — 현재 stub
   shared/    스키마 검증, 상수, 경로 유틸 (공통)
-  web/       에디터 (담당 2) — 현재 스캐폴딩 placeholder
+  web/       캔버스 에디터 (담당 2)
+    index.html, styles.css
+    js/ main.js · editor.js · combobox.js · templates.js · result-modal.js · api.js · constants.js
+    smoke.html  API 스모크 테스트
 schemas/     화면정의 payload / 생성결과 / 수정요청 / IR  (공통 계약)
 fixtures/    mock 데이터 (systems, screens, payloads, results)
 catalog/     사내 UI 표준 (components, tokens, layout-guide, websquare 매핑)
