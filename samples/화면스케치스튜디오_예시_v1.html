@@ -51,6 +51,28 @@ h4:first-child{margin-top:0;}
          color:var(--sub);border-radius:8px;cursor:pointer;transition:.12s;}
 .seg div.on{background:#fff;color:var(--nv);box-shadow:0 1px 3px rgba(16,24,40,.12);}
 
+.cbox{position:relative;}
+.cbin{width:100%;height:36px;border:1px solid var(--line);border-radius:10px;background:#fff;
+      padding:0 32px 0 11px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink);
+      cursor:pointer;outline:none;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cbin:hover{border-color:#D2D7E0;}
+.cbox.open .cbin,.cbin:focus{border-color:var(--or);}
+.cbin.empty{color:var(--mut);font-weight:500;}
+.cbox::after{content:"▾";position:absolute;right:11px;top:50%;transform:translateY(-50%);
+             color:#8E98A6;font-size:12px;pointer-events:none;}
+.cbpop{position:fixed;background:#fff;border:1px solid var(--line);
+       border-radius:12px;box-shadow:0 8px 28px rgba(16,24,40,.16);z-index:50;padding:7px;display:none;}
+.cbox.open .cbpop{display:block;}
+.cbsearch{width:100%;height:32px;border:1px solid var(--line);border-radius:8px;padding:0 10px;
+          font-family:inherit;font-size:12.5px;outline:none;margin-bottom:6px;}
+.cbsearch:focus{border-color:var(--or);}
+.cblist{max-height:210px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+.cbitem{padding:8px 9px;border-radius:8px;cursor:pointer;font-size:12.5px;color:#3C4655;}
+.cbitem:hover,.cbitem.hl{background:var(--or-l);color:var(--or-d);}
+.cbitem.on{background:var(--nv-l);color:var(--nv);font-weight:700;}
+.cbitem .sub{display:block;font-size:11px;color:var(--mut);font-weight:400;margin-top:1px;}
+.cbempty{padding:14px 9px;text-align:center;color:var(--mut);font-size:11.5px;}
+
 .tpls{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
 .tpl{border:2px solid var(--line);border-radius:12px;padding:9px;cursor:pointer;background:#fff;transition:.12s;}
 .tpl:hover{border-color:#C6CDD8;}
@@ -202,22 +224,44 @@ textarea:focus{border-color:var(--or);}
   <div class="pane">
     <div class="pbd">
       <h4>어느 시스템인가요?</h4>
-      <div class="seg" id="sysSeg">
-        <div class="on" data-sys="portal">하이포탈</div>
-        <div data-sys="hicall">하이콜</div>
+      <div class="cbox" id="sysBox">
+        <button type="button" class="cbin empty">시스템 선택</button>
+        <div class="cbpop">
+          <input class="cbsearch" placeholder="시스템 검색">
+          <div class="cblist"></div>
+        </div>
       </div>
 
-      <h4>어떤 화면인가요?</h4>
-      <div class="tpls" id="tpls">
-        <div class="tpl on" data-tpl="list"><div class="wf"><i class="q"></i><i class="h"></i>
-          <div class="g"><i></i><i></i><i></i></div><div class="g"><i></i><i></i><i></i></div></div>
-          <div class="nm">목록 조회</div></div>
-        <div class="tpl" data-tpl="detail"><div class="wf"><i class="h"></i><i class="m"></i><i></i><i class="q"></i></div>
-          <div class="nm">상세 조회</div></div>
-        <div class="tpl" data-tpl="form"><div class="wf"><i class="h"></i><i class="m"></i><i class="m"></i><i class="q"></i></div>
-          <div class="nm">등록 · 수정</div></div>
-        <div class="tpl" data-tpl="popup"><div class="wf" style="padding:8px 10px"><i class="h"></i><i></i><i class="m"></i></div>
-          <div class="nm">팝업</div></div>
+      <h4>어떤 작업인가요?</h4>
+      <div class="seg" id="modeSeg">
+        <div class="on" data-mode="new">신규 화면</div>
+        <div data-mode="edit">변경 화면</div>
+      </div>
+
+      <div id="newBlock">
+        <h4>어떤 화면인가요?</h4>
+        <div class="tpls" id="tpls">
+          <div class="tpl on" data-tpl="list"><div class="wf"><i class="q"></i><i class="h"></i>
+            <div class="g"><i></i><i></i><i></i></div><div class="g"><i></i><i></i><i></i></div></div>
+            <div class="nm">목록 조회</div></div>
+          <div class="tpl" data-tpl="detail"><div class="wf"><i class="h"></i><i class="m"></i><i></i><i class="q"></i></div>
+            <div class="nm">상세 조회</div></div>
+          <div class="tpl" data-tpl="form"><div class="wf"><i class="h"></i><i class="m"></i><i class="m"></i><i class="q"></i></div>
+            <div class="nm">등록 · 수정</div></div>
+          <div class="tpl" data-tpl="popup"><div class="wf" style="padding:8px 10px"><i class="h"></i><i></i><i class="m"></i></div>
+            <div class="nm">팝업</div></div>
+        </div>
+      </div>
+
+      <div id="editBlock" class="hidden">
+        <h4>어떤 화면을 변경하나요?</h4>
+        <div class="cbox" id="scrBox">
+          <button type="button" class="cbin empty">먼저 시스템을 선택하세요</button>
+          <div class="cbpop">
+            <input class="cbsearch" placeholder="화면명 검색">
+            <div class="cblist"></div>
+          </div>
+        </div>
       </div>
 
       <h4>요소 추가 <span style="font-weight:400;color:var(--mut);font-size:11px">클릭하면 놓입니다</span></h4>
@@ -440,8 +484,118 @@ document.addEventListener('keydown',e=>{
 window.addEventListener('resize',placeCtx);
 document.getElementById('cv').addEventListener('scroll',placeCtx);
 
-document.querySelectorAll('#sysSeg div').forEach(el=>el.onclick=()=>{
-  document.querySelectorAll('#sysSeg div').forEach(x=>x.classList.remove('on'));el.classList.add('on');});
+/* ── 시스템 · 변경화면 목록 (프로토타입 mock. 실제로는 /api/systems, /api/screens) ── */
+const SYSTEMS=[
+  {id:'portal',name:'하이포탈',sub:'영업 포탈'},
+  {id:'hicall',name:'하이콜',sub:'컨택센터'},
+  {id:'hiclaim',name:'하이클레임',sub:'보상 처리'},
+  {id:'hicontract',name:'하이계약',sub:'계약 관리'},
+  {id:'hipay',name:'하이페이',sub:'수납 · 정산'},
+  {id:'hiadmin',name:'하이어드민',sub:'관리자'},
+  {id:'hireport',name:'하이리포트',sub:'통계 · 리포트'},
+  {id:'himobile',name:'하이모바일',sub:'모바일 창구'}
+];
+const SCREENS={
+  portal:[
+    {id:'SCR-P-001938',name:'지정대리인 등록',tpl:'form'},
+    {id:'SCR-P-002104',name:'계약자 조회',tpl:'list'},
+    {id:'SCR-P-002311',name:'보험료 납입내역 상세',tpl:'detail'},
+    {id:'SCR-P-002890',name:'수익자 변경 신청',tpl:'form'}
+  ],
+  hicall:[
+    {id:'SCR-C-000512',name:'상담 이력 조회',tpl:'list'},
+    {id:'SCR-C-000778',name:'고객 정보 팝업',tpl:'popup'},
+    {id:'SCR-C-000934',name:'콜 배정 현황',tpl:'list'}
+  ],
+  hiclaim:[
+    {id:'SCR-L-001220',name:'사고 접수 등록',tpl:'form'},
+    {id:'SCR-L-001355',name:'지급 심사 상세',tpl:'detail'}
+  ],
+  hicontract:[{id:'SCR-T-004001',name:'계약 변경 이력',tpl:'list'}],
+  hipay:[{id:'SCR-Y-006200',name:'수납 대사 현황',tpl:'list'}],
+  hiadmin:[{id:'SCR-A-009100',name:'사용자 권한 관리',tpl:'form'}],
+  hireport:[{id:'SCR-R-003300',name:'월 실적 리포트',tpl:'detail'}],
+  himobile:[{id:'SCR-M-007700',name:'모바일 청약 조회',tpl:'popup'}]
+};
+
+/* ── 재사용 콤보박스 ── */
+function makeCombo(rootId,opts){
+  const root=document.getElementById(rootId);
+  const btn=root.querySelector('.cbin'), pop=root.querySelector('.cbpop'),
+        search=root.querySelector('.cbsearch'), list=root.querySelector('.cblist');
+  let items=[], value=null, hl=-1;
+  function place(){
+    const r=btn.getBoundingClientRect();
+    pop.style.left=r.left+'px';pop.style.width=r.width+'px';
+    const below=window.innerHeight-r.bottom;
+    if(below<260&&r.top>below){pop.style.top='auto';pop.style.bottom=(window.innerHeight-r.top+5)+'px';}
+    else{pop.style.bottom='auto';pop.style.top=(r.bottom+5)+'px';}
+  }
+  function open(){root.classList.add('open');place();search.value='';draw('');setTimeout(()=>search.focus(),0);}
+  function close(){root.classList.remove('open');hl=-1;}
+  function draw(q){
+    const f=items.filter(it=>!q||it.name.toLowerCase().includes(q.toLowerCase())||(it.sub||'').toLowerCase().includes(q.toLowerCase()));
+    list.innerHTML=f.length?f.map((it,i)=>
+      `<div class="cbitem${it.id===value?' on':''}${i===hl?' hl':''}" data-id="${it.id}">${it.name}`
+      +(it.sub?`<span class="sub">${it.sub}</span>`:'')+`</div>`).join('')
+      : `<div class="cbempty">${opts.emptyText||'결과가 없습니다'}</div>`;
+    list.querySelectorAll('.cbitem').forEach(el=>el.onclick=()=>pick(el.dataset.id));
+    root._filtered=f;
+  }
+  function pick(id){
+    value=id;const it=items.find(x=>x.id===id);
+    btn.textContent=it?it.name:(opts.placeholder||'선택');
+    btn.classList.toggle('empty',!it);
+    close();opts.onPick&&opts.onPick(it||null);
+  }
+  btn.onclick=()=>root.classList.contains('open')?close():open();
+  search.oninput=()=>{hl=-1;draw(search.value);};
+  search.onkeydown=e=>{
+    const f=root._filtered||[];
+    if(e.key==='ArrowDown'){e.preventDefault();hl=Math.min(f.length-1,hl+1);draw(search.value);}
+    else if(e.key==='ArrowUp'){e.preventDefault();hl=Math.max(0,hl-1);draw(search.value);}
+    else if(e.key==='Enter'){e.preventDefault();if(f[hl])pick(f[hl].id);}
+    else if(e.key==='Escape')close();
+  };
+  document.addEventListener('mousedown',e=>{if(!root.contains(e.target)&&!pop.contains(e.target))close();});
+  document.querySelector('.pbd').addEventListener('scroll',close);
+  window.addEventListener('resize',close);
+  return {
+    setItems(arr){items=arr;value=null;draw('');},
+    setPlaceholder(t){if(!value){btn.textContent=t;btn.classList.add('empty');}},
+    choose(id){pick(id);},
+    get(){return items.find(x=>x.id===value)||null;},
+    reset(){value=null;btn.textContent=opts.placeholder||'선택';btn.classList.add('empty');draw('');}
+  };
+}
+
+const sysCombo=makeCombo('sysBox',{placeholder:'시스템 선택',emptyText:'시스템이 없습니다',
+  onPick:sys=>{
+    scrCombo.setItems(sys?(SCREENS[sys.id]||[]):[]);
+    scrCombo.setPlaceholder(sys?'화면 선택':'먼저 시스템을 선택하세요');
+  }});
+const scrCombo=makeCombo('scrBox',{placeholder:'화면 선택',emptyText:'해당 시스템에 등록된 화면이 없습니다',
+  onPick:scr=>{ if(scr) loadScreen(scr); }});
+sysCombo.setItems(SYSTEMS);
+scrCombo.setItems([]);
+sysCombo.choose('portal');   // 데모 기본값
+
+/* ── 작업 구분 (신규 / 변경) ── */
+let workMode='new';
+document.querySelectorAll('#modeSeg div').forEach(el=>el.onclick=()=>{
+  document.querySelectorAll('#modeSeg div').forEach(x=>x.classList.remove('on'));el.classList.add('on');
+  workMode=el.dataset.mode;
+  document.getElementById('newBlock').classList.toggle('hidden',workMode!=='new');
+  document.getElementById('editBlock').classList.toggle('hidden',workMode!=='edit');
+});
+
+function loadScreen(scr){
+  if(shapes.length&&!confirm('선택한 화면을 불러오면 지금 그린 내용이 사라집니다. 계속할까요?'))return;
+  loadTpl(scr.tpl);
+  scrNm.value=scr.name;
+  document.getElementById('abL').innerHTML=scr.name+' <span>960 × 600</span>';
+}
+
 document.querySelectorAll('.tpl').forEach(el=>el.onclick=()=>{
   if(shapes.length&&!confirm('화면 종류를 바꾸면 지금 그린 내용이 사라집니다. 계속할까요?'))return;
   document.querySelectorAll('.tpl').forEach(x=>x.classList.remove('on'));el.classList.add('on');
@@ -507,13 +661,18 @@ function loadSample(){
   uid=30;select(null);
 }
 
-function payload(){return{
-  system:document.querySelector('#sysSeg .on').dataset.sys,
-  template:document.querySelector('.tpl.on').dataset.tpl,
-  screenName:scrNm.value,note:document.getElementById('prompt').value||undefined,
-  attachments:files.length?files:undefined,canvas:{w:BW,h:BH},
-  shapes:shapes.map(s=>({type:s.t,x:s.x,y:s.y,w:s.w,h:s.h,label:s.label||undefined,
-    items:s.cols||undefined,required:s.req||undefined}))};}
+function payload(){
+  const sys=sysCombo.get(), scr=scrCombo.get();
+  return{
+    systemId:sys?sys.id:undefined,
+    systemName:sys?sys.name:undefined,
+    mode:workMode,
+    template:workMode==='new'?(document.querySelector('.tpl.on')||{}).dataset?.tpl:undefined,
+    baseScreen:workMode==='edit'&&scr?{id:scr.id,name:scr.name}:undefined,
+    screenName:scrNm.value,note:document.getElementById('prompt').value||undefined,
+    attachments:files.length?files:undefined,canvas:{w:BW,h:BH},
+    shapes:shapes.map(s=>({type:s.t,x:s.x,y:s.y,w:s.w,h:s.h,label:s.label||undefined,
+      items:s.cols||undefined,required:s.req||undefined}))};}
 let OUT={};
 function closeM(){document.getElementById('mask').classList.remove('on');}
 document.querySelectorAll('.mtab').forEach(t=>t.onclick=()=>{
