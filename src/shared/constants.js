@@ -1,11 +1,11 @@
 /** 캔버스 팔레트 요소 타입. (src/web/js/constants.js 의 COMPS 와 일치해야 함) */
 export const SHAPE_TYPES = [
   'title', 'label', 'input', 'select', 'radio', 'date', 'check', 'text', 'file',
-  'list', 'pager', 'tab', 'image', 'button', 'buttongroup', 'divider', 'area',
+  'list', 'pager', 'tab', 'image', 'button', 'divider', 'area',
 ];
 
 /** 요소가 items(쉼표 구분 목록)를 갖는 타입. */
-export const HAS_ITEMS = ['list', 'select', 'radio', 'tab', 'buttongroup'];
+export const HAS_ITEMS = ['list', 'select', 'radio', 'tab'];
 
 /** 작업 구분. */
 export const WORK_MODES = ['new', 'edit'];
@@ -27,7 +27,6 @@ export const WEBSQUARE_TAG = {
   tab: 'w2:tabControl',
   image: 'w2:image',
   button: 'w2:trigger',
-  buttongroup: 'w2:trigger', // 여러 개
   divider: 'w2:group', // 스타일상의 선 — group 으로 대체
   label: 'w2:textbox',
   title: 'w2:textbox',

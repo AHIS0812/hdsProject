@@ -13,7 +13,6 @@
     { "componentKey": "std.tab", "name": "탭", "websquare": "w2:tabControl", "params": ["id", "tabItems"], "snippet": "snippets/tab.html" },
     { "componentKey": "std.image", "name": "이미지", "websquare": "w2:image", "params": ["id", "alt"], "snippet": "snippets/image.html" },
     { "componentKey": "std.button", "name": "버튼", "websquare": "w2:trigger", "params": ["id", "value", "onclick"], "snippet": "snippets/button.html" },
-    { "componentKey": "std.buttongroup", "name": "버튼그룹", "websquare": "w2:trigger", "params": ["id", "values"], "snippet": "snippets/buttongroup.html" },
     { "componentKey": "std.divider", "name": "구분선", "websquare": "w2:group", "params": ["id", "class"], "snippet": "snippets/divider.html" },
     { "componentKey": "std.label", "name": "글자", "websquare": "w2:textbox", "params": ["id", "value"], "snippet": "snippets/label.html" },
     { "componentKey": "std.section", "name": "섹션 제목", "websquare": "w2:textbox", "params": ["id", "value"], "snippet": "snippets/section.html" },

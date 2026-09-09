@@ -70,7 +70,7 @@
         "type": {
           "enum": [
             "title", "label", "input", "select", "radio", "date", "check", "text", "file",
-            "list", "pager", "tab", "image", "button", "buttongroup", "divider", "area"
+            "list", "pager", "tab", "image", "button", "divider", "area"
           ]
         },
         "x": { "type": "number" },

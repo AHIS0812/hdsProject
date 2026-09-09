@@ -13,7 +13,6 @@
     "tab":         { "tag": "w2:tabControl", "attrs": { "id": "tab{n}" }, "tabItemTag": "w2:tabItem", "items": "{items}" },
     "image":       { "tag": "w2:image",     "attrs": { "id": "img{n}", "alt": "{label}" } },
     "button":      { "tag": "w2:trigger",   "attrs": { "id": "btn{n}", "value": "{label}", "onclick": "fn_{n}" } },
-    "buttongroup": { "tag": "w2:trigger",   "repeatPerItem": true, "attrs": { "id": "btn{n}_{i}", "value": "{item}", "onclick": "fn_{n}_{i}" } },
     "divider":     { "tag": "w2:group",     "attrs": { "id": "hr{n}", "class": "w2group_divider" } },
     "label":       { "tag": "w2:textbox",   "attrs": { "id": "lbl{n}", "value": "{label}" } },
     "title":       { "tag": "w2:textbox",   "attrs": { "id": "ttl{n}", "value": "{label}" } },

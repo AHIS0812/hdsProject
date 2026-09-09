@@ -152,9 +152,6 @@ textarea:focus{border-color:var(--or);}
 .sh[data-t=image]{border-style:dashed;border-color:#C7CFDA;background:#FAFBFD;color:#AEB7C4;font-size:11px;}
 .sh[data-t=pager]{border:none;background:none;justify-content:flex-end;color:#8E98A6;font-size:12px;letter-spacing:3px;}
 .sh[data-t=pager]::after{content:"‹ 1 2 3 ›";}
-.sh[data-t=buttongroup]{background:none;border:none;justify-content:flex-start;gap:4px;padding:0;color:#fff;}
-.sh[data-t=buttongroup]::before{content:"버튼그룹";display:flex;align-items:center;justify-content:center;
-                                height:100%;padding:0 14px;background:var(--nv);border-radius:5px;font-weight:700;font-size:11px;}
 .sh[data-t=divider]{border:none;background:none;padding:0;overflow:visible;}
 .sh[data-t=divider]::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:#C7CFDA;}
 
