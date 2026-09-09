@@ -101,6 +101,9 @@ document.querySelector('.tools').addEventListener('click', (e) => {
 function applyMode() {
   $('newBlock').classList.toggle('hidden', workMode !== 'new');
   $('editBlock').classList.toggle('hidden', workMode !== 'edit');
+  // 신규: 화면 이름 직접 입력 / 변경: 불러온 화면 이름 고정
+  scrNm.readOnly = workMode === 'edit';
+  scrNm.title = workMode === 'edit' ? '변경 모드에서는 화면 이름을 바꿀 수 없습니다' : '화면 이름 (클릭해서 수정)';
 }
 document.querySelectorAll('#modeSeg div').forEach((el) => {
   el.addEventListener('click', () => {
@@ -344,6 +347,7 @@ async function boot() {
   initResultModal();
 
   const restored = restore();
+  applyMode();
   if (!restored) {
     // 최초 실행: 선택된 유형(목록조회)의 프리셋을 올려 타일 ↔ 캔버스 상태를 맞춘다
     loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
