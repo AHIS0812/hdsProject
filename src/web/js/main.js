@@ -84,7 +84,8 @@ const TOOL = {
 };
 document.querySelector('.tools').addEventListener('click', (e) => {
   const act = e.target.closest('button')?.dataset.act;
-  TOOL[act]?.();
+  if (!act || !TOOL[act]) return;
+  TOOL[act]();
   autosave();
 });
 
@@ -437,11 +438,20 @@ function payload() {
   return p;
 }
 
+/** 생성 요청 직전 캔버스 모습 스냅샷 (결과 모달의 "내 스케치" 비교용) */
+function snapshotSketch() {
+  const { w, h } = editor.getBoardSize();
+  const clone = $('board').cloneNode(true);
+  clone.querySelectorAll('.hh,.gd,.marq,#hint,.coach').forEach((e) => e.remove());
+  clone.querySelectorAll('.sh.sel').forEach((e) => e.classList.remove('sel'));
+  return { html: clone.innerHTML, w, h };
+}
+
 function build() {
   if (!editor.count()) { toast('먼저 화면 요소를 배치해주세요'); return; }
   if (!sysCombo.get()) { toast('시스템을 선택해주세요'); return; }
   if (workMode === 'edit' && !scrCombo.get()) { toast('변경할 화면을 선택해주세요'); return; }
-  runBuild(payload(), scrNm.value || '생성 결과');
+  runBuild(payload(), scrNm.value || '생성 결과', snapshotSketch());
 }
 
 // ── 임시저장 (localStorage) ───────────────────────────────
@@ -502,10 +512,36 @@ function restore() {
   return { systemId: saved.systemId };
 }
 
+// ── 온보딩 코치 / 단축키 도움말 ──────────────────────────
+function initHelp() {
+  const helpPop = $('helpPop');
+  const toggleHelp = () => { helpPop.hidden = !helpPop.hidden; };
+  $('btnHelp').addEventListener('click', toggleHelp);
+  $('helpClose').addEventListener('click', () => { helpPop.hidden = true; });
+  document.addEventListener('mousedown', (e) => {
+    if (!helpPop.hidden && !helpPop.contains(e.target) && e.target.id !== 'btnHelp') helpPop.hidden = true;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (e.key === '?') { e.preventDefault(); toggleHelp(); }
+    else if (e.key === 'Escape' && !helpPop.hidden) helpPop.hidden = true;
+  });
+
+  let seen = false;
+  try { seen = !!localStorage.getItem('hds:coachDone'); } catch { /* 무시 */ }
+  const coach = $('coach');
+  if (!seen) coach.hidden = false;
+  $('coachOk').addEventListener('click', () => {
+    coach.hidden = true;
+    try { localStorage.setItem('hds:coachDone', '1'); } catch { /* 무시 */ }
+  });
+}
+
 // ── 부팅 ─────────────────────────────────────────────────
 async function boot() {
   editor.initEditor({ onChange: () => { canvasDirty = true; autosave(); } });
   initResultModal();
+  initHelp();
 
   const restored = restore();
   applyMode();

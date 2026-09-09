@@ -10,8 +10,10 @@ const $ = (id) => document.getElementById(id);
 const STEPS = ['배치된 요소 해석', '보충 설명 · 첨부 파일 반영', '사내 표준 컴포넌트 치환', 'WebSquare XML 변환 및 검증'];
 
 // last.payload = 최초 생성 payload, last.result = 가장 최근 결과 (generate/refine 공통)
-let last = { payload: null, result: null };
+// last.sketch = 생성 요청 시점의 캔버스 스냅샷 { html, w, h } — "내 스케치" 비교용
+let last = { payload: null, result: null, sketch: null };
 let currentTab = 'v';
+let viewMode = 'after';   // 화면 탭 보기: after | sketch | split
 
 const mask = () => $('mask');
 const mbody = () => $('mbody');
@@ -68,13 +70,24 @@ function renderTab(p) {
     b.replaceChildren(pre);
     return;
   }
-  if (r.status === 'needs_input') {
+  if (r.status === 'needs_input' && viewMode !== 'sketch') {
     const pre = document.createElement('pre');
     pre.textContent = '아래 질문에 답하면 반영해서 다시 생성합니다.';
     b.replaceChildren(pre);
     return;
   }
   const html = r.preview?.html;
+
+  if (viewMode === 'sketch') {
+    b.replaceChildren();
+    if (last.sketch) mountSketch(b);
+    else b.innerHTML = '<pre>(스케치 없음)</pre>';
+    return;
+  }
+  if (viewMode === 'split' && last.sketch) {
+    b.replaceChildren(buildCompare(html));
+    return;
+  }
   if (!html) {
     b.innerHTML = '<pre>(preview HTML 없음)</pre>';
     return;
@@ -84,11 +97,66 @@ function renderTab(p) {
   b.replaceChildren(frame);
 }
 
+/** 스케치 스냅샷을 컨테이너 폭에 맞춰 축소해 붙인다 */
+function mountSketch(host) {
+  const { html, w, h } = last.sketch;
+  const wrap = document.createElement('div');
+  wrap.className = 'sketchwrap';
+  const inner = document.createElement('div');
+  inner.className = 'sketchscale';
+  inner.style.cssText = `width:${w}px;height:${h}px;background:#fff`;
+  inner.innerHTML = html;
+  wrap.append(inner);
+  host.append(wrap);
+  requestAnimationFrame(() => {
+    const r = wrap.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const k = Math.min((r.width - 4) / w, (r.height - 4) / h, 1);
+    inner.style.transform = `scale(${k})`;
+  });
+}
+
+/** 내 스케치 ↔ 생성 결과 나란히 */
+function buildCompare(html) {
+  const box = document.createElement('div');
+  box.className = 'mcompare';
+  const mk = (caption, fill) => {
+    const fig = document.createElement('figure');
+    const cap = document.createElement('figcaption');
+    cap.textContent = caption;
+    const pane = document.createElement('div');
+    pane.className = 'pane-box';
+    fill(pane);
+    fig.append(cap, pane);
+    return fig;
+  };
+  box.append(
+    mk('내 스케치', (pane) => mountSketch(pane)),
+    mk('생성 결과', (pane) => {
+      if (html) {
+        const fr = document.createElement('iframe');
+        fr.srcdoc = html;
+        pane.append(fr);
+      } else {
+        pane.innerHTML = '<pre>(preview HTML 없음)</pre>';
+      }
+    }),
+  );
+  return box;
+}
+
+function updateViewBar(p = currentTab) {
+  $('mView').hidden = !(p === 'v' && !!last.sketch);
+  [...$('mSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.v === viewMode));
+}
+
 function setTab(p) {
   currentTab = p;
   document.querySelectorAll('.mtab').forEach((x) => x.classList.toggle('on', x.dataset.p === p));
+  updateViewBar(p);
   renderTab(p);
-  const canCopy = p === 'v' ? !!last.result?.preview?.html : !!textForTab(p);
+  const hasPreview = !!last.result?.preview?.html;
+  const canCopy = p === 'v' ? (hasPreview && viewMode !== 'sketch') : !!textForTab(p);
   $('mCopy').hidden = !canCopy;
   $('mCopy').textContent = p === 'v' ? '이미지 복사' : '복사';
 }
@@ -273,9 +341,10 @@ async function doRefine() {
 
   const stop = showProgress('수정 내용 반영');
   mfoot().hidden = true;
+  $('mView').hidden = true;
   try {
     const result = await api.refine(req);
-    last = { payload: last.payload, result };
+    last = { payload: last.payload, result, sketch: last.sketch };
     $('mInstruction').value = '';
     stop();
     refreshFoot();
@@ -306,17 +375,20 @@ function download() {
 /**
  * @param {object} payload  화면정의 payload
  * @param {string} title    모달 제목
+ * @param {{html:string,w:number,h:number}} [sketch]  생성 요청 시점 캔버스 스냅샷
  */
-export async function runBuild(payload, title) {
+export async function runBuild(payload, title, sketch = null) {
   $('mTitle').textContent = title;
   $('mInstruction').value = '';
+  viewMode = 'after';
   mask().classList.add('on');
   mfoot().hidden = true;
+  $('mView').hidden = true;
   document.querySelectorAll('.mtab').forEach((x) => x.classList.toggle('on', x.dataset.p === 'v'));
   const stop = showProgress();
   try {
     const result = await api.generate(payload);
-    last = { payload, result };
+    last = { payload, result, sketch };
     stop();
     refreshFoot();
     setTab('v');
@@ -337,5 +409,11 @@ export function initResultModal() {
   $('mRefine').addEventListener('click', doRefine);
   $('mInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') doRefine(); });
   document.querySelectorAll('.mtab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.p)));
+  $('mSeg').addEventListener('click', (e) => {
+    const v = e.target.closest('button')?.dataset.v;
+    if (!v || v === viewMode) return;
+    viewMode = v;
+    setTab('v');
+  });
   mask().addEventListener('mousedown', (e) => { if (e.target === mask()) closeModal(); });
 }

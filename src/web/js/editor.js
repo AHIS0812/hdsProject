@@ -1,22 +1,23 @@
 // 캔버스 에디터 엔진 — 배치 / 이동 / 8방향 리사이즈 / 정렬 스냅 / 히스토리 / 줌 /
-// 플로팅 컨텍스트 툴바 / 단축키. 예시 프로토타입의 로직을 그대로 계승.
+// 다중 선택(Shift·드래그) / 정렬·분배 / 플로팅 컨텍스트 툴바 / 단축키.
 // 개발지시서 U-2 ~ U-5.
 
 import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, defaultLabel, defaultCols } from './constants.js';
 
-let board, ctx, hint, ctxT, fL, fC, bReq, bU, bR, zv, cv;
+let board, ctx, hint, ctxT, fL, fC, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl;
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
 let BOARD_W = DEFAULT_BOARD.w;
 let BOARD_H = DEFAULT_BOARD.h;
 let shapes = [];
-let sel = null;
+let selIds = [];          // 선택된 요소 id 목록 (다중 선택)
 let hist = [];
 let future = [];
 let uid = 1;
 let zm = 100;
-let clip = null;
+let clip = null;          // 복사 버퍼 (배열)
 let move = null;
 let rs = null;
+let marq = null;          // 드래그 선택 사각형 상태
 let notify = () => {};
 
 const pt = (e) => {
@@ -25,12 +26,15 @@ const pt = (e) => {
   return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k };
 };
 const find = (id) => shapes.find((s) => s.id === id);
+const isSel = (id) => selIds.includes(id);
+const selShapes = () => selIds.map(find).filter(Boolean);
 
 function render() {
   board.querySelectorAll('.sh').forEach((e) => e.remove());
+  const single = selIds.length === 1 ? selIds[0] : null;
   shapes.forEach((s) => {
     const d = document.createElement('div');
-    d.className = 'sh' + (sel === s.id ? ' sel' : '');
+    d.className = 'sh' + (isSel(s.id) ? ' sel' : '');
     d.dataset.t = s.t;
     d.dataset.id = s.id;
     Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
@@ -43,12 +47,18 @@ function render() {
         rs = { id: s.id, d: ev.target.dataset.d, ox: s.x, oy: s.y, ow: s.w, oh: s.h, px: p.x, py: p.y };
         return;
       }
-      select(s.id);
+      if (ev.shiftKey) { toggleSel(s.id); return; }
+      if (!isSel(s.id)) setSel([s.id]);
       push();
       const p = pt(ev);
-      move = { id: s.id, dx: p.x - s.x, dy: p.y - s.y };
+      if (selIds.length === 1) {
+        move = { single: true, id: s.id, dx: p.x - s.x, dy: p.y - s.y };
+      } else {
+        move = { single: false, sx: p.x, sy: p.y, orig: {} };
+        selShapes().forEach((o) => { move.orig[o.id] = { x: o.x, y: o.y }; });
+      }
     };
-    if (sel === s.id) {
+    if (single === s.id) {
       ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach((dir) => {
         const h = document.createElement('div');
         h.className = 'hh';
@@ -68,6 +78,10 @@ function render() {
 function quick(s) {
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) Object.assign(el.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
+}
+
+function paintSel() {
+  board.querySelectorAll('.sh').forEach((el) => el.classList.toggle('sel', isSel(+el.dataset.id)));
 }
 
 function guides(s) {
@@ -99,35 +113,52 @@ function line(dir, p) {
   board.appendChild(g);
 }
 
-function select(id) {
-  sel = id;
+// ── 선택 ─────────────────────────────────────────────────
+function setSel(ids) {
+  selIds = [...new Set(ids)].filter((id) => find(id));
   render();
-  const s = find(id);
-  ctx.classList.toggle('on', !!s);
-  if (!s) return;
-  ctxT.textContent = NAME[s.t];
-  fL.value = s.label;
-  fC.value = s.cols;
-  fC.classList.toggle('hidden', !HAS_ITEMS[s.t]);
-  bReq.classList.toggle('on', s.req);
+  syncCtx();
+}
+function toggleSel(id) {
+  setSel(isSel(id) ? selIds.filter((x) => x !== id) : [...selIds, id]);
+}
+
+function syncCtx() {
+  const n = selIds.length;
+  ctx.classList.toggle('on', n > 0);
+  const multi = n > 1;
+  ctxSingle.hidden = multi;
+  ctxAlign.hidden = !multi;
+  if (n === 1) {
+    const s = find(selIds[0]);
+    ctxT.textContent = NAME[s.t];
+    fL.value = s.label;
+    fC.value = s.cols;
+    fC.classList.toggle('hidden', !HAS_ITEMS[s.t]);
+    bReq.classList.toggle('on', s.req);
+  }
   placeCtx();
 }
 
 function placeCtx() {
-  const s = find(sel);
-  if (!s) { ctx.classList.remove('on'); return; }
+  const ss = selShapes();
+  if (!ss.length) { ctx.classList.remove('on'); return; }
+  const minX = Math.min(...ss.map((s) => s.x));
+  const maxR = Math.max(...ss.map((s) => s.x + s.w));
+  const minY = Math.min(...ss.map((s) => s.y));
   const b = board.getBoundingClientRect();
   const k = zm / 100;
   const cw = ctx.offsetWidth || 430;
-  let l = b.left + (s.x + s.w / 2) * k - cw / 2;
-  let t = b.top + s.y * k - 54;
-  if (t < 68) t = b.top + (s.y + s.h) * k + 12;
+  const l = b.left + ((minX + maxR) / 2) * k - cw / 2;
+  let t = b.top + minY * k - 54;
+  if (t < 68) t = b.top + minY * k + 40;
   ctx.style.left = Math.max(316, Math.min(window.innerWidth - cw - 14, l)) + 'px';
   ctx.style.top = t + 'px';
 }
 
 function applyLabel() {
-  const s = find(sel);
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
   if (!s) return;
   s.label = fL.value;
   s.cols = fC.value;
@@ -137,7 +168,8 @@ function applyLabel() {
 }
 
 function toggleReq() {
-  const s = find(sel);
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
   if (!s) return;
   push();
   s.req = !s.req;
@@ -145,37 +177,87 @@ function toggleReq() {
   render();
 }
 
-function dup() {
-  const s = find(sel);
-  if (!s) return;
+// ── 정렬 / 분배 ──────────────────────────────────────────
+/**
+ * 정렬·분배 좌표 계산 (순수 함수 — 입력을 바꾸지 않고 새 {x,y} 배열 반환).
+ * @param {{x:number,y:number,w:number,h:number}[]} list
+ * @param {'left'|'hcenter'|'right'|'top'|'vcenter'|'bottom'|'hdist'|'vdist'} act
+ */
+export function computeAlign(list, act) {
+  const out = list.map((s) => ({ x: s.x, y: s.y }));
+  if (list.length < 2) return out;
+  const minX = Math.min(...list.map((s) => s.x));
+  const maxR = Math.max(...list.map((s) => s.x + s.w));
+  const minY = Math.min(...list.map((s) => s.y));
+  const maxB = Math.max(...list.map((s) => s.y + s.h));
+  list.forEach((s, i) => {
+    if (act === 'left') out[i].x = minX;
+    else if (act === 'right') out[i].x = maxR - s.w;
+    else if (act === 'hcenter') out[i].x = Math.round((minX + maxR) / 2 - s.w / 2);
+    else if (act === 'top') out[i].y = minY;
+    else if (act === 'bottom') out[i].y = maxB - s.h;
+    else if (act === 'vcenter') out[i].y = Math.round((minY + maxB) / 2 - s.h / 2);
+  });
+  if ((act === 'hdist' || act === 'vdist') && list.length >= 3) {
+    const ax = act === 'hdist' ? 'x' : 'y';
+    const aw = act === 'hdist' ? 'w' : 'h';
+    const idx = list.map((_, i) => i).sort((a, b) =>
+      (list[a][ax] + list[a][aw] / 2) - (list[b][ax] + list[b][aw] / 2));
+    const first = list[idx[0]][ax] + list[idx[0]][aw] / 2;
+    const last = list[idx.at(-1)][ax] + list[idx.at(-1)][aw] / 2;
+    const step = (last - first) / (idx.length - 1);
+    idx.forEach((li, k) => { out[li][ax] = Math.round(first + k * step - list[li][aw] / 2); });
+  }
+  return out;
+}
+
+function alignAct(act) {
+  const ss = selShapes();
+  if (ss.length < 2) return;
   push();
-  const c = { ...s, id: uid++, x: Math.min(BOARD_W - s.w, s.x + 16), y: Math.min(BOARD_H - s.h, s.y + 16) };
-  shapes.push(c);
+  const next = computeAlign(ss, act);
+  ss.forEach((s, i) => {
+    s.x = Math.max(0, Math.min(BOARD_W - s.w, next[i].x));
+    s.y = Math.max(0, Math.min(BOARD_H - s.h, next[i].y));
+  });
   render();
-  select(c.id);
+}
+
+// ── 복제 / 순서 / 삭제 ───────────────────────────────────
+function dup() {
+  const ss = selShapes();
+  if (!ss.length) return;
+  push();
+  const copies = ss.map((s) => ({
+    ...s, id: uid++,
+    x: Math.min(BOARD_W - s.w, s.x + 16),
+    y: Math.min(BOARD_H - s.h, s.y + 16),
+  }));
+  shapes.push(...copies);
+  setSel(copies.map((c) => c.id));
 }
 
 function front() {
-  const s = find(sel);
-  if (!s) return;
+  const ss = selShapes();
+  if (!ss.length) return;
   push();
-  shapes = shapes.filter((x) => x.id !== s.id).concat(s);
+  shapes = shapes.filter((x) => !isSel(x.id)).concat(ss);
   render();
 }
 
 function back() {
-  const s = find(sel);
-  if (!s) return;
+  const ss = selShapes();
+  if (!ss.length) return;
   push();
-  shapes = [s].concat(shapes.filter((x) => x.id !== s.id));
+  shapes = ss.concat(shapes.filter((x) => !isSel(x.id)));
   render();
 }
 
 function delSel() {
-  if (sel === null) return;
+  if (!selIds.length) return;
   push();
-  shapes = shapes.filter((s) => s.id !== sel);
-  select(null);
+  shapes = shapes.filter((s) => !isSel(s.id));
+  setSel([]);
 }
 
 function push() {
@@ -209,19 +291,62 @@ export function initEditor(opts = {}) {
   bR = document.getElementById('bR');
   zv = document.getElementById('zv');
   cv = document.getElementById('cv');
+  ctxSingle = document.getElementById('ctxSingle');
+  ctxAlign = document.getElementById('ctxAlign');
   notify = opts.onChange || (() => {});
 
+  marqEl = document.createElement('div');
+  marqEl.className = 'marq';
+  marqEl.hidden = true;
+  board.appendChild(marqEl);
+
   board.addEventListener('mousedown', (e) => {
-    if (e.target === board || e.target.id === 'hint') select(null);
+    if (e.target !== board && e.target.id !== 'hint' && e.target !== marqEl) return;
+    if (!e.shiftKey) setSel([]);
+    const p = pt(e);
+    marq = { x0: p.x, y0: p.y, add: e.shiftKey, base: [...selIds] };
   });
 
   document.addEventListener('mousemove', (e) => {
-    if (move) {
-      const s = find(move.id);
+    if (marq) {
       const p = pt(e);
-      s.x = Math.max(0, Math.min(BOARD_W - s.w, Math.round(p.x - move.dx)));
-      s.y = Math.max(0, Math.min(BOARD_H - s.h, Math.round(p.y - move.dy)));
-      guides(s); quick(s); placeCtx();
+      const x = Math.min(marq.x0, p.x);
+      const y = Math.min(marq.y0, p.y);
+      const w = Math.abs(p.x - marq.x0);
+      const h = Math.abs(p.y - marq.y0);
+      Object.assign(marqEl.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+      marqEl.hidden = false;
+      const hits = shapes
+        .filter((s) => s.x < x + w && s.x + s.w > x && s.y < y + h && s.y + s.h > y)
+        .map((s) => s.id);
+      selIds = marq.add ? [...new Set([...marq.base, ...hits])] : hits;
+      paintSel();
+      return;
+    }
+    if (move) {
+      const p = pt(e);
+      if (move.single) {
+        const s = find(move.id);
+        s.x = Math.max(0, Math.min(BOARD_W - s.w, Math.round(p.x - move.dx)));
+        s.y = Math.max(0, Math.min(BOARD_H - s.h, Math.round(p.y - move.dy)));
+        guides(s); quick(s); placeCtx();
+      } else {
+        const ss = selShapes();
+        let dx = p.x - move.sx;
+        let dy = p.y - move.sy;
+        const minX = Math.min(...ss.map((s) => move.orig[s.id].x));
+        const maxR = Math.max(...ss.map((s) => move.orig[s.id].x + s.w));
+        const minY = Math.min(...ss.map((s) => move.orig[s.id].y));
+        const maxB = Math.max(...ss.map((s) => move.orig[s.id].y + s.h));
+        dx = Math.max(-minX, Math.min(BOARD_W - maxR, dx));
+        dy = Math.max(-minY, Math.min(BOARD_H - maxB, dy));
+        ss.forEach((s) => {
+          s.x = Math.round(move.orig[s.id].x + dx);
+          s.y = Math.round(move.orig[s.id].y + dy);
+          quick(s);
+        });
+        placeCtx();
+      }
     }
     if (rs) {
       const s = find(rs.id);
@@ -238,6 +363,12 @@ export function initEditor(opts = {}) {
   });
 
   document.addEventListener('mouseup', () => {
+    if (marq) {
+      marqEl.hidden = true;
+      marq = null;
+      setSel(selIds);
+      return;
+    }
     if (move || rs) {
       board.querySelectorAll('.gd').forEach((e) => e.remove());
       notify();
@@ -249,28 +380,42 @@ export function initEditor(opts = {}) {
   document.addEventListener('keydown', (e) => {
     if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
     const c = e.ctrlKey || e.metaKey;
-    if (c && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-    else if (c && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
-    else if (c && e.key.toLowerCase() === 'c') { const s = find(sel); if (s) clip = { ...s }; }
-    else if (c && e.key.toLowerCase() === 'v') {
-      if (!clip) return;
+    const k = e.key.toLowerCase();
+    if (c && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+    else if (c && k === 'y') { e.preventDefault(); redo(); }
+    else if (c && k === 'a') { e.preventDefault(); setSel(shapes.map((s) => s.id)); }
+    else if (c && k === 'c') { const ss = selShapes(); if (ss.length) clip = ss.map((s) => ({ ...s })); }
+    else if (c && k === 'v') {
+      if (!clip || !clip.length) return;
       push();
-      const n = { ...clip, id: uid++, x: Math.min(BOARD_W - clip.w, clip.x + 20), y: Math.min(BOARD_H - clip.h, clip.y + 20) };
-      shapes.push(n);
-      render();
-      select(n.id);
-    } else if (c && e.key.toLowerCase() === 'd') { e.preventDefault(); dup(); }
-    else if (e.key === 'Delete' || e.key === 'Backspace') { if (sel !== null) { e.preventDefault(); delSel(); } }
-    else if (e.key === 'Escape') select(null);
-    else if (e.key.indexOf('Arrow') === 0 && sel !== null) {
+      const copies = clip.map((cc) => ({
+        ...cc, id: uid++,
+        x: Math.min(BOARD_W - cc.w, cc.x + 20),
+        y: Math.min(BOARD_H - cc.h, cc.y + 20),
+      }));
+      shapes.push(...copies);
+      setSel(copies.map((cc) => cc.id));
+    } else if (c && k === 'd') { e.preventDefault(); dup(); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { if (selIds.length) { e.preventDefault(); delSel(); } }
+    else if (e.key === 'Escape') setSel([]);
+    else if (e.key.indexOf('Arrow') === 0 && selIds.length) {
       e.preventDefault();
-      const s = find(sel);
+      const ss = selShapes();
       const d = e.shiftKey ? 10 : 1;
-      if (e.key === 'ArrowLeft') s.x = Math.max(0, s.x - d);
-      if (e.key === 'ArrowRight') s.x = Math.min(BOARD_W - s.w, s.x + d);
-      if (e.key === 'ArrowUp') s.y = Math.max(0, s.y - d);
-      if (e.key === 'ArrowDown') s.y = Math.min(BOARD_H - s.h, s.y + d);
-      quick(s); placeCtx(); notify();
+      let dx = 0;
+      let dy = 0;
+      if (e.key === 'ArrowLeft') dx = -d;
+      if (e.key === 'ArrowRight') dx = d;
+      if (e.key === 'ArrowUp') dy = -d;
+      if (e.key === 'ArrowDown') dy = d;
+      const minX = Math.min(...ss.map((s) => s.x));
+      const maxR = Math.max(...ss.map((s) => s.x + s.w));
+      const minY = Math.min(...ss.map((s) => s.y));
+      const maxB = Math.max(...ss.map((s) => s.y + s.h));
+      dx = Math.max(-minX, Math.min(BOARD_W - maxR, dx));
+      dy = Math.max(-minY, Math.min(BOARD_H - maxB, dy));
+      ss.forEach((s) => { s.x += dx; s.y += dy; quick(s); });
+      placeCtx(); notify();
     }
   });
 
@@ -280,8 +425,15 @@ export function initEditor(opts = {}) {
   // 컨텍스트 툴바
   fL.addEventListener('input', applyLabel);
   fC.addEventListener('input', applyLabel);
+  const ALIGN = {
+    alignL: 'left', alignC: 'hcenter', alignR: 'right',
+    alignT: 'top', alignM: 'vcenter', alignB: 'bottom',
+    distH: 'hdist', distV: 'vdist',
+  };
   ctx.addEventListener('click', (e) => {
     const act = e.target.closest('button')?.dataset.act;
+    if (!act) return;
+    if (ALIGN[act]) { alignAct(ALIGN[act]); return; }
     ({ req: toggleReq, dup, front, back, del: delSel })[act]?.();
   });
 
@@ -329,35 +481,35 @@ export function addComponent(t) {
     label: defaultLabel(t), cols: defaultCols(t), req: false,
   });
   render();
-  select(shapes.at(-1).id);
+  setSel([shapes.at(-1).id]);
 }
 
 export function setShapes(arr) {
   push();
   shapes = normalize(arr);
   uid = shapes.length + 1;
-  select(null);
+  setSel([]);
 }
 
 export function clearShapes() {
   if (!shapes.length) return;
   push();
   shapes = [];
-  select(null);
+  setSel([]);
 }
 
 export function undo() {
   if (!hist.length) return;
   future.push(JSON.stringify(shapes));
   shapes = JSON.parse(hist.pop());
-  select(null);
+  setSel([]);
 }
 
 export function redo() {
   if (!future.length) return;
   hist.push(JSON.stringify(shapes));
   shapes = JSON.parse(future.pop());
-  select(null);
+  setSel([]);
 }
 
 export function zoomBy(d) {
@@ -375,6 +527,7 @@ export function zoomReset() {
 }
 
 export const count = () => shapes.length;
+export const selectedCount = () => selIds.length;
 
 /** payload.shapes 형식으로 반환 (개발지시서 §6.1). id 는 questions/report 참조용. */
 export function toPayloadShapes() {

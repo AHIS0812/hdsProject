@@ -101,6 +101,17 @@
       <div class="hint" id="hint">화면을 자유롭게 그려보세요
         <b>반듯하지 않아도 괜찮습니다 · AI가 사내 표준으로 정리합니다</b></div>
     </div>
+
+    <div class="coach" id="coach" hidden>
+      <b>처음이신가요?</b>
+      <ol>
+        <li>왼쪽 <em>요소 추가</em>에서 클릭하면 캔버스에 놓입니다</li>
+        <li>드래그로 옮기고, 모서리 점으로 크기를 바꿉니다</li>
+        <li>여러 개는 <em>Shift+클릭</em> 또는 빈 곳을 <em>드래그</em>해 선택 → 정렬</li>
+        <li><em>화면 생성</em>을 누르면 AI가 사내 표준으로 정리합니다</li>
+      </ol>
+      <button class="btn sm nv" id="coachOk">알겠어요</button>
+    </div>
   </div>
 
   <div class="tools">
@@ -110,16 +121,54 @@
     <button data-act="zoomOut" title="축소">−</button>
     <button class="zz" id="zv" data-act="zoomReset">100%</button>
     <button data-act="zoomIn" title="확대">＋</button>
+    <div class="dv"></div>
+    <button id="btnHelp" data-act="help" title="단축키 도움말 (?)">?</button>
+  </div>
+
+  <div class="help" id="helpPop" hidden>
+    <div class="help-hd"><b>단축키 · 사용법</b><button class="cb" id="helpClose" title="닫기">✕</button></div>
+    <div class="help-bd">
+      <dl>
+        <dt>요소 추가</dt><dd>왼쪽 팔레트에서 클릭</dd>
+        <dt>선택</dt><dd>클릭 · <kbd>Shift</kbd>+클릭(여러 개) · 빈 곳 드래그</dd>
+        <dt>전체 선택</dt><dd><kbd>Ctrl</kbd>+<kbd>A</kbd></dd>
+        <dt>선택 해제</dt><dd><kbd>Esc</kbd></dd>
+        <dt>이동</dt><dd>드래그 · 방향키 (<kbd>Shift</kbd>=10px)</dd>
+        <dt>크기 변경</dt><dd>선택 후 모서리·변의 점 드래그</dd>
+        <dt>복제</dt><dd><kbd>Ctrl</kbd>+<kbd>D</kbd></dd>
+        <dt>복사 · 붙여넣기</dt><dd><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></dd>
+        <dt>삭제</dt><dd><kbd>Del</kbd></dd>
+        <dt>되돌리기 · 다시</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></dd>
+        <dt>정렬 · 분배</dt><dd>2개 이상 선택 시 상단 툴바 (분배는 3개 이상)</dd>
+        <dt>확대 · 축소</dt><dd>하단 <b>−</b> / <b>＋</b> 버튼</dd>
+      </dl>
+    </div>
   </div>
 </div>
 
 <div class="ctx" id="ctx">
-  <span class="lb" id="ctxT">버튼</span>
-  <input id="fL" placeholder="문구">
-  <input id="fC" class="wide hidden" placeholder="항목을 쉼표로 구분">
-  <div class="cdiv"></div>
-  <button class="cb" id="bReq" data-act="req" title="필수 입력 표시">＊</button>
-  <div class="cdiv"></div>
+  <span class="ctx-grp" id="ctxSingle">
+    <span class="lb" id="ctxT">버튼</span>
+    <input id="fL" placeholder="문구">
+    <input id="fC" class="wide hidden" placeholder="항목을 쉼표로 구분">
+    <div class="cdiv"></div>
+    <button class="cb" id="bReq" data-act="req" title="필수 입력 표시">＊</button>
+    <div class="cdiv"></div>
+  </span>
+  <span class="ctx-grp" id="ctxAlign" hidden>
+    <span class="lb" id="ctxN"></span>
+    <button class="cb" data-act="alignL" title="왼쪽 정렬">⇤</button>
+    <button class="cb" data-act="alignC" title="가로 가운데 정렬">⇔</button>
+    <button class="cb" data-act="alignR" title="오른쪽 정렬">⇥</button>
+    <div class="cdiv"></div>
+    <button class="cb" data-act="alignT" title="위쪽 정렬">⤒</button>
+    <button class="cb" data-act="alignM" title="세로 가운데 정렬">⇕</button>
+    <button class="cb" data-act="alignB" title="아래쪽 정렬">⤓</button>
+    <div class="cdiv"></div>
+    <button class="cb" data-act="distH" title="가로 균등 분배 (3개 이상)">⇿</button>
+    <button class="cb" data-act="distV" title="세로 균등 분배 (3개 이상)">↕</button>
+    <div class="cdiv"></div>
+  </span>
   <button class="cb" data-act="dup" title="복제 (Ctrl+D)">⧉</button>
   <button class="cb" data-act="front" title="맨 앞으로">⬆</button>
   <button class="cb" data-act="back" title="맨 뒤로">⬇</button>
@@ -139,6 +188,14 @@
         <button class="btn sm" id="mCopy" title="현재 탭 내용을 클립보드로 복사">복사</button>
         <button class="btn sm nv" id="mDownload">↓ 내려받기</button>
         <button class="btn sm" id="mClose">닫기</button>
+      </div>
+    </div>
+    <div class="mview" id="mView" hidden>
+      <span>보기</span>
+      <div class="mseg" id="mSeg">
+        <button class="on" data-v="after">결과</button>
+        <button data-v="sketch">내 스케치</button>
+        <button data-v="split">나란히</button>
       </div>
     </div>
     <div class="mbody" id="mbody"></div>
