@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: 단위 테스트
+        run: npm test
+
+      - name: 서버 스모크 (부팅 + 메타/생성 API mock)
+        run: |
+          node src/server/index.js &
+          SERVER_PID=$!
+          timeout 20 bash -c 'until curl -sf "http://localhost:3000/api/health" >/dev/null; do sleep 0.5; done'
+          curl -sf "http://localhost:3000/api/systems" | grep -q '"systems"'
+          curl -sf "http://localhost:3000/api/screens?system=portal" | grep -q '"screens"'
+          curl -sf -X POST "http://localhost:3000/api/generate" \
+            -H 'Content-Type: application/json' \
+            -d @fixtures/payloads/list.json | grep -q '"status":"ok"'
+          kill "$SERVER_PID"

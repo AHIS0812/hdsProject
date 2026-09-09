@@ -1,5 +1,7 @@
 # 하이스케치 (AI Screen Draft)
 
+[![CI](https://github.com/AHIS0812/hdsProject/actions/workflows/ci.yml/badge.svg)](https://github.com/AHIS0812/hdsProject/actions/workflows/ci.yml)
+
 2026-09-08
 
 캔버스에 화면을 러프하게 그리면 AI가 사내 UI 표준으로 정리한 화면 초안과 코드(WebSquare XML)를
@@ -77,6 +79,8 @@ runs/        세션 로그 (gitignore)
 | `npm run dev` | 개발 서버 (자동 재시작) |
 | `npm start` | 서버 1회 실행 |
 | `npm test` | `node --test` — `test/` 아래 단위 테스트 (31개) |
+
+push/PR 시 GitHub Actions(`.github/workflows/ci.yml`)가 Node 20·22 에서 `npm test` + 서버 스모크(부팅·메타/생성 API)를 실행한다.
 
 ### 테스트 커버리지 (`test/`)
 
