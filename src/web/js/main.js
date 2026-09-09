@@ -5,7 +5,7 @@ import { COMPS, DEFAULT_BOARD, boardSizeFor } from './constants.js';
 import * as api from './api.js';
 import * as editor from './editor.js';
 import { makeCombo } from './combobox.js';
-import { templateShapes, sampleShapes } from './templates.js';
+import { templateShapes } from './templates.js';
 import { initResultModal, runBuild } from './result-modal.js';
 
 const $ = (id) => document.getElementById(id);
@@ -62,12 +62,10 @@ function syncAbL() {
 }
 scrNm.addEventListener('input', () => { syncAbL(); autosave(); });
 
-$('btnSample').addEventListener('click', () => {
-  if (!guardDiscard()) return;
-  loadCanvas(sampleShapes(), '지정대리인 등록', DEFAULT_BOARD);
+$('btnClear').addEventListener('click', () => {
+  if (editor.count() && !confirm('캔버스의 요소를 전부 비울까요? (되돌리기로 복구 가능)')) return;
+  editor.clearShapes();
 });
-
-$('btnSave').addEventListener('click', () => { autosave(true); toast('임시저장되었습니다'); });
 $('btnBuild').addEventListener('click', build);
 
 // ── 요소 팔레트 ───────────────────────────────────────────
@@ -82,14 +80,10 @@ clist.replaceChildren(
   }),
 );
 
-// ── 하단 툴바 ─────────────────────────────────────────────
+// ── 하단 툴바 (되돌리기 / 줌) ─────────────────────────────
 const TOOL = {
   undo: editor.undo, redo: editor.redo,
   zoomIn: () => editor.zoomBy(10), zoomOut: () => editor.zoomBy(-10), zoomReset: editor.zoomReset,
-  clear: () => {
-    if (editor.count() && !confirm('캔버스를 전부 비울까요?')) return;
-    editor.clearShapes();
-  },
 };
 document.querySelector('.tools').addEventListener('click', (e) => {
   const act = e.target.closest('button')?.dataset.act;
@@ -282,6 +276,15 @@ function build() {
 
 // ── 임시저장 (localStorage) ───────────────────────────────
 let saveTimer;
+let savedFlashTimer;
+function flashSaved() {
+  const el = $('autosaveHint');
+  if (!el) return;
+  el.textContent = '저장됨';
+  el.classList.add('on');
+  clearTimeout(savedFlashTimer);
+  savedFlashTimer = setTimeout(() => { el.textContent = '자동 저장'; el.classList.remove('on'); }, 1200);
+}
 function autosave(immediate) {
   clearTimeout(saveTimer);
   const doSave = () => {
@@ -296,6 +299,7 @@ function autosave(immediate) {
         canvas: editor.getBoardSize(),
         shapes: editor.toPayloadShapes(),
       }));
+      flashSaved();
     } catch { /* 프라이빗 모드 등 — 무시 */ }
   };
   if (immediate) doSave();

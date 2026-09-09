@@ -13,8 +13,8 @@
   <div class="sep"></div>
   <input class="fname" id="scrNm" value="새 화면">
   <div class="r">
-    <button class="btn sm" id="btnSample">샘플</button>
-    <button class="btn sm" id="btnSave">임시저장</button>
+    <span class="autosave" id="autosaveHint" title="변경 사항은 이 브라우저에 자동 저장됩니다">자동 저장</span>
+    <button class="btn sm" id="btnClear" title="캔버스 비우기 (되돌리기로 복구 가능)">비우기</button>
     <div class="sep"></div>
     <button class="btn pri" id="btnBuild">화면 생성</button>
   </div>
@@ -96,8 +96,6 @@
     <button data-act="zoomOut" title="축소">−</button>
     <button class="zz" id="zv" data-act="zoomReset">100%</button>
     <button data-act="zoomIn" title="확대">＋</button>
-    <div class="dv"></div>
-    <button data-act="clear" title="전체 비우기">✕</button>
   </div>
 </div>
 

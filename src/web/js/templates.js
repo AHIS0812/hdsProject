@@ -112,6 +112,8 @@ export function templateShapes(key) {
   return (PRESETS[key] || PRESETS.list)();
 }
 
+// 예시 화면(지정대리인 등록). '샘플' 버튼 제거 후 현재는 미사용 —
+// "예시 채우기" 같은 기능으로 재활용 가능하도록 남겨둠(테스트가 유효성 검증).
 export function sampleShapes() {
   return build([
     ['area', 30, 30, 900, 70, '조회 영역'],
