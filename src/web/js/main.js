@@ -36,10 +36,14 @@ function loadCanvas(shapes, name, size) {
   autosave();
 }
 
-/** 캔버스 내용이 사라지는 동작 전에 호출. 수정한 게 없거나 비어 있으면 그냥 통과 */
-function guardDiscard() {
-  if (!canvasDirty || editor.count() === 0) return true;
-  return confirm('지금 캔버스에 있는 내용이 사라집니다. 계속할까요?');
+/**
+ * 캔버스를 교체하기 직전에 호출. 사용자가 직접 편집한 내용이 있으면
+ * "되돌리기로 복구 가능" 안내만 띄운다. (confirm 대신 — undo 히스토리가 복구를 보장)
+ */
+function noteReplace() {
+  if (canvasDirty && editor.count() > 0) {
+    toast('이전 캔버스는 되돌리기(Ctrl+Z)로 복구할 수 있어요');
+  }
 }
 
 // ── 토스트 ────────────────────────────────────────────────
@@ -63,8 +67,9 @@ function syncAbL() {
 scrNm.addEventListener('input', () => { syncAbL(); autosave(); });
 
 $('btnClear').addEventListener('click', () => {
-  if (editor.count() && !confirm('캔버스의 요소를 전부 비울까요? (되돌리기로 복구 가능)')) return;
+  if (!editor.count()) return;
   editor.clearShapes();
+  toast('캔버스를 비웠습니다 · 되돌리기(Ctrl+Z)로 복구');
 });
 $('btnBuild').addEventListener('click', build);
 
@@ -115,7 +120,8 @@ document.querySelectorAll('.tpl').forEach((el) => {
   el.addEventListener('click', () => {
     if (workMode !== 'new') return;
     const key = el.dataset.tpl;
-    if (!guardDiscard()) return;
+    if (key === currentTpl && !canvasDirty) { highlightTpl(key); return; }
+    noteReplace();
     currentTpl = key;
     highlightTpl(key);
     // 방금까지 기존 화면을 보고 있었다면 이름을 새 화면 기본값으로
