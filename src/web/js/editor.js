@@ -300,6 +300,13 @@ export function initEditor(opts = {}) {
   marqEl.hidden = true;
   board.appendChild(marqEl);
 
+  // 캔버스를 클릭하면 입력 필드에서 포커스를 뗀다 → Ctrl+A·Del 등 단축키가 바로 먹도록.
+  // capture 단계라 요소의 stopPropagation 보다 먼저 실행된다.
+  cv.addEventListener('mousedown', () => {
+    const ae = document.activeElement;
+    if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && !ae.closest('.ctx')) ae.blur();
+  }, true);
+
   board.addEventListener('mousedown', (e) => {
     if (e.target !== board && e.target.id !== 'hint' && e.target !== marqEl) return;
     if (!e.shiftKey) setSel([]);
