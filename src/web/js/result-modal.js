@@ -3,6 +3,7 @@
 // 개발지시서 U-7, U-8, U-9. 결과는 POST /api/generate|refine 응답에서 온다.
 
 import * as api from './api.js';
+import { toast } from './toast.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -133,39 +134,56 @@ async function copyText(text) {
   }
   flashCopied();
 }
-async function copyScreenImage() {
+/** preview iframe → PNG Blob */
+async function renderScreenBlob() {
   const frame = mbody().querySelector('iframe');
   const doc = frame?.contentDocument;
-  if (!doc || !window.html2canvas) {
-    // html2canvas 로드 실패 시 HTML 텍스트라도 복사
-    return copyText(last.result?.preview?.html || '');
-  }
-  const prev = $('mCopy').textContent;
-  $('mCopy').textContent = '만드는 중…';
+  if (!doc?.body || !window.html2canvas) throw new Error('미리보기가 준비되지 않았습니다');
+  const root = doc.documentElement;
+  const canvas = await window.html2canvas(doc.body, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    logging: false,
+    width: root.scrollWidth,
+    height: root.scrollHeight,
+    windowWidth: root.scrollWidth,
+    windowHeight: root.scrollHeight,
+  });
+  return await new Promise((res, rej) =>
+    canvas.toBlob((b) => (b ? res(b) : rej(new Error('이미지 변환 실패'))), 'image/png'),
+  );
+}
+
+async function copyScreenImage() {
+  const btn = $('mCopy');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '이미지 만드는 중…';
+
+  // clipboard.write 는 사용자 제스처 직후에 호출해야 하므로 Blob 을 Promise 로 전달한다.
+  const blobPromise = renderScreenBlob();
+
   try {
-    const canvas = await window.html2canvas(doc.body, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      width: doc.body.scrollWidth,
-      height: doc.body.scrollHeight,
-      logging: false,
-    });
-    const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+    if (!navigator.clipboard || !window.ClipboardItem) throw new Error('clipboard image unsupported');
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+    flashCopied('✓ 이미지 복사됨');
+  } catch {
+    // 클립보드 이미지 복사 불가(브라우저 미지원·권한 등) → PNG 파일로 저장
     try {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      flashCopied('✓ 이미지 복사됨');
-    } catch {
-      // 클립보드 이미지 미지원 → 파일로 저장
+      const blob = await blobPromise;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${(last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_')}.png`;
       a.click();
       URL.revokeObjectURL(a.href);
-      flashCopied('↓ 이미지 저장됨');
+      toast('클립보드 대신 이미지 파일(.png)로 저장했습니다');
+      flashCopied('↓ 저장됨');
+    } catch (e) {
+      toast('이미지를 만들지 못했습니다: ' + e.message);
+      btn.textContent = '이미지 복사';
     }
-  } catch {
-    $('mCopy').textContent = prev;
-    copyText(last.result?.preview?.html || '');
+  } finally {
+    btn.disabled = false;
   }
 }
 function copyCurrent() {

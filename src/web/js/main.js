@@ -7,6 +7,7 @@ import * as editor from './editor.js';
 import { makeCombo } from './combobox.js';
 import { templateShapes } from './templates.js';
 import { initResultModal, runBuild } from './result-modal.js';
+import { toast } from './toast.js';
 
 const $ = (id) => document.getElementById(id);
 const scrNm = $('scrNm');
@@ -46,15 +47,6 @@ function noteReplace() {
   }
 }
 
-// ── 토스트 ────────────────────────────────────────────────
-let toastTimer;
-function toast(msg) {
-  const el = $('toast');
-  el.textContent = msg;
-  el.classList.add('on');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('on'), 2200);
-}
 
 // ── 상단 바 ───────────────────────────────────────────────
 function syncAbL() {
