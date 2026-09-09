@@ -27,10 +27,12 @@ npm run dev
 
 동작:
 - Express 서버 + 정적 서빙
-- **캔버스 에디터** (`/`) — 배치/이동/리사이즈/스냅/undo·redo/줌/컨텍스트 툴바/단축키,
-  신규·변경 모드(유형 자동 반영), 시스템·화면 콤보박스, "화면 생성" → 결과 모달 3탭,
+- **캔버스 에디터** (`/`) — 요소 16종 배치/이동/리사이즈/스냅/undo·redo/줌/컨텍스트 툴바/단축키,
+  신규·변경 모드, 시스템·화면 콤보박스, 유형별 캔버스 크기, "화면 생성" → 결과 모달 4탭
+  (화면 / 전달 데이터 / WebSquare XML / 처리 리포트, 탭별 복사),
   질문 응답 + 자연어 수정 요청 → 재생성(`/api/refine`),
-  **참고 파일 업로드**(클릭/드래그, `/api/attachments` → `uploads/`). localStorage 임시저장.
+  참고 파일 업로드(클릭/드래그, `/api/attachments` → `uploads/`),
+  **`.hds.json` 내보내기/불러오기**, localStorage 자동 저장.
 - API 스모크 페이지 (`/smoke.html`) — `/api/*` 를 백엔드 없이 확인
 - **개발용 트리거**: 보충 설명에 "질문" 을 넣고 생성하면 mock 서버가 `needs_input`(질문 3개)을 반환
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` mock

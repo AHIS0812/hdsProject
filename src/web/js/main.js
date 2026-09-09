@@ -256,6 +256,79 @@ function drawFiles() {
   );
 }
 
+// ── 내보내기 / 불러오기 (.hds.json) ──────────────────────
+function currentDoc() {
+  return {
+    app: 'hds',
+    version: 1,
+    savedAt: new Date().toISOString(),
+    screenName: scrNm.value,
+    systemId: sysCombo.get()?.id || null,
+    mode: workMode,
+    template: currentTpl,
+    note: noteEl.value,
+    canvas: editor.getBoardSize(),
+    attachments,
+    shapes: editor.toPayloadShapes(),
+  };
+}
+
+$('btnExport').addEventListener('click', () => {
+  const name = (scrNm.value || 'screen').replace(/[\\/:*?"<>|]/g, '_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(currentDoc(), null, 2)], { type: 'application/json' }));
+  a.download = `${name}.hds.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('파일로 내보냈습니다');
+});
+
+const importInput = document.createElement('input');
+importInput.type = 'file';
+importInput.accept = '.json,application/json';
+importInput.hidden = true;
+document.body.append(importInput);
+$('btnImport').addEventListener('click', () => importInput.click());
+importInput.addEventListener('change', async () => {
+  const file = importInput.files[0];
+  importInput.value = '';
+  if (!file) return;
+  let doc;
+  try {
+    doc = JSON.parse(await file.text());
+  } catch {
+    toast('JSON 파일을 읽지 못했습니다');
+    return;
+  }
+  applyDoc(doc);
+});
+
+function applyDoc(doc) {
+  if (!doc || !Array.isArray(doc.shapes)) {
+    toast('형식이 맞지 않는 파일입니다');
+    return;
+  }
+  noteEl.value = doc.note || '';
+  attachments = Array.isArray(doc.attachments) ? doc.attachments : [];
+  drawFiles();
+
+  workMode = doc.mode === 'edit' ? 'edit' : 'new';
+  document.querySelectorAll('#modeSeg div').forEach((x) => x.classList.toggle('on', x.dataset.mode === workMode));
+  applyMode();
+
+  if (doc.template && document.querySelector(`.tpl[data-tpl="${doc.template}"]`)) {
+    currentTpl = doc.template;
+    highlightTpl(doc.template);
+  }
+
+  loadCanvas(doc.shapes, doc.screenName || '새 화면', doc.canvas || DEFAULT_BOARD);
+  loadedScreenId = null;
+  if (doc.systemId) sysCombo.choose(doc.systemId);
+
+  const hasFileRefs = attachments.some((a) => a.url);
+  toast(hasFileRefs ? '불러왔습니다 · 첨부 파일 실물은 포함되지 않습니다' : '불러왔습니다');
+}
+
 // ── payload / 생성 ────────────────────────────────────────
 function payload() {
   const sys = sysCombo.get();
