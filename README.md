@@ -32,7 +32,8 @@ npm run dev
   (화면 / 전달 데이터 / WebSquare XML — 화면은 이미지로, 나머지는 텍스트로 복사),
   생성 완료 시 상태·소요시간 표시, 질문 응답 + 자연어 수정 요청 → 재생성(`/api/refine`),
   참고 파일 업로드(클릭/드래그, `/api/attachments` → `uploads/`),
-  **`.hds.json` 내보내기/불러오기**, localStorage 자동 저장.
+  **이름 붙인 저장본**(localStorage 슬롯 — 저장/덮어쓰기/불러오기/삭제) · `.hds.json` 파일 내보내기·불러오기,
+  localStorage 자동 저장.
 - API 스모크 페이지 (`/smoke.html`) — `/api/*` 를 백엔드 없이 확인
 - **개발용 트리거**: 보충 설명에 "질문" 을 넣고 생성하면 mock 서버가 `needs_input`(질문 3개)을 반환
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` mock

@@ -265,6 +265,7 @@ function currentDoc() {
   };
 }
 
+// 파일로 내보내기
 $('btnExport').addEventListener('click', () => {
   const name = (scrNm.value || 'screen').replace(/[\\/:*?"<>|]/g, '_');
   const a = document.createElement('a');
@@ -273,8 +274,10 @@ $('btnExport').addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(a.href);
   toast('파일로 내보냈습니다');
+  closeSavesPop();
 });
 
+// 파일에서 불러오기
 const importInput = document.createElement('input');
 importInput.type = 'file';
 importInput.accept = '.json,application/json';
@@ -293,6 +296,99 @@ importInput.addEventListener('change', async () => {
     return;
   }
   applyDoc(doc);
+  closeSavesPop();
+});
+
+// ── 이름 붙인 저장본 (localStorage 슬롯) ──────────────────
+const SLOT_INDEX = 'hds:saves';
+const slotKey = (id) => 'hds:save:' + id;
+
+function listSlots() {
+  try { return JSON.parse(localStorage.getItem(SLOT_INDEX) || '[]'); } catch { return []; }
+}
+function writeIndex(list) {
+  try { localStorage.setItem(SLOT_INDEX, JSON.stringify(list)); } catch { /* 용량 초과 */ }
+}
+function saveSlot() {
+  const name = $('saveName').value.trim();
+  if (!name) { toast('저장본 이름을 입력하세요'); $('saveName').focus(); return; }
+  const list = listSlots();
+  const existing = list.find((s) => s.name === name);
+  const id = existing?.id || 's' + Date.now().toString(36);
+  try {
+    localStorage.setItem(slotKey(id), JSON.stringify(currentDoc()));
+  } catch {
+    toast('브라우저 저장 공간이 부족합니다');
+    return;
+  }
+  const meta = {
+    id, name, updatedAt: Date.now(),
+    screenName: scrNm.value, mode: workMode, shapes: editor.count(),
+  };
+  writeIndex([meta, ...list.filter((s) => s.id !== id)]);
+  $('saveName').value = '';
+  renderSlots();
+  toast(existing ? `"${name}" 갱신됨` : `"${name}" 저장됨`);
+}
+function loadSlot(id) {
+  let doc;
+  try { doc = JSON.parse(localStorage.getItem(slotKey(id)) || 'null'); } catch { doc = null; }
+  if (!doc) { toast('저장본을 찾지 못했습니다'); return; }
+  applyDoc(doc);
+  closeSavesPop();
+}
+function deleteSlot(id) {
+  try { localStorage.removeItem(slotKey(id)); } catch { /* 무시 */ }
+  writeIndex(listSlots().filter((s) => s.id !== id));
+  renderSlots();
+}
+function fmtWhen(ts) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function renderSlots() {
+  const box = $('saveList');
+  const list = listSlots();
+  if (!list.length) {
+    box.replaceChildren(Object.assign(document.createElement('div'), { className: 'pop-empty', textContent: '저장한 항목이 없습니다' }));
+    return;
+  }
+  box.replaceChildren(...list.map((s) => {
+    const row = document.createElement('div');
+    row.className = 'pop-item';
+    const main = document.createElement('button');
+    main.className = 'pop-item-main';
+    main.innerHTML = `<b></b><span></span>`;
+    main.querySelector('b').textContent = s.name;
+    main.querySelector('span').textContent =
+      `${s.screenName || '제목 없음'} · ${s.mode === 'edit' ? '변경' : '신규'} · 요소 ${s.shapes ?? 0} · ${fmtWhen(s.updatedAt)}`;
+    main.addEventListener('click', () => loadSlot(s.id));
+    const del = document.createElement('button');
+    del.className = 'pop-item-del';
+    del.textContent = '✕';
+    del.title = '삭제';
+    del.addEventListener('click', (e) => { e.stopPropagation(); deleteSlot(s.id); });
+    row.append(main, del);
+    return row;
+  }));
+}
+
+function closeSavesPop() {
+  $('savesPop').hidden = true;
+  $('btnSaves').classList.remove('on');
+}
+$('btnSaves').addEventListener('click', () => {
+  const pop = $('savesPop');
+  const open = pop.hidden;
+  pop.hidden = !open;
+  $('btnSaves').classList.toggle('on', open);
+  if (open) { renderSlots(); $('saveName').focus(); }
+});
+$('saveNow').addEventListener('click', saveSlot);
+$('saveName').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveSlot(); });
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.savesbox')) closeSavesPop();
 });
 
 function applyDoc(doc) {

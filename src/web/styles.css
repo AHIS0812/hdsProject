@@ -28,6 +28,29 @@ body{font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-ser
 .top .r{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .autosave{font-size:11.5px;color:var(--mut);font-weight:600;margin-right:2px;transition:color .15s;}
 .autosave.on{color:#1a7f37;}
+
+.savesbox{position:relative;display:inline-flex;}
+.btn.sm.on{background:#F0F2F6;border-color:#C2C9D4;}
+.pop{position:absolute;top:calc(100% + 6px);right:0;width:300px;background:#fff;border:1px solid var(--line);
+     border-radius:12px;box-shadow:0 10px 30px rgba(16,24,40,.18);z-index:40;padding:10px;}
+.pop-row{display:flex;gap:6px;}
+.pop-row input{flex:1;height:32px;border:1px solid var(--line);border-radius:8px;padding:0 10px;
+               font-family:inherit;font-size:12.5px;outline:none;}
+.pop-row input:focus{border-color:var(--or);}
+.pop-row button{flex:0 0 auto;height:32px;}
+.pop-list{max-height:220px;overflow-y:auto;margin:8px 0 6px;display:flex;flex-direction:column;gap:3px;}
+.pop-empty{padding:16px 8px;text-align:center;color:var(--mut);font-size:11.5px;}
+.pop-item{display:flex;align-items:stretch;gap:4px;}
+.pop-item-main{flex:1;text-align:left;background:#fff;border:1px solid transparent;border-radius:8px;
+               padding:7px 9px;cursor:pointer;font-family:inherit;min-width:0;}
+.pop-item-main:hover{background:var(--or-l);}
+.pop-item-main b{display:block;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pop-item-main span{display:block;font-size:10.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pop-item-del{flex:0 0 auto;width:28px;border:none;background:none;color:var(--mut);border-radius:8px;
+              cursor:pointer;font-size:12px;font-family:inherit;}
+.pop-item-del:hover{background:#FFF0EC;color:#E5484D;}
+.pop-foot{display:flex;gap:6px;border-top:1px solid var(--line2);padding-top:8px;}
+.pop-foot button{flex:1;}
 .btn{height:36px;padding:0 15px;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;
      cursor:pointer;border:1px solid var(--line);background:#fff;color:#3C4655;
      display:inline-flex;align-items:center;gap:7px;transition:.12s;}
