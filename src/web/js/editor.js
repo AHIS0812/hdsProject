@@ -302,9 +302,11 @@ export function initEditor(opts = {}) {
 
   // 캔버스를 클릭하면 입력 필드에서 포커스를 뗀다 → Ctrl+A·Del 등 단축키가 바로 먹도록.
   // capture 단계라 요소의 stopPropagation 보다 먼저 실행된다.
-  cv.addEventListener('mousedown', () => {
+  cv.addEventListener('mousedown', (e) => {
     const ae = document.activeElement;
     if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && !ae.closest('.ctx')) ae.blur();
+    // 캔버스에 키보드 포커스를 준다 → Ctrl+A·Del·방향키가 확실히 먹도록
+    if (!e.target.closest('.ctx')) board.focus({ preventScroll: true });
   }, true);
 
   board.addEventListener('mousedown', (e) => {
@@ -385,7 +387,7 @@ export function initEditor(opts = {}) {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     const c = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (c && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }

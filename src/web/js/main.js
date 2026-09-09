@@ -522,7 +522,7 @@ function initHelp() {
     if (!helpPop.hidden && !helpPop.contains(e.target) && e.target.id !== 'btnHelp') helpPop.hidden = true;
   });
   document.addEventListener('keydown', (e) => {
-    if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     if (e.key === '?') { e.preventDefault(); toggleHelp(); }
     else if (e.key === 'Escape' && !helpPop.hidden) helpPop.hidden = true;
   });

@@ -136,9 +136,11 @@ textarea:focus{border-color:var(--or);}
 .file b{margin-left:auto;color:var(--mut);cursor:pointer;font-weight:400;}
 
 .canvas{position:absolute;inset:0 0 0 306px;display:flex;flex-direction:column;align-items:safe center;
-        justify-content:safe center;overflow:auto;padding:30px 20px 80px;}
+        justify-content:safe center;overflow:auto;padding:30px 20px 80px;
+        user-select:none;-webkit-user-select:none;}
 .abL{font-size:12px;color:var(--sub);font-weight:600;margin-bottom:10px;}
 .abL span{color:var(--mut);font-weight:400;margin-left:8px;}
+#board:focus{outline:none;}
 #board{width:960px;height:600px;background:#fff;position:relative;flex:0 0 auto;border-radius:12px;margin:auto;
        box-shadow:0 1px 3px rgba(16,24,40,.08),0 14px 44px rgba(16,24,40,.12);
        background-image:linear-gradient(#F1F3F7 1px,transparent 1px),linear-gradient(90deg,#F1F3F7 1px,transparent 1px);
