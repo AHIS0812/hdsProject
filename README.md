@@ -26,16 +26,18 @@ npm run dev
 - Express 서버 + 정적 서빙
 - **캔버스 에디터** (`/`) — 배치/이동/리사이즈/스냅/undo·redo/줌/컨텍스트 툴바/단축키,
   신규·변경 모드(유형 자동 반영), 시스템·화면 콤보박스, "화면 생성" → 결과 모달 3탭,
-  **질문 응답 + 자연어 수정 요청 → 재생성**(`/api/refine`). localStorage 임시저장.
+  질문 응답 + 자연어 수정 요청 → 재생성(`/api/refine`),
+  **참고 파일 업로드**(클릭/드래그, `/api/attachments` → `uploads/`). localStorage 임시저장.
 - API 스모크 페이지 (`/smoke.html`) — `/api/*` 를 백엔드 없이 확인
 - **개발용 트리거**: 보충 설명에 "질문" 을 넣고 생성하면 mock 서버가 `needs_input`(질문 3개)을 반환
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` mock
 - 생성 API: `POST /api/generate`, `POST /api/refine` — **스키마 검증은 실제**, 결과는 `fixtures/results` mock
+- 첨부 API: `POST /api/attachments` (multipart, multer), `DELETE /api/attachments/:id` — **실제 저장**(`uploads/`, gitignore, PNG/JPG/GIF·XLSX/XLS/CSV·PPT/PPTX·PDF, ≤20MB)
 
 미구현 (다음 작업):
 - `src/pipeline/*` (Stage A/B, autofix, 결정론적 변환기) — 담당 1
 - `src/llm/*` (Claude/OpenAI provider) — 담당 1
-- 에디터 잔여 항목: 첨부 실제 업로드(U-11), 유형별 보드 크기(U-12)
+- 에디터 잔여 항목: 유형별 보드 크기(U-12)
 
 ## 구조
 

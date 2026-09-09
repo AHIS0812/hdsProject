@@ -3,6 +3,7 @@ import path from 'node:path';
 import { ROOT, readJson } from '../shared/paths.js';
 import metaRoutes from './routes/meta.js';
 import generateRoutes from './routes/generate.js';
+import attachmentRoutes, { UPLOAD_DIR } from './routes/attachments.js';
 
 const settings = readJson('config/settings.json', { port: 3000 });
 const port = process.env.PORT || settings.port || 3000;
@@ -13,7 +14,11 @@ app.use(express.json({ limit: '8mb' }));
 // API
 app.use('/api', metaRoutes);
 app.use('/api', generateRoutes);
+app.use('/api', attachmentRoutes);
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
+
+// 업로드된 참고 파일
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 // 에디터 정적 파일 ([담당 2] — src/web)
 app.use(express.static(path.join(ROOT, 'src/web')));

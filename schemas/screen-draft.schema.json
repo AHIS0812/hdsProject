@@ -31,7 +31,8 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "kind": { "enum": ["excel", "ppt", "image", "other"] },
-          "url": { "type": "string" }
+          "url": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 }
         }
       }
     },

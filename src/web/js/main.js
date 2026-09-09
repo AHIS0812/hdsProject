@@ -159,34 +159,85 @@ const scrCombo = makeCombo($('scrBox'), {
   },
 });
 
-// ── 참고 파일 (이름만 수집, 업로드는 U-11) ────────────────
+// ── 참고 파일 업로드 (U-11) ───────────────────────────────
+const ACCEPT = '.png,.jpg,.jpeg,.gif,.webp,.xlsx,.xls,.csv,.ppt,.pptx,.pdf';
+const MAX_BYTES = 20 * 1024 * 1024;
+const drop = $('drop');
+const DROP_LABEL = '＋ 참고 파일 (Excel · PPT · 이미지 · PDF, 20MB 이하)';
+drop.textContent = DROP_LABEL;
+
 const fileInput = document.createElement('input');
 fileInput.type = 'file';
 fileInput.multiple = true;
+fileInput.accept = ACCEPT;
 fileInput.hidden = true;
 document.body.append(fileInput);
-$('drop').addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', () => {
-  for (const f of fileInput.files) {
-    const ext = (f.name.split('.').pop() || '').toLowerCase();
-    const kind = ['xlsx', 'xls', 'csv'].includes(ext) ? 'excel'
-      : ['ppt', 'pptx'].includes(ext) ? 'ppt'
-      : ['png', 'jpg', 'jpeg', 'gif'].includes(ext) ? 'image' : 'other';
-    attachments.push({ id: 'att-' + (attachments.length + 1), name: f.name, kind });
+
+const fmtSize = (n) => (n > 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB');
+
+async function uploadFiles(fileList) {
+  const files = [...fileList];
+  if (!files.length) return;
+
+  const big = files.filter((f) => f.size > MAX_BYTES);
+  if (big.length) toast(`20MB 초과로 제외: ${big.map((f) => f.name).join(', ')}`);
+  const ok = files.filter((f) => f.size <= MAX_BYTES);
+  if (!ok.length) return;
+
+  const form = new FormData();
+  ok.forEach((f) => form.append('files', f));
+  drop.textContent = `업로드 중… (${ok.length}개)`;
+  drop.style.pointerEvents = 'none';
+  try {
+    const r = await fetch('/api/attachments', { method: 'POST', body: form });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || `업로드 실패 (${r.status})`);
+    attachments.push(...(body.attachments || []));
+    drawFiles();
+    autosave();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    drop.textContent = DROP_LABEL;
+    drop.style.pointerEvents = '';
   }
+}
+
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  uploadFiles(fileInput.files);
   fileInput.value = '';
+});
+['dragenter', 'dragover'].forEach((ev) =>
+  drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('drag'); }),
+);
+['dragleave', 'dragend'].forEach((ev) =>
+  drop.addEventListener(ev, () => drop.classList.remove('drag')),
+);
+drop.addEventListener('drop', (e) => {
+  e.preventDefault();
+  drop.classList.remove('drag');
+  uploadFiles(e.dataTransfer.files);
+});
+
+async function removeAttachment(i) {
+  const a = attachments[i];
+  attachments.splice(i, 1);
   drawFiles();
   autosave();
-});
+  if (a?.id) fetch(`/api/attachments/${encodeURIComponent(a.id)}`, { method: 'DELETE' }).catch(() => {});
+}
+
 function drawFiles() {
   $('files').replaceChildren(
     ...attachments.map((a, i) => {
       const row = document.createElement('div');
       row.className = 'file';
-      row.textContent = '▤ ' + a.name;
+      row.textContent = `▤ ${a.name}` + (a.size ? `  ·  ${fmtSize(a.size)}` : '');
       const x = document.createElement('b');
       x.textContent = '✕';
-      x.addEventListener('click', () => { attachments.splice(i, 1); drawFiles(); autosave(); });
+      x.title = '삭제';
+      x.addEventListener('click', () => removeAttachment(i));
       row.append(x);
       return row;
     }),
