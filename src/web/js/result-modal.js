@@ -215,24 +215,51 @@ async function copyText(text) {
   }
   flashCopied();
 }
-/** preview iframe → PNG Blob */
+/**
+ * preview iframe → PNG Blob.
+ * 화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 보이므로, 캡처 직전에 iframe 을
+ * 콘텐츠 전체 크기로 잠깐 키운 뒤 캡처하고 원상복구한다(잘림 방지).
+ */
 async function renderScreenBlob() {
   const frame = mbody().querySelector('iframe');
   const doc = frame?.contentDocument;
   if (!doc?.body || !window.html2canvas) throw new Error('미리보기가 준비되지 않았습니다');
-  const root = doc.documentElement;
-  const canvas = await window.html2canvas(doc.body, {
-    backgroundColor: '#ffffff',
-    scale: 2,
-    logging: false,
-    width: root.scrollWidth,
-    height: root.scrollHeight,
-    windowWidth: root.scrollWidth,
-    windowHeight: root.scrollHeight,
-  });
-  return await new Promise((res, rej) =>
-    canvas.toBlob((b) => (b ? res(b) : rej(new Error('이미지 변환 실패'))), 'image/png'),
-  );
+
+  const el = doc.documentElement;
+  const body = doc.body;
+  const fullW = Math.max(el.scrollWidth, body.scrollWidth, el.offsetWidth, body.offsetWidth, 320);
+  const fullH = Math.max(el.scrollHeight, body.scrollHeight, el.offsetHeight, body.offsetHeight, 240);
+
+  const prev = { w: frame.style.width, h: frame.style.height, min: frame.style.minHeight };
+  frame.style.width = fullW + 'px';
+  frame.style.height = fullH + 'px';
+  frame.style.minHeight = '0';
+  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+
+  try {
+    const render = window.html2canvas(body, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      logging: false,
+      width: fullW,
+      height: fullH,
+      windowWidth: fullW,
+      windowHeight: fullH,
+      scrollX: 0,
+      scrollY: 0,
+    });
+    const timeout = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error('이미지 생성이 지연됩니다. 창을 활성 상태로 두고 다시 시도해주세요.')), 20000),
+    );
+    const canvas = await Promise.race([render, timeout]);
+    return await new Promise((res, rej) =>
+      canvas.toBlob((b) => (b ? res(b) : rej(new Error('이미지 변환 실패'))), 'image/png'),
+    );
+  } finally {
+    frame.style.width = prev.w;
+    frame.style.height = prev.h;
+    frame.style.minHeight = prev.min;
+  }
 }
 
 async function copyScreenImage() {
