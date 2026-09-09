@@ -17,7 +17,6 @@ let workMode = 'new';
 let currentTpl = 'list';
 let attachments = [];
 let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드된 화면 id
-let suppressScrPick = false;
 // 사용자가 캔버스를 직접 수정했는지. 템플릿/화면/샘플을 "프로그램으로" 로드한 직후엔 false.
 // true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
 let canvasDirty = false;
@@ -151,15 +150,9 @@ const sysCombo = makeCombo($('sysBox'), {
 const scrCombo = makeCombo($('scrBox'), {
   placeholder: '화면 선택',
   emptyText: '해당 시스템에 등록된 화면이 없습니다',
+  // 변경 모드에서 화면을 고르는 건 "그 화면을 보여줘" 라는 뜻이므로 확인 없이 바로 로드한다.
   onPick: async (scr) => {
-    if (suppressScrPick || !scr || scr.id === loadedScreenId) return;
-    if (!guardDiscard()) {
-      // 취소: 콤보를 직전 화면으로 되돌린다
-      suppressScrPick = true;
-      loadedScreenId ? scrCombo.choose(loadedScreenId) : scrCombo.reset();
-      suppressScrPick = false;
-      return;
-    }
+    if (!scr || scr.id === loadedScreenId) return;
     try {
       const def = await api.getScreen(scr.id);
       loadCanvas(def.shapes || [], def.name || scr.name);
