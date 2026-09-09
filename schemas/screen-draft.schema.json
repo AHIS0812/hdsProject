@@ -67,7 +67,12 @@
       "required": ["type", "x", "y", "w", "h"],
       "properties": {
         "id": { "type": "string" },
-        "type": { "enum": ["title", "label", "input", "select", "date", "check", "text", "list", "button", "area"] },
+        "type": {
+          "enum": [
+            "title", "label", "input", "select", "radio", "date", "check", "text", "file",
+            "list", "pager", "tab", "image", "button", "buttongroup", "divider", "area"
+          ]
+        },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "w": { "type": "number", "exclusiveMinimum": 0 },

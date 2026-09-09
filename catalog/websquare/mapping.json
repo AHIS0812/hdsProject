@@ -1,15 +1,22 @@
 {
-  "$comment": "요소 타입 → WebSquare 매핑 규칙. 개발지시서 §7. 시스템별 차이는 override.<systemId>.json 로.",
+  "$comment": "요소 타입 → WebSquare 매핑 규칙. 개발지시서 §7. 시스템별 차이는 override.<systemId>.json 로. (담당 1 검증 대상)",
   "default": {
-    "input":  { "tag": "w2:inputBox",  "attrs": { "id": "ipb{n}" }, "requiredClass": "w2input_essential" },
-    "select": { "tag": "w2:selectBox", "attrs": { "id": "sel{n}", "dataList": "dl{n}" } },
-    "date":   { "tag": "w2:calendar",  "attrs": { "id": "cal{n}", "displayFormat": "yyyy-MM-dd" } },
-    "check":  { "tag": "w2:checkbox",  "attrs": { "id": "chk{n}", "label": "{label}" } },
-    "text":   { "tag": "w2:textarea",  "attrs": { "id": "txa{n}" } },
-    "list":   { "tag": "w2:gridView",  "attrs": { "id": "grd{n}", "dataList": "dl{n}" }, "columnTag": "w2:gridColumn" },
-    "button": { "tag": "w2:trigger",   "attrs": { "id": "btn{n}", "value": "{label}", "onclick": "fn_{n}" } },
-    "label":  { "tag": "w2:textbox",   "attrs": { "id": "lbl{n}", "value": "{label}" } },
-    "title":  { "tag": "w2:textbox",   "attrs": { "id": "ttl{n}", "value": "{label}" } },
-    "area":   { "tag": "w2:group",     "attrs": { "id": "grp{n}" } }
+    "input":       { "tag": "w2:inputBox",  "attrs": { "id": "ipb{n}" }, "requiredClass": "w2input_essential" },
+    "select":      { "tag": "w2:selectBox", "attrs": { "id": "sel{n}", "dataList": "dl{n}" }, "options": "{items}" },
+    "radio":       { "tag": "w2:radiobutton", "attrs": { "id": "rdo{n}", "dataList": "dl{n}" }, "options": "{items}" },
+    "date":        { "tag": "w2:calendar",  "attrs": { "id": "cal{n}", "displayFormat": "yyyy-MM-dd" } },
+    "check":       { "tag": "w2:checkbox",  "attrs": { "id": "chk{n}", "label": "{label}" } },
+    "text":        { "tag": "w2:textarea",  "attrs": { "id": "txa{n}" } },
+    "file":        { "tag": "w2:fileUpload", "attrs": { "id": "fup{n}", "title": "{label}" } },
+    "list":        { "tag": "w2:gridView",  "attrs": { "id": "grd{n}", "dataList": "dl{n}" }, "columnTag": "w2:gridColumn", "columns": "{items}" },
+    "pager":       { "tag": "w2:pagination", "attrs": { "id": "pgn{n}", "pageListCnt": 10 } },
+    "tab":         { "tag": "w2:tabControl", "attrs": { "id": "tab{n}" }, "tabItemTag": "w2:tabItem", "items": "{items}" },
+    "image":       { "tag": "w2:image",     "attrs": { "id": "img{n}", "alt": "{label}" } },
+    "button":      { "tag": "w2:trigger",   "attrs": { "id": "btn{n}", "value": "{label}", "onclick": "fn_{n}" } },
+    "buttongroup": { "tag": "w2:trigger",   "repeatPerItem": true, "attrs": { "id": "btn{n}_{i}", "value": "{item}", "onclick": "fn_{n}_{i}" } },
+    "divider":     { "tag": "w2:group",     "attrs": { "id": "hr{n}", "class": "w2group_divider" } },
+    "label":       { "tag": "w2:textbox",   "attrs": { "id": "lbl{n}", "value": "{label}" } },
+    "title":       { "tag": "w2:textbox",   "attrs": { "id": "ttl{n}", "value": "{label}" } },
+    "area":        { "tag": "w2:group",     "attrs": { "id": "grp{n}" } }
   }
 }

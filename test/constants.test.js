@@ -25,8 +25,14 @@ test('모든 요소 타입에 DEF 기본 크기 [w,h] 가 있다', () => {
   }
 });
 
-test('HAS_ITEMS 는 list / select 만', () => {
-  assert.deepEqual(Object.keys(HAS_ITEMS).sort(), ['list', 'select']);
+test('HAS_ITEMS 키는 전부 유효한 요소 타입이고 list/select 를 포함한다', () => {
+  const typeSet = new Set(TYPES);
+  for (const k of Object.keys(HAS_ITEMS)) assert.ok(typeSet.has(k), `HAS_ITEMS[${k}] 는 알 수 없는 타입`);
+  assert.ok(HAS_ITEMS.list && HAS_ITEMS.select);
+});
+
+test('HAS_ITEMS 타입에는 defaultCols 기본값이 있다', () => {
+  for (const k of Object.keys(HAS_ITEMS)) assert.ok(defaultCols(k).length > 0, `${k}: defaultCols 비어 있음`);
 });
 
 test('BOARD_SIZES 가 blank 을 제외한 모든 템플릿 키를 덮는다', () => {

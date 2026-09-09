@@ -3,11 +3,18 @@
   "components": [
     { "componentKey": "std.input", "name": "입력칸", "websquare": "w2:inputBox", "params": ["id", "essential"], "snippet": "snippets/input.html" },
     { "componentKey": "std.select", "name": "선택", "websquare": "w2:selectBox", "params": ["id", "dataList"], "snippet": "snippets/select.html" },
+    { "componentKey": "std.radio", "name": "라디오", "websquare": "w2:radiobutton", "params": ["id", "dataList"], "snippet": "snippets/radio.html" },
     { "componentKey": "std.date", "name": "날짜", "websquare": "w2:calendar", "params": ["id", "displayFormat"], "snippet": "snippets/date.html" },
     { "componentKey": "std.check", "name": "체크", "websquare": "w2:checkbox", "params": ["id", "label"], "snippet": "snippets/check.html" },
     { "componentKey": "std.textarea", "name": "긴 글", "websquare": "w2:textarea", "params": ["id"], "snippet": "snippets/textarea.html" },
+    { "componentKey": "std.file", "name": "파일", "websquare": "w2:fileUpload", "params": ["id", "title"], "snippet": "snippets/file.html" },
     { "componentKey": "std.grid", "name": "표", "websquare": "w2:gridView", "params": ["id", "dataList", "columns"], "snippet": "snippets/grid.html" },
+    { "componentKey": "std.pager", "name": "페이지", "websquare": "w2:pagination", "params": ["id", "pageListCnt"], "snippet": "snippets/pager.html" },
+    { "componentKey": "std.tab", "name": "탭", "websquare": "w2:tabControl", "params": ["id", "tabItems"], "snippet": "snippets/tab.html" },
+    { "componentKey": "std.image", "name": "이미지", "websquare": "w2:image", "params": ["id", "alt"], "snippet": "snippets/image.html" },
     { "componentKey": "std.button", "name": "버튼", "websquare": "w2:trigger", "params": ["id", "value", "onclick"], "snippet": "snippets/button.html" },
+    { "componentKey": "std.buttongroup", "name": "버튼그룹", "websquare": "w2:trigger", "params": ["id", "values"], "snippet": "snippets/buttongroup.html" },
+    { "componentKey": "std.divider", "name": "구분선", "websquare": "w2:group", "params": ["id", "class"], "snippet": "snippets/divider.html" },
     { "componentKey": "std.label", "name": "글자", "websquare": "w2:textbox", "params": ["id", "value"], "snippet": "snippets/label.html" },
     { "componentKey": "std.section", "name": "섹션 제목", "websquare": "w2:textbox", "params": ["id", "value"], "snippet": "snippets/section.html" },
     { "componentKey": "std.group", "name": "묶음", "websquare": "w2:group", "params": ["id"], "snippet": "snippets/group.html" }
