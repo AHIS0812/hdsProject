@@ -376,9 +376,10 @@ export function zoomReset() {
 
 export const count = () => shapes.length;
 
-/** payload.shapes 형식으로 반환 (개발지시서 §6.1) */
+/** payload.shapes 형식으로 반환 (개발지시서 §6.1). id 는 questions/report 참조용. */
 export function toPayloadShapes() {
   return shapes.map((s) => ({
+    id: 's' + s.id,
     type: s.t,
     x: s.x, y: s.y, w: s.w, h: s.h,
     label: s.label || undefined,

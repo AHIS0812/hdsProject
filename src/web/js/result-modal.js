@@ -10,6 +10,7 @@ const STEPS = ['배치된 요소 해석', '보충 설명 · 첨부 파일 반영
 
 // last.payload = 최초 생성 payload, last.result = 가장 최근 결과 (generate/refine 공통)
 let last = { payload: null, result: null };
+let currentTab = 'v';
 
 const mask = () => $('mask');
 const mbody = () => $('mbody');
@@ -58,6 +59,10 @@ function renderTab(p) {
     b.replaceChildren(pre);
     return;
   }
+  if (p === 'r') {
+    b.replaceChildren(renderReport(r));
+    return;
+  }
   // 'v' — 화면
   if (r.status === 'error') {
     const pre = document.createElement('pre');
@@ -83,8 +88,107 @@ function renderTab(p) {
 }
 
 function setTab(p) {
+  currentTab = p;
   document.querySelectorAll('.mtab').forEach((x) => x.classList.toggle('on', x.dataset.p === p));
   renderTab(p);
+  $('mCopy').hidden = !textForTab(p);
+}
+
+// ── 처리 리포트 (report 시각화) ───────────────────────────
+function renderReport(r) {
+  const wrap = document.createElement('div');
+  wrap.className = 'report';
+  const rep = r.report || {};
+  const labelOf = (id) => {
+    const s = (last.payload?.shapes || []).find((x) => x.id === id);
+    return s ? `${s.label || s.type}` : id;
+  };
+
+  const stat = document.createElement('div');
+  stat.className = 'rep-stats';
+  stat.append(
+    repStat('상태', r.status || '-'),
+    repStat('재시도', (rep.retries ?? 0) + '회'),
+    repStat('소요', rep.elapsedMs != null ? Math.round(rep.elapsedMs / 100) / 10 + '초' : '-'),
+    repStat('AI', rep.usedDeterministicFallback ? '미사용(폴백)' : rep.mock ? 'mock' : '사용'),
+  );
+  wrap.append(stat);
+
+  wrap.append(repSection('표준 대체 (fallback)',
+    (rep.fallbacksApplied || []).map((f) =>
+      `${labelOf(f.targetId)} : ${f.from ?? '?'} → ${f.to ?? '?'}${f.reason ? `  (${f.reason})` : ''}`),
+    '표준에 없는 요소를 대체한 내역이 없습니다'));
+
+  wrap.append(repSection('미확정 항목',
+    (rep.unresolved || []).map(labelOf),
+    '미확정으로 남은 요소가 없습니다'));
+
+  if (rep.note) {
+    const n = document.createElement('p');
+    n.className = 'rep-note';
+    n.textContent = rep.note;
+    wrap.append(n);
+  }
+  return wrap;
+}
+function repStat(k, v) {
+  const d = document.createElement('div');
+  d.className = 'rep-stat';
+  d.innerHTML = `<b></b><span></span>`;
+  d.querySelector('b').textContent = v;
+  d.querySelector('span').textContent = k;
+  return d;
+}
+function repSection(title, lines, emptyText) {
+  const sec = document.createElement('div');
+  sec.className = 'rep-sec';
+  const h = document.createElement('h4');
+  h.textContent = title;
+  sec.append(h);
+  if (lines.length) {
+    const ul = document.createElement('ul');
+    lines.forEach((t) => {
+      const li = document.createElement('li');
+      li.textContent = t;
+      ul.append(li);
+    });
+    sec.append(ul);
+  } else {
+    const p = document.createElement('p');
+    p.className = 'rep-empty';
+    p.textContent = emptyText;
+    sec.append(p);
+  }
+  return sec;
+}
+
+// ── 복사 ─────────────────────────────────────────────────
+function textForTab(p) {
+  const r = last.result || {};
+  if (p === 'j') return last.payload ? JSON.stringify(last.payload, null, 2) : '';
+  if (p === 'x') return r.code?.websquareXml || '';
+  if (p === 'v') return r.preview?.html || '';
+  if (p === 'r') return r.report ? JSON.stringify(r.report, null, 2) : '';
+  return '';
+}
+async function copyCurrent() {
+  const text = textForTab(currentTab);
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch { /* 무시 */ }
+    ta.remove();
+  }
+  const btn = $('mCopy');
+  btn.textContent = '✓ 복사됨';
+  clearTimeout(copyCurrent._t);
+  copyCurrent._t = setTimeout(() => { btn.textContent = '복사'; }, 1200);
 }
 
 // ── 질문 / 수정 요청 footer ───────────────────────────────
@@ -180,6 +284,7 @@ async function doRefine() {
     pre.className = 'err';
     pre.textContent = e.message;
     mbody().replaceChildren(pre);
+    $('mCopy').hidden = true;
     mfoot().hidden = false;
   }
 }
@@ -219,12 +324,14 @@ export async function runBuild(payload, title) {
     pre.className = 'err';
     pre.textContent = e.message;
     mbody().replaceChildren(pre);
+    $('mCopy').hidden = true;
   }
 }
 
 export function initResultModal() {
   $('mClose').addEventListener('click', closeModal);
   $('mDownload').addEventListener('click', download);
+  $('mCopy').addEventListener('click', copyCurrent);
   $('mRefine').addEventListener('click', doRefine);
   $('mInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') doRefine(); });
   document.querySelectorAll('.mtab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.p)));
