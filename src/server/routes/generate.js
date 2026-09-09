@@ -8,8 +8,21 @@
 import { Router } from 'express';
 import { validateScreenDraft, validateRefineRequest } from '../../shared/validate.js';
 import { fixture } from '../mock.js';
+import { deterministicResult } from '../../pipeline/deterministic.js';
 
 const router = Router();
+
+// 개발용 트리거: 보충 설명에 이 말이 있으면 파이프라인이 실패한 것으로 간주 → 결정론적 폴백
+const FORCE_FALLBACK = /폴백|fallback|생성\s*실패|파이프라인\s*실패/i;
+
+/**
+ * 생성 파이프라인. 지금은 mock.
+ * TODO(담당 1): Stage A → 매핑 → Stage B → 자동 검증 루프로 교체.
+ * 이 함수가 throw 하거나 status:'error' 를 반환하면 결정론적 변환기로 폴백한다(아래 라우트).
+ */
+function runPipeline(payload) {
+  return mockResult(payload);
+}
 
 function mockResult(payload) {
   const base = fixture('results/generic.json', { status: 'ok' });
@@ -41,7 +54,18 @@ router.post('/generate', (req, res) => {
   if ((req.body.note || '').includes('질문')) {
     return res.json({ ...fixture('results/needs-input.json', { status: 'needs_input', questions: [] }) });
   }
-  res.json(mockResult(req.body));
+
+  // 파이프라인 실행 → 실패 시 결정론적 변환기로 폴백 (개발지시서 §4.2, D-7)
+  try {
+    if (FORCE_FALLBACK.test(req.body.note || '')) {
+      throw new Error('개발용 트리거로 파이프라인 실패를 시뮬레이션했습니다.');
+    }
+    const result = runPipeline(req.body);
+    if (result?.status === 'error') throw new Error(result.error?.message || '파이프라인 오류');
+    return res.json(result);
+  } catch (err) {
+    return res.json(deterministicResult(req.body, err.message));
+  }
 });
 
 router.post('/refine', (req, res) => {
@@ -52,12 +76,20 @@ router.post('/refine', (req, res) => {
       error: { message: 'refine 요청이 스키마를 위반했습니다.', details: errors },
     });
   }
-  const result = mockResult(req.body?.basePayload);
-  result.report = {
-    ...result.report,
-    refinedWith: { answers: req.body?.answers || [], instruction: req.body?.instruction || null },
-  };
-  res.json(result);
+  const refinedWith = { answers: req.body?.answers || [], instruction: req.body?.instruction || null };
+  try {
+    if (FORCE_FALLBACK.test(req.body?.instruction || '')) {
+      throw new Error('개발용 트리거로 파이프라인 실패를 시뮬레이션했습니다.');
+    }
+    const result = runPipeline(req.body?.basePayload);
+    if (result?.status === 'error') throw new Error(result.error?.message || '파이프라인 오류');
+    result.report = { ...result.report, refinedWith };
+    return res.json(result);
+  } catch (err) {
+    const result = deterministicResult(req.body?.basePayload, err.message);
+    result.report.refinedWith = refinedWith;
+    return res.json(result);
+  }
 });
 
 export default router;

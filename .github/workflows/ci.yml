@@ -36,4 +36,8 @@ jobs:
           curl -sf -X POST "http://localhost:3000/api/generate" \
             -H 'Content-Type: application/json' \
             -d @fixtures/payloads/list.json | grep -q '"status":"ok"'
+          # 파이프라인 실패 시 결정론적 폴백
+          curl -sf -X POST "http://localhost:3000/api/generate" \
+            -H 'Content-Type: application/json' \
+            -d @fixtures/payloads/fallback.json | grep -q '"usedDeterministicFallback":true'
           kill "$SERVER_PID"

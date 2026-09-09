@@ -31,15 +31,18 @@ npm run dev
   다중 선택(Shift+클릭·마퀴 드래그) + 정렬·균등 분배, 단축키 도움말(?)·첫 방문 온보딩,
   신규·변경 모드, 시스템·화면 콤보박스, 유형별 캔버스 크기, "화면 생성" → 결과 모달 3탭
   (화면 = 결과/동시 보기(내 스케치+결과) 전환·이미지 복사 / 전달 데이터 = payload JSON / WebSquare XML = 구문 강조·텍스트 복사),
-  코드 내려받기(파일 2개↑ zip, `fflate`), 생성 실패·추가 확인 상태 안내,
+  코드 내려받기(파일 2개↑ zip, `fflate`),
   생성 완료 시 상태·소요시간 표시, 질문 응답 + 자연어 수정 요청 → 재생성(`/api/refine`),
   참고 파일 업로드(클릭/드래그, `/api/attachments` → `uploads/`),
   **이름 붙인 저장본**(localStorage 슬롯 — 저장/덮어쓰기/불러오기/삭제) · `.hds.json` 파일 내보내기·불러오기,
   localStorage 자동 저장.
 - API 스모크 페이지 (`/smoke.html`) — `/api/*` 를 백엔드 없이 확인
-- **개발용 트리거**: 보충 설명에 "질문" 을 넣고 생성하면 mock 서버가 `needs_input`(질문 3개)을 반환
+- **결정론적 폴백 변환기** (`src/pipeline/deterministic.js`) — AI 파이프라인이 실패하면 payload 를
+  읽기순으로 정렬해 `catalog/websquare/mapping.json` 기반 WebSquare XML + 좌표 그대로의 Preview HTML 로 변환.
+  `report.usedDeterministicFallback=true`
+- **개발용 트리거**: 보충 설명에 "질문" → `needs_input`(질문 3개), "폴백" → 결정론적 폴백 강제
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` mock
-- 생성 API: `POST /api/generate`, `POST /api/refine` — **스키마 검증은 실제**, 결과는 `fixtures/results` mock
+- 생성 API: `POST /api/generate`, `POST /api/refine` — **스키마 검증은 실제**, 결과는 `fixtures/results` mock (실패 시 결정론적 폴백)
 - 첨부 API: `POST /api/attachments` (multipart, multer), `DELETE /api/attachments/:id` — **실제 저장**(`uploads/`, gitignore, PNG/JPG/GIF·XLSX/XLS/CSV·PPT/PPTX·PDF, ≤20MB)
 
 미구현 (다음 작업):

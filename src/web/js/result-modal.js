@@ -78,11 +78,16 @@ function renderTab(p) {
   }
   // 'v' — 화면
   if (r.status === 'error') {
-    b.replaceChildren(errorBox(r));
+    const pre = document.createElement('pre');
+    pre.className = 'err';
+    pre.textContent = '생성 실패\n\n' + (r.error?.message || '') + '\n\n' + (r.error?.log || '');
+    b.replaceChildren(pre);
     return;
   }
   if (r.status === 'needs_input') {
-    b.replaceChildren(needsInputBox(r));
+    const pre = document.createElement('pre');
+    pre.textContent = '아래 질문에 답하면 반영해서 다시 생성합니다.';
+    b.replaceChildren(pre);
     return;
   }
   const html = r.preview?.html;
@@ -98,47 +103,6 @@ function renderTab(p) {
   const frame = document.createElement('iframe');
   frame.srcdoc = html;
   b.replaceChildren(frame);
-}
-
-/** status=error 안내 박스 (메시지 + 접이식 로그) */
-function errorBox(r) {
-  const box = document.createElement('div');
-  box.className = 'mstate err';
-  const h = document.createElement('b');
-  h.textContent = '⚠ 화면을 생성하지 못했습니다';
-  box.append(h);
-  const msg = document.createElement('p');
-  msg.textContent = r.error?.message || '알 수 없는 오류입니다. 잠시 후 다시 시도해주세요.';
-  box.append(msg);
-  if (r.error?.log) {
-    const det = document.createElement('details');
-    const sum = document.createElement('summary');
-    sum.textContent = '자세한 로그';
-    const pre = document.createElement('pre');
-    pre.className = 'err';
-    pre.textContent = r.error.log;
-    det.append(sum, pre);
-    box.append(det);
-  }
-  const hint = document.createElement('p');
-  hint.className = 'mstate-hint';
-  hint.textContent = '아래 입력창에 조건을 더 적어 다시 시도하거나, 캔버스를 정리한 뒤 다시 생성해보세요.';
-  box.append(hint);
-  return box;
-}
-
-/** status=needs_input 안내 박스 (질문은 footer 에 렌더된다) */
-function needsInputBox(r) {
-  const box = document.createElement('div');
-  box.className = 'mstate';
-  const h = document.createElement('b');
-  h.textContent = '몇 가지만 확인하면 됩니다';
-  box.append(h);
-  const p = document.createElement('p');
-  const n = (r.questions || []).length;
-  p.textContent = `아래 질문 ${n}개에 답하면 반영해서 다시 생성합니다. (건너뛰고 수정 요청만 적어도 됩니다)`;
-  box.append(p);
-  return box;
 }
 
 /** 스케치 스냅샷을 컨테이너 폭에 맞춰 축소해 붙인다 */
@@ -212,9 +176,12 @@ function renderStatus() {
   const st = $('mStatus');
   const r = last.result;
   if (!r?.status) { st.hidden = true; return; }
-  const label = { ok: '✓ 생성 완료', needs_input: '추가 확인이 필요합니다', error: '⚠ 생성 실패' }[r.status] || r.status;
+  const fallback = r.report?.usedDeterministicFallback;
+  const label = fallback
+    ? '✓ 생성 완료 (결정론적 변환 · AI 정리 없음)'
+    : { ok: '✓ 생성 완료', needs_input: '추가 확인이 필요합니다', error: '⚠ 생성 실패' }[r.status] || r.status;
   const ms = r.report?.elapsedMs;
-  const suffix = ms > 0 ? ` · ${Math.round(ms / 100) / 10}초` : r.report?.mock ? ' · mock' : '';
+  const suffix = ms > 0 ? ` · ${Math.round(ms / 100) / 10}초` : r.report?.mock && !fallback ? ' · mock' : '';
   st.textContent = label + suffix;
   st.className = 'mstatus' + (r.status === 'ok' ? ' ok' : r.status === 'error' ? ' err' : '');
   st.hidden = false;
@@ -397,7 +364,10 @@ async function doRefine() {
     setTab('v');
   } catch (e) {
     stop();
-    mbody().replaceChildren(errorBox({ error: { message: e.message } }));
+    const pre = document.createElement('pre');
+    pre.className = 'err';
+    pre.textContent = e.message;
+    mbody().replaceChildren(pre);
     $('mCopy').hidden = true;
     mfoot().hidden = false;
   }
@@ -476,7 +446,10 @@ export async function runBuild(payload, title, sketch = null) {
   } catch (e) {
     stop();
     last = { payload, result: null, sketch };
-    mbody().replaceChildren(errorBox({ error: { message: e.message } }));
+    const pre = document.createElement('pre');
+    pre.className = 'err';
+    pre.textContent = e.message;
+    mbody().replaceChildren(pre);
     $('mCopy').hidden = true;
     $('mDownload').hidden = true;
   }

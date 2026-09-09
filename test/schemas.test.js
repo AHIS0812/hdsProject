@@ -85,8 +85,10 @@ test('모든 screen 픽스처: shapes 가 canvas 안에 들어가고 edit payloa
   }
 });
 
-test('fixtures/payloads/list.json 이 스키마를 통과한다', () => {
-  assert.equal(validateScreenDraft(readJson('fixtures/payloads/list.json')), null);
+test('fixtures/payloads/*.json 이 스키마를 통과한다', () => {
+  for (const f of ['list.json', 'fallback.json']) {
+    assert.equal(validateScreenDraft(readJson(`fixtures/payloads/${f}`)), null, `${f} 위반`);
+  }
 });
 
 test('fixtures/results/*.json 이 generation-result 스키마를 통과한다', () => {

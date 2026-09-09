@@ -1,0 +1,17 @@
+{
+  "systemId": "portal",
+  "systemName": "하이포탈",
+  "mode": "new",
+  "template": "list",
+  "screenName": "폴백 테스트",
+  "note": "폴백 확인용 — 파이프라인 실패 시 결정론적 변환기로 생성되는지 확인",
+  "canvas": { "w": 960, "h": 600 },
+  "shapes": [
+    { "id": "s1", "type": "area", "x": 30, "y": 30, "w": 900, "h": 70, "label": "조회 영역" },
+    { "id": "s2", "type": "label", "x": 50, "y": 54, "w": 80, "h": 24, "label": "계약번호", "required": true },
+    { "id": "s3", "type": "input", "x": 140, "y": 52, "w": 170, "h": 28 },
+    { "id": "s4", "type": "button", "x": 740, "y": 52, "w": 80, "h": 28, "label": "조회" },
+    { "id": "s5", "type": "title", "x": 30, "y": 125, "w": 200, "h": 26, "label": "조회 결과" },
+    { "id": "s6", "type": "list", "x": 30, "y": 165, "w": 900, "h": 300, "label": "목록", "items": "순번,계약번호,계약자,상품명,상태" }
+  ]
+}
