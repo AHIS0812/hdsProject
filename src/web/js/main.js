@@ -334,6 +334,10 @@ async function boot() {
   initResultModal();
 
   const restored = restore();
+  if (!restored) {
+    // 최초 실행: 선택된 유형(목록조회)의 프리셋을 올려 타일 ↔ 캔버스 상태를 맞춘다
+    loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
+  }
   syncAbL();
   canvasDirty = false; // 부팅 시점의 로드는 사용자 수정이 아님
 

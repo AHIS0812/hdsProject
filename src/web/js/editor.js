@@ -296,9 +296,13 @@ function applyBoardSize() {
 
 /** 캔버스(보드) 크기 변경. 화면 유형/불러온 화면에 맞춰 호출. */
 export function setBoardSize(w, h) {
-  BOARD_W = Math.max(320, Math.round(w) || DEFAULT_BOARD.w);
-  BOARD_H = Math.max(240, Math.round(h) || DEFAULT_BOARD.h);
+  const nw = Math.max(320, Math.round(w) || DEFAULT_BOARD.w);
+  const nh = Math.max(240, Math.round(h) || DEFAULT_BOARD.h);
+  if (nw === BOARD_W && nh === BOARD_H) return;
+  BOARD_W = nw;
+  BOARD_H = nh;
   applyBoardSize();
+  if (zm !== 100) zoomReset(); // 크기가 바뀌면 배율은 100% 로
   // 보드가 줄어든 경우 밖으로 나간 요소를 안으로 당긴다
   shapes.forEach((s) => {
     s.w = Math.min(s.w, BOARD_W);
