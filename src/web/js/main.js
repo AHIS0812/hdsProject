@@ -1,7 +1,7 @@
 // 화면 스케치 스튜디오 — 에디터 조립. 담당 2.
 // 예시 프로토타입(samples/화면스케치스튜디오_예시_v1.html)을 src/web 모듈 구조로 이전.
 
-import { COMPS } from './constants.js';
+import { COMPS, DEFAULT_BOARD, boardSizeFor } from './constants.js';
 import * as api from './api.js';
 import * as editor from './editor.js';
 import { makeCombo } from './combobox.js';
@@ -22,10 +22,13 @@ let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드�
 let canvasDirty = false;
 
 const STORE_KEY = 'aiScreenDraft:v1';
-const CANVAS = { w: 960, h: 600 };
 
-/** 캔버스를 새 shapes 로 교체 (프로그램 로드 — dirty 아님) */
-function loadCanvas(shapes, name) {
+/**
+ * 캔버스를 새 shapes 로 교체 (프로그램 로드 — dirty 아님)
+ * @param {object} [size] { w, h } — 지정 시 보드 크기도 변경
+ */
+function loadCanvas(shapes, name, size) {
+  if (size && (size.w || size.h)) editor.setBoardSize(size.w || DEFAULT_BOARD.w, size.h || DEFAULT_BOARD.h);
   editor.setShapes(shapes || []);
   if (name != null) scrNm.value = name;
   syncAbL();
@@ -51,16 +54,17 @@ function toast(msg) {
 
 // ── 상단 바 ───────────────────────────────────────────────
 function syncAbL() {
+  const { w, h } = editor.getBoardSize();
   abL.textContent = (scrNm.value || '제목 없음') + '  ';
   const span = document.createElement('span');
-  span.textContent = `${CANVAS.w} × ${CANVAS.h}`;
+  span.textContent = `${w} × ${h}`;
   abL.append(span);
 }
 scrNm.addEventListener('input', () => { syncAbL(); autosave(); });
 
 $('btnSample').addEventListener('click', () => {
   if (!guardDiscard()) return;
-  loadCanvas(sampleShapes(), '지정대리인 등록');
+  loadCanvas(sampleShapes(), '지정대리인 등록', DEFAULT_BOARD);
 });
 
 $('btnSave').addEventListener('click', () => { autosave(true); toast('임시저장되었습니다'); });
@@ -121,7 +125,7 @@ document.querySelectorAll('.tpl').forEach((el) => {
     currentTpl = key;
     highlightTpl(key);
     // 방금까지 기존 화면을 보고 있었다면 이름을 새 화면 기본값으로
-    loadCanvas(templateShapes(key), loadedScreenId ? '새 화면' : undefined);
+    loadCanvas(templateShapes(key), loadedScreenId ? '새 화면' : undefined, boardSizeFor(key));
     loadedScreenId = null;
   });
 });
@@ -155,7 +159,7 @@ const scrCombo = makeCombo($('scrBox'), {
     if (!scr || scr.id === loadedScreenId) return;
     try {
       const def = await api.getScreen(scr.id);
-      loadCanvas(def.shapes || [], def.name || scr.name);
+      loadCanvas(def.shapes || [], def.name || scr.name, def.canvas || DEFAULT_BOARD);
       loadedScreenId = scr.id;
     } catch (e) {
       toast('화면을 불러오지 못했습니다');
@@ -258,7 +262,7 @@ function payload() {
     systemName: sys?.name,
     mode: workMode,
     screenName: scrNm.value,
-    canvas: { ...CANVAS },
+    canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
   };
   if (workMode === 'new') p.template = currentTpl;
@@ -289,6 +293,7 @@ function autosave(immediate) {
         template: currentTpl,
         note: noteEl.value,
         attachments,
+        canvas: editor.getBoardSize(),
         shapes: editor.toPayloadShapes(),
       }));
     } catch { /* 프라이빗 모드 등 — 무시 */ }
@@ -318,6 +323,7 @@ function restore() {
     currentTpl = saved.template;
     highlightTpl(saved.template);
   }
+  if (saved.canvas?.w && saved.canvas?.h) editor.setBoardSize(saved.canvas.w, saved.canvas.h);
   if (Array.isArray(saved.shapes) && saved.shapes.length) editor.setShapes(saved.shapes);
   return { systemId: saved.systemId };
 }

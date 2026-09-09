@@ -25,9 +25,22 @@ export const NAME = Object.fromEntries(COMPS.map((c) => [c.t, c.n]));
 /** items(쉼표 목록)를 갖는 타입 */
 export const HAS_ITEMS = { list: 1, select: 1 };
 
-export const BOARD_W = 960;
-export const BOARD_H = 600;
 export const SNAP = 6;
+
+/** 캔버스 기본 크기 */
+export const DEFAULT_BOARD = { w: 960, h: 600 };
+
+/** 화면 유형별 캔버스 크기 (U-12) */
+export const BOARD_SIZES = {
+  list:   { w: 960, h: 600 },
+  detail: { w: 960, h: 600 },
+  form:   { w: 960, h: 600 },
+  blank:  { w: 960, h: 600 },
+  main:   { w: 1280, h: 720 },
+  popup:  { w: 560, h: 420 },
+};
+
+export const boardSizeFor = (key) => BOARD_SIZES[key] || DEFAULT_BOARD;
 
 export const defaultLabel = (t) =>
   ({ title: '제목을 입력하세요', label: '항목명', button: '버튼', area: '묶음 영역',

@@ -37,7 +37,7 @@ npm run dev
 미구현 (다음 작업):
 - `src/pipeline/*` (Stage A/B, autofix, 결정론적 변환기) — 담당 1
 - `src/llm/*` (Claude/OpenAI provider) — 담당 1
-- 에디터 잔여 항목: 유형별 보드 크기(U-12)
+- 에디터 U-1~U-12 완료. 반응형·접근성 세부 다듬기 정도만 남음
 
 ## 구조
 

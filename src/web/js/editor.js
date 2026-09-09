@@ -2,9 +2,12 @@
 // 플로팅 컨텍스트 툴바 / 단축키. 예시 프로토타입의 로직을 그대로 계승.
 // 개발지시서 U-2 ~ U-5.
 
-import { DEF, NAME, HAS_ITEMS, BOARD_W, BOARD_H, SNAP, defaultLabel, defaultCols } from './constants.js';
+import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, defaultLabel, defaultCols } from './constants.js';
 
 let board, ctx, hint, ctxT, fL, fC, bReq, bU, bR, zv, cv;
+// 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
+let BOARD_W = DEFAULT_BOARD.w;
+let BOARD_H = DEFAULT_BOARD.h;
 let shapes = [];
 let sel = null;
 let hist = [];
@@ -282,7 +285,32 @@ export function initEditor(opts = {}) {
     ({ req: toggleReq, dup, front, back, del: delSel })[act]?.();
   });
 
+  applyBoardSize();
   render();
+}
+
+function applyBoardSize() {
+  board.style.width = BOARD_W + 'px';
+  board.style.height = BOARD_H + 'px';
+}
+
+/** 캔버스(보드) 크기 변경. 화면 유형/불러온 화면에 맞춰 호출. */
+export function setBoardSize(w, h) {
+  BOARD_W = Math.max(320, Math.round(w) || DEFAULT_BOARD.w);
+  BOARD_H = Math.max(240, Math.round(h) || DEFAULT_BOARD.h);
+  applyBoardSize();
+  // 보드가 줄어든 경우 밖으로 나간 요소를 안으로 당긴다
+  shapes.forEach((s) => {
+    s.w = Math.min(s.w, BOARD_W);
+    s.h = Math.min(s.h, BOARD_H);
+    s.x = Math.max(0, Math.min(BOARD_W - s.w, s.x));
+    s.y = Math.max(0, Math.min(BOARD_H - s.h, s.y));
+  });
+  render();
+}
+
+export function getBoardSize() {
+  return { w: BOARD_W, h: BOARD_H };
 }
 
 export function addComponent(t) {
