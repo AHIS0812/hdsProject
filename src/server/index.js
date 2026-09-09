@@ -20,6 +20,10 @@ app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 // 업로드된 참고 파일
 app.use('/uploads', express.static(UPLOAD_DIR));
 
+// 벤더 라이브러리 (화면 → 이미지 복사용)
+app.get('/vendor/html2canvas.js', (req, res) =>
+  res.sendFile(path.join(ROOT, 'node_modules/html2canvas/dist/html2canvas.min.js')));
+
 // 에디터 정적 파일 ([담당 2] — src/web)
 app.use(express.static(path.join(ROOT, 'src/web')));
 

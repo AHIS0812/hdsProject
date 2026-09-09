@@ -122,7 +122,6 @@
         <div class="mtab on" data-p="v">화면</div>
         <div class="mtab" data-p="j">전달 데이터</div>
         <div class="mtab" data-p="x">WebSquare XML</div>
-        <div class="mtab" data-p="r">처리 리포트</div>
       </div>
       <div class="r">
         <button class="btn sm" id="mCopy" title="현재 탭 내용을 클립보드로 복사">복사</button>
@@ -132,6 +131,7 @@
     </div>
     <div class="mbody" id="mbody"></div>
     <div class="mfoot" id="mfoot" hidden>
+      <div class="mstatus" id="mStatus" hidden></div>
       <div id="mQuestions"></div>
       <div class="mfoot-row">
         <input id="mInstruction" placeholder="자연어로 수정 요청 (예: 조회 버튼을 오른쪽 정렬하고 초기화 버튼을 옆에 붙여줘)">
@@ -143,6 +143,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/vendor/html2canvas.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

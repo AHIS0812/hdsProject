@@ -59,10 +59,6 @@ function renderTab(p) {
     b.replaceChildren(pre);
     return;
   }
-  if (p === 'r') {
-    b.replaceChildren(renderReport(r));
-    return;
-  }
   // 'v' — 화면
   if (r.status === 'error') {
     const pre = document.createElement('pre');
@@ -91,75 +87,22 @@ function setTab(p) {
   currentTab = p;
   document.querySelectorAll('.mtab').forEach((x) => x.classList.toggle('on', x.dataset.p === p));
   renderTab(p);
-  $('mCopy').hidden = !textForTab(p);
+  const canCopy = p === 'v' ? !!last.result?.preview?.html : !!textForTab(p);
+  $('mCopy').hidden = !canCopy;
+  $('mCopy').textContent = p === 'v' ? '이미지 복사' : '복사';
 }
 
-// ── 처리 리포트 (report 시각화) ───────────────────────────
-function renderReport(r) {
-  const wrap = document.createElement('div');
-  wrap.className = 'report';
-  const rep = r.report || {};
-  const labelOf = (id) => {
-    const s = (last.payload?.shapes || []).find((x) => x.id === id);
-    return s ? `${s.label || s.type}` : id;
-  };
-
-  const stat = document.createElement('div');
-  stat.className = 'rep-stats';
-  stat.append(
-    repStat('상태', r.status || '-'),
-    repStat('재시도', (rep.retries ?? 0) + '회'),
-    repStat('소요', rep.elapsedMs != null ? Math.round(rep.elapsedMs / 100) / 10 + '초' : '-'),
-    repStat('AI', rep.usedDeterministicFallback ? '미사용(폴백)' : rep.mock ? 'mock' : '사용'),
-  );
-  wrap.append(stat);
-
-  wrap.append(repSection('표준 대체 (fallback)',
-    (rep.fallbacksApplied || []).map((f) =>
-      `${labelOf(f.targetId)} : ${f.from ?? '?'} → ${f.to ?? '?'}${f.reason ? `  (${f.reason})` : ''}`),
-    '표준에 없는 요소를 대체한 내역이 없습니다'));
-
-  wrap.append(repSection('미확정 항목',
-    (rep.unresolved || []).map(labelOf),
-    '미확정으로 남은 요소가 없습니다'));
-
-  if (rep.note) {
-    const n = document.createElement('p');
-    n.className = 'rep-note';
-    n.textContent = rep.note;
-    wrap.append(n);
-  }
-  return wrap;
-}
-function repStat(k, v) {
-  const d = document.createElement('div');
-  d.className = 'rep-stat';
-  d.innerHTML = `<b></b><span></span>`;
-  d.querySelector('b').textContent = v;
-  d.querySelector('span').textContent = k;
-  return d;
-}
-function repSection(title, lines, emptyText) {
-  const sec = document.createElement('div');
-  sec.className = 'rep-sec';
-  const h = document.createElement('h4');
-  h.textContent = title;
-  sec.append(h);
-  if (lines.length) {
-    const ul = document.createElement('ul');
-    lines.forEach((t) => {
-      const li = document.createElement('li');
-      li.textContent = t;
-      ul.append(li);
-    });
-    sec.append(ul);
-  } else {
-    const p = document.createElement('p');
-    p.className = 'rep-empty';
-    p.textContent = emptyText;
-    sec.append(p);
-  }
-  return sec;
+// ── footer 상태줄 (상태 + 소요시간) ──────────────────────
+function renderStatus() {
+  const st = $('mStatus');
+  const r = last.result;
+  if (!r?.status) { st.hidden = true; return; }
+  const label = { ok: '✓ 생성 완료', needs_input: '추가 확인이 필요합니다', error: '⚠ 생성 실패' }[r.status] || r.status;
+  const ms = r.report?.elapsedMs;
+  const suffix = ms > 0 ? ` · ${Math.round(ms / 100) / 10}초` : r.report?.mock ? ' · mock' : '';
+  st.textContent = label + suffix;
+  st.className = 'mstatus' + (r.status === 'ok' ? ' ok' : r.status === 'error' ? ' err' : '');
+  st.hidden = false;
 }
 
 // ── 복사 ─────────────────────────────────────────────────
@@ -167,13 +110,16 @@ function textForTab(p) {
   const r = last.result || {};
   if (p === 'j') return last.payload ? JSON.stringify(last.payload, null, 2) : '';
   if (p === 'x') return r.code?.websquareXml || '';
-  if (p === 'v') return r.preview?.html || '';
-  if (p === 'r') return r.report ? JSON.stringify(r.report, null, 2) : '';
   return '';
 }
-async function copyCurrent() {
-  const text = textForTab(currentTab);
-  if (!text) return;
+function flashCopied(text = '✓ 복사됨') {
+  const btn = $('mCopy');
+  const restore = currentTab === 'v' ? '이미지 복사' : '복사';
+  btn.textContent = text;
+  clearTimeout(flashCopied._t);
+  flashCopied._t = setTimeout(() => { btn.textContent = restore; }, 1400);
+}
+async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
@@ -185,10 +131,47 @@ async function copyCurrent() {
     try { document.execCommand('copy'); } catch { /* 무시 */ }
     ta.remove();
   }
-  const btn = $('mCopy');
-  btn.textContent = '✓ 복사됨';
-  clearTimeout(copyCurrent._t);
-  copyCurrent._t = setTimeout(() => { btn.textContent = '복사'; }, 1200);
+  flashCopied();
+}
+async function copyScreenImage() {
+  const frame = mbody().querySelector('iframe');
+  const doc = frame?.contentDocument;
+  if (!doc || !window.html2canvas) {
+    // html2canvas 로드 실패 시 HTML 텍스트라도 복사
+    return copyText(last.result?.preview?.html || '');
+  }
+  const prev = $('mCopy').textContent;
+  $('mCopy').textContent = '만드는 중…';
+  try {
+    const canvas = await window.html2canvas(doc.body, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      width: doc.body.scrollWidth,
+      height: doc.body.scrollHeight,
+      logging: false,
+    });
+    const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashCopied('✓ 이미지 복사됨');
+    } catch {
+      // 클립보드 이미지 미지원 → 파일로 저장
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_')}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      flashCopied('↓ 이미지 저장됨');
+    }
+  } catch {
+    $('mCopy').textContent = prev;
+    copyText(last.result?.preview?.html || '');
+  }
+}
+function copyCurrent() {
+  if (currentTab === 'v') return copyScreenImage();
+  const text = textForTab(currentTab);
+  if (text) copyText(text);
 }
 
 // ── 질문 / 수정 요청 footer ───────────────────────────────
@@ -242,6 +225,7 @@ function collectAnswers() {
 
 function refreshFoot() {
   const r = last.result || {};
+  renderStatus();
   renderQuestions(r.status === 'needs_input' ? r.questions : []);
   mfoot().hidden = !last.result;
   $('mInstruction').placeholder =
