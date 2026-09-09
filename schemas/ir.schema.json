@@ -11,7 +11,7 @@
       "properties": {
         "systemId": { "type": "string" },
         "mode": { "enum": ["new", "edit"] },
-        "template": { "enum": ["list", "detail", "form", "popup", "main"] },
+        "template": { "enum": ["list", "detail", "form", "popup", "main", "blank"] },
         "baseScreenId": { "type": "string" },
         "title": { "type": "string" }
       }

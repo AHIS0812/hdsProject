@@ -3,7 +3,7 @@
 
 import { NAME } from './constants.js';
 
-export const TEMPLATE_KEYS = ['list', 'detail', 'form', 'popup', 'main'];
+export const TEMPLATE_KEYS = ['list', 'detail', 'form', 'popup', 'main', 'blank'];
 
 function build(defs) {
   return defs.map(([t, x, y, w, h, label, cols, req]) => ({
@@ -108,6 +108,7 @@ const PRESETS = {
 };
 
 export function templateShapes(key) {
+  if (key === 'blank') return [];
   return (PRESETS[key] || PRESETS.list)();
 }
 
