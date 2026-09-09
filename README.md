@@ -73,4 +73,13 @@ runs/        세션 로그 (gitignore)
 |---|---|
 | `npm run dev` | 개발 서버 (자동 재시작) |
 | `npm start` | 서버 1회 실행 |
-| `npm test` | `node --test` |
+| `npm test` | `node --test` — `test/` 아래 단위 테스트 (31개) |
+
+### 테스트 커버리지 (`test/`)
+
+- `constants.test.js` — 요소 타입/DEF/NAME/BOARD_SIZES 정합성
+- `templates.test.js` — 6개 템플릿 프리셋이 유효하고 각 보드(960×600 / 1280×720 / 560×420) 안에 들어감, 서로 다른 레이아웃
+- `schemas.test.js` — 템플릿·픽스처에서 만든 payload 가 `schemas/` 를 통과, 잘못된 payload 는 실패, screen 픽스처 shapes 가 canvas 안에 들어감
+- `modules.test.js` — 웹 모듈이 Node 에서 부작용 없이 import 됨
+
+브라우저 상호작용(드래그·스냅·모달)은 수동 검증. jsdom 도입은 추후.
