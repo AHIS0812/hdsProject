@@ -13,7 +13,7 @@ const STEPS = ['배치된 요소 해석', '보충 설명 · 첨부 파일 반영
 // last.sketch = 생성 요청 시점의 캔버스 스냅샷 { html, w, h } — "내 스케치" 비교용
 let last = { payload: null, result: null, sketch: null };
 let currentTab = 'v';
-let viewMode = 'after';   // 화면 탭 보기: after | sketch | split
+let viewMode = 'after';   // 화면 탭 보기: after(결과) | split(동시 보기 — 내 스케치 + 결과)
 
 const mask = () => $('mask');
 const mbody = () => $('mbody');
@@ -70,7 +70,7 @@ function renderTab(p) {
     b.replaceChildren(pre);
     return;
   }
-  if (r.status === 'needs_input' && viewMode !== 'sketch') {
+  if (r.status === 'needs_input') {
     const pre = document.createElement('pre');
     pre.textContent = '아래 질문에 답하면 반영해서 다시 생성합니다.';
     b.replaceChildren(pre);
@@ -78,12 +78,6 @@ function renderTab(p) {
   }
   const html = r.preview?.html;
 
-  if (viewMode === 'sketch') {
-    b.replaceChildren();
-    if (last.sketch) mountSketch(b);
-    else b.innerHTML = '<pre>(스케치 없음)</pre>';
-    return;
-  }
   if (viewMode === 'split' && last.sketch) {
     b.replaceChildren(buildCompare(html));
     return;
@@ -156,7 +150,7 @@ function setTab(p) {
   updateViewBar(p);
   renderTab(p);
   const hasPreview = !!last.result?.preview?.html;
-  const canCopy = p === 'v' ? (hasPreview && viewMode !== 'sketch') : !!textForTab(p);
+  const canCopy = p === 'v' ? hasPreview : !!textForTab(p);
   $('mCopy').hidden = !canCopy;
   $('mCopy').textContent = p === 'v' ? '이미지 복사' : '복사';
 }
