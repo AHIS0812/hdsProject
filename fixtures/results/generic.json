@@ -6,7 +6,8 @@
   "code": {
     "websquareXml": "<!-- 스캐폴딩 mock — 실제 Stage B 산출 아님 -->\n<w2:inputBox id=\"ipb1\" class=\"w2input_essential\"/>\n<w2:trigger id=\"btn1\" value=\"조회\" onclick=\"fn_search\"/>\n<w2:gridView id=\"grd1\" dataList=\"dl1\">\n  <w2:gridColumn value=\"순번\"/>\n  <w2:gridColumn value=\"항목1\"/>\n  <w2:gridColumn value=\"항목2\"/>\n</w2:gridView>",
     "files": [
-      { "path": "screen.xml", "content": "<!-- 스캐폴딩 mock -->" }
+      { "path": "screen.xml", "content": "<!-- 스캐폴딩 mock — 실제 Stage B 산출 아님 -->\n<w2:inputBox id=\"ipb1\" class=\"w2input_essential\"/>\n<w2:trigger id=\"btn1\" value=\"조회\" onclick=\"fn_search\"/>" },
+      { "path": "screen.js", "content": "// 스캐폴딩 mock — 실제 Stage B 산출 아님\nfunction fn_search() {\n  // TODO: 조회 서비스 호출\n}" }
     ]
   },
   "ir": {

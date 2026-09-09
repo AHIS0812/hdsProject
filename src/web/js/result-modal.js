@@ -4,6 +4,7 @@
 
 import * as api from './api.js';
 import { toast } from './toast.js';
+import { highlightXml } from './highlight.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -57,23 +58,31 @@ function renderTab(p) {
     return;
   }
   if (p === 'x') {
+    const xml = r.code?.websquareXml;
     const pre = document.createElement('pre');
-    pre.textContent = r.code?.websquareXml || '(WebSquare XML 없음)';
-    b.replaceChildren(pre);
+    pre.className = 'xml';
+    if (xml) pre.innerHTML = highlightXml(xml);
+    else pre.textContent = '(WebSquare XML 없음)';
+    const wrap = document.createElement('div');
+    wrap.className = 'xmlwrap';
+    wrap.append(pre);
+    const files = r.code?.files || [];
+    if (files.length) {
+      const note = document.createElement('div');
+      note.className = 'xmlfiles';
+      note.textContent = `생성 파일 ${files.length}개: ` + files.map((f) => f.path).join(', ') + ' · [내려받기] 로 zip 저장';
+      wrap.append(note);
+    }
+    b.replaceChildren(wrap);
     return;
   }
   // 'v' — 화면
   if (r.status === 'error') {
-    const pre = document.createElement('pre');
-    pre.className = 'err';
-    pre.textContent = '생성 실패\n\n' + (r.error?.message || '') + '\n\n' + (r.error?.log || '');
-    b.replaceChildren(pre);
+    b.replaceChildren(errorBox(r));
     return;
   }
   if (r.status === 'needs_input') {
-    const pre = document.createElement('pre');
-    pre.textContent = '아래 질문에 답하면 반영해서 다시 생성합니다.';
-    b.replaceChildren(pre);
+    b.replaceChildren(needsInputBox(r));
     return;
   }
   const html = r.preview?.html;
@@ -89,6 +98,47 @@ function renderTab(p) {
   const frame = document.createElement('iframe');
   frame.srcdoc = html;
   b.replaceChildren(frame);
+}
+
+/** status=error 안내 박스 (메시지 + 접이식 로그) */
+function errorBox(r) {
+  const box = document.createElement('div');
+  box.className = 'mstate err';
+  const h = document.createElement('b');
+  h.textContent = '⚠ 화면을 생성하지 못했습니다';
+  box.append(h);
+  const msg = document.createElement('p');
+  msg.textContent = r.error?.message || '알 수 없는 오류입니다. 잠시 후 다시 시도해주세요.';
+  box.append(msg);
+  if (r.error?.log) {
+    const det = document.createElement('details');
+    const sum = document.createElement('summary');
+    sum.textContent = '자세한 로그';
+    const pre = document.createElement('pre');
+    pre.className = 'err';
+    pre.textContent = r.error.log;
+    det.append(sum, pre);
+    box.append(det);
+  }
+  const hint = document.createElement('p');
+  hint.className = 'mstate-hint';
+  hint.textContent = '아래 입력창에 조건을 더 적어 다시 시도하거나, 캔버스를 정리한 뒤 다시 생성해보세요.';
+  box.append(hint);
+  return box;
+}
+
+/** status=needs_input 안내 박스 (질문은 footer 에 렌더된다) */
+function needsInputBox(r) {
+  const box = document.createElement('div');
+  box.className = 'mstate';
+  const h = document.createElement('b');
+  h.textContent = '몇 가지만 확인하면 됩니다';
+  box.append(h);
+  const p = document.createElement('p');
+  const n = (r.questions || []).length;
+  p.textContent = `아래 질문 ${n}개에 답하면 반영해서 다시 생성합니다. (건너뛰고 수정 요청만 적어도 됩니다)`;
+  box.append(p);
+  return box;
 }
 
 /** 스케치 스냅샷을 컨테이너 폭에 맞춰 축소해 붙인다 */
@@ -153,6 +203,8 @@ function setTab(p) {
   const canCopy = p === 'v' ? hasPreview : !!textForTab(p);
   $('mCopy').hidden = !canCopy;
   $('mCopy').textContent = p === 'v' ? '이미지 복사' : '복사';
+  const code = last.result?.code;
+  $('mDownload').hidden = !(code?.websquareXml || code?.files?.length);
 }
 
 // ── footer 상태줄 (상태 + 소요시간) ──────────────────────
@@ -345,25 +397,58 @@ async function doRefine() {
     setTab('v');
   } catch (e) {
     stop();
-    const pre = document.createElement('pre');
-    pre.className = 'err';
-    pre.textContent = e.message;
-    mbody().replaceChildren(pre);
+    mbody().replaceChildren(errorBox({ error: { message: e.message } }));
     $('mCopy').hidden = true;
     mfoot().hidden = false;
   }
 }
 
 // ── 다운로드 ──────────────────────────────────────────────
-function download() {
-  const xml = last.result?.code?.websquareXml;
-  if (!xml) return;
-  const name = (last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_');
+function saveBlob(blob, filename) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
-  a.download = `${name}.xml`;
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/**
+ * 생성 결과 내려받기.
+ * - code.files 가 2개 이상: zip
+ * - 1개: 그 파일
+ * - files 없고 websquareXml 만: `<화면>.xml`
+ */
+function download() {
+  const code = last.result?.code;
+  if (!code) { toast('내려받을 코드가 없습니다'); return; }
+  const base = (last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_');
+  const files = (code.files || []).filter((f) => f && f.path);
+  const xml = code.websquareXml;
+
+  if (files.length >= 2 && window.fflate) {
+    const entries = {};
+    files.forEach((f) => { entries[f.path] = window.fflate.strToU8(f.content ?? ''); });
+    if (xml && !files.some((f) => f.path.toLowerCase().endsWith('.xml'))) {
+      entries[`${base}.xml`] = window.fflate.strToU8(xml);
+    }
+    try {
+      const zipped = window.fflate.zipSync(entries, { level: 6 });
+      saveBlob(new Blob([zipped], { type: 'application/zip' }), `${base}.zip`);
+      return;
+    } catch (e) {
+      toast('zip 생성에 실패해 첫 파일만 저장합니다');
+      console.error(e);
+    }
+  }
+  if (files.length === 1) {
+    saveBlob(new Blob([files[0].content ?? ''], { type: 'text/plain' }), files[0].path.split('/').pop());
+    return;
+  }
+  if (xml) {
+    saveBlob(new Blob([xml], { type: 'application/xml' }), `${base}.xml`);
+    return;
+  }
+  toast('내려받을 코드가 없습니다');
 }
 
 /**
@@ -378,6 +463,8 @@ export async function runBuild(payload, title, sketch = null) {
   mask().classList.add('on');
   mfoot().hidden = true;
   $('mView').hidden = true;
+  $('mCopy').hidden = true;
+  $('mDownload').hidden = true;
   document.querySelectorAll('.mtab').forEach((x) => x.classList.toggle('on', x.dataset.p === 'v'));
   const stop = showProgress();
   try {
@@ -388,11 +475,10 @@ export async function runBuild(payload, title, sketch = null) {
     setTab('v');
   } catch (e) {
     stop();
-    const pre = document.createElement('pre');
-    pre.className = 'err';
-    pre.textContent = e.message;
-    mbody().replaceChildren(pre);
+    last = { payload, result: null, sketch };
+    mbody().replaceChildren(errorBox({ error: { message: e.message } }));
     $('mCopy').hidden = true;
+    $('mDownload').hidden = true;
   }
 }
 

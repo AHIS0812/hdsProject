@@ -32,6 +32,7 @@ jobs:
           timeout 20 bash -c 'until curl -sf "http://localhost:3000/api/health" >/dev/null; do sleep 0.5; done'
           curl -sf "http://localhost:3000/api/systems" | grep -q '"systems"'
           curl -sf "http://localhost:3000/api/screens?system=portal" | grep -q '"screens"'
+          curl -sf "http://localhost:3000/vendor/fflate.js" | grep -q 'zipSync'
           curl -sf -X POST "http://localhost:3000/api/generate" \
             -H 'Content-Type: application/json' \
             -d @fixtures/payloads/list.json | grep -q '"status":"ok"'
