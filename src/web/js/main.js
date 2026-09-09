@@ -16,9 +16,29 @@ const abL = $('abL');
 let workMode = 'new';
 let currentTpl = 'list';
 let attachments = [];
+let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드된 화면 id
+let suppressScrPick = false;
+// 사용자가 캔버스를 직접 수정했는지. 템플릿/화면/샘플을 "프로그램으로" 로드한 직후엔 false.
+// true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
+let canvasDirty = false;
 
 const STORE_KEY = 'aiScreenDraft:v1';
 const CANVAS = { w: 960, h: 600 };
+
+/** 캔버스를 새 shapes 로 교체 (프로그램 로드 — dirty 아님) */
+function loadCanvas(shapes, name) {
+  editor.setShapes(shapes || []);
+  if (name != null) scrNm.value = name;
+  syncAbL();
+  canvasDirty = false;
+  autosave();
+}
+
+/** 캔버스 내용이 사라지는 동작 전에 호출. 수정한 게 없거나 비어 있으면 그냥 통과 */
+function guardDiscard() {
+  if (!canvasDirty || editor.count() === 0) return true;
+  return confirm('지금 캔버스에 있는 내용이 사라집니다. 계속할까요?');
+}
 
 // ── 토스트 ────────────────────────────────────────────────
 let toastTimer;
@@ -40,11 +60,8 @@ function syncAbL() {
 scrNm.addEventListener('input', () => { syncAbL(); autosave(); });
 
 $('btnSample').addEventListener('click', () => {
-  if (editor.count() && !confirm('샘플을 불러오면 지금 그린 내용이 사라집니다. 계속할까요?')) return;
-  editor.setShapes(sampleShapes());
-  scrNm.value = '지정대리인 등록';
-  syncAbL();
-  autosave();
+  if (!guardDiscard()) return;
+  loadCanvas(sampleShapes(), '지정대리인 등록');
 });
 
 $('btnSave').addEventListener('click', () => { autosave(true); toast('임시저장되었습니다'); });
@@ -78,9 +95,10 @@ document.querySelector('.tools').addEventListener('click', (e) => {
 });
 
 // ── 작업 구분 (신규 / 변경) ───────────────────────────────
+// 화면 유형(템플릿)은 신규 모드에서만 노출한다. 변경 모드는 완성된 화면을 불러와 고치므로 불필요.
 function applyMode() {
+  $('newBlock').classList.toggle('hidden', workMode !== 'new');
   $('editBlock').classList.toggle('hidden', workMode !== 'edit');
-  $('tplH').textContent = workMode === 'edit' ? '화면 유형' : '어떤 화면인가요?';
 }
 document.querySelectorAll('#modeSeg div').forEach((el) => {
   el.addEventListener('click', () => {
@@ -92,26 +110,20 @@ document.querySelectorAll('#modeSeg div').forEach((el) => {
   });
 });
 
-// ── 화면 유형 ─────────────────────────────────────────────
+// ── 화면 유형 (신규 모드) ─────────────────────────────────
 function highlightTpl(key) {
   document.querySelectorAll('.tpl').forEach((x) => x.classList.toggle('on', x.dataset.tpl === key));
 }
 document.querySelectorAll('.tpl').forEach((el) => {
   el.addEventListener('click', () => {
+    if (workMode !== 'new') return;
     const key = el.dataset.tpl;
-    if (workMode === 'new') {
-      // 신규: 유형 선택 = 프리셋 로드
-      if (editor.count() && !confirm('화면 종류를 바꾸면 지금 그린 내용이 사라집니다. 계속할까요?')) return;
-      currentTpl = key;
-      highlightTpl(key);
-      editor.setShapes(templateShapes(key));
-    } else {
-      // 변경: 유형 재분류만 (캔버스 유지)
-      currentTpl = key;
-      highlightTpl(key);
-      toast(`화면 유형을 "${el.querySelector('.nm').textContent.trim()}" 로 지정했습니다`);
-    }
-    autosave();
+    if (!guardDiscard()) return;
+    currentTpl = key;
+    highlightTpl(key);
+    // 방금까지 기존 화면을 보고 있었다면 이름을 새 화면 기본값으로
+    loadCanvas(templateShapes(key), loadedScreenId ? '새 화면' : undefined);
+    loadedScreenId = null;
   });
 });
 
@@ -121,6 +133,7 @@ const sysCombo = makeCombo($('sysBox'), {
   emptyText: '시스템이 없습니다',
   onPick: async (sys) => {
     scrCombo.setItems([]);
+    loadedScreenId = null;
     scrCombo.setPlaceholder(sys ? '불러오는 중…' : '먼저 시스템을 선택하세요');
     if (!sys) return;
     try {
@@ -139,19 +152,18 @@ const scrCombo = makeCombo($('scrBox'), {
   placeholder: '화면 선택',
   emptyText: '해당 시스템에 등록된 화면이 없습니다',
   onPick: async (scr) => {
-    if (!scr) return;
-    if (editor.count() && !confirm('선택한 화면을 불러오면 지금 그린 내용이 사라집니다. 계속할까요?')) return;
+    if (suppressScrPick || !scr || scr.id === loadedScreenId) return;
+    if (!guardDiscard()) {
+      // 취소: 콤보를 직전 화면으로 되돌린다
+      suppressScrPick = true;
+      loadedScreenId ? scrCombo.choose(loadedScreenId) : scrCombo.reset();
+      suppressScrPick = false;
+      return;
+    }
     try {
       const def = await api.getScreen(scr.id);
-      editor.setShapes(def.shapes || []);
-      scrNm.value = def.name || scr.name;
-      // 화면 유형도 선택한 화면에 맞춰 자동 반영
-      if (def.template) {
-        currentTpl = def.template;
-        highlightTpl(def.template);
-      }
-      syncAbL();
-      autosave();
+      loadCanvas(def.shapes || [], def.name || scr.name);
+      loadedScreenId = scr.id;
     } catch (e) {
       toast('화면을 불러오지 못했습니다');
       console.error(e);
@@ -256,7 +268,7 @@ function payload() {
     canvas: { ...CANVAS },
     shapes: editor.toPayloadShapes(),
   };
-  if (currentTpl) p.template = currentTpl;
+  if (workMode === 'new') p.template = currentTpl;
   if (workMode === 'edit' && scr) p.baseScreen = { id: scr.id, name: scr.name };
   const note = noteEl.value.trim();
   if (note) p.note = note;
@@ -309,7 +321,7 @@ function restore() {
     document.querySelectorAll('#modeSeg div').forEach((x) => x.classList.toggle('on', x.dataset.mode === 'edit'));
     applyMode();
   }
-  if (saved.template) {
+  if (saved.template && document.querySelector(`.tpl[data-tpl="${saved.template}"]`)) {
     currentTpl = saved.template;
     highlightTpl(saved.template);
   }
@@ -319,11 +331,12 @@ function restore() {
 
 // ── 부팅 ─────────────────────────────────────────────────
 async function boot() {
-  editor.initEditor({ onChange: () => autosave() });
+  editor.initEditor({ onChange: () => { canvasDirty = true; autosave(); } });
   initResultModal();
 
   const restored = restore();
   syncAbL();
+  canvasDirty = false; // 부팅 시점의 로드는 사용자 수정이 아님
 
   try {
     const systems = await api.getSystems();
