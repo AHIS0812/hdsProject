@@ -34,7 +34,7 @@ npm run dev
   "화면 생성" → 결과 모달 2탭 (화면 = 결과/동시 보기(내 스케치↔결과)·이미지 복사 / WebSquare XML = 구문 강조·복사),
   코드 내려받기(파일 2개↑ zip, `fflate`),
   이미지 추가(드래그·선택·붙여넣기 → 캔버스 image 요소, data URL, 리사이즈),
-  **이름 붙인 저장본**(localStorage 슬롯) · `.hds.json` 파일 내보내기·불러오기, localStorage 자동 저장.
+  **이름 붙인 저장본**(localStorage 슬롯) · `.hds.json` 파일 내보내기·불러오기. (새로고침 시 캔버스는 시작 상태로 초기화 — 남기려면 저장본/파일)
 - **규칙 기반 변환기** (`src/pipeline/deterministic.js`) — payload 를 읽기순으로 정렬 →
   `catalog/websquare/mapping.json` 기반 WebSquare XML(select/radio/list/tab 항목 펼침, `area` 자식 중첩,
   필수(＊) 라벨 → 인접 필드 전파) + 좌표 그대로의 Preview HTML.

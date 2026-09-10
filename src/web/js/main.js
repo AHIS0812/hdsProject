@@ -20,7 +20,8 @@ let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드�
 // true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
 let canvasDirty = false;
 
-const STORE_KEY = 'aiScreenDraft:v1';
+// 캔버스 편집 내용은 새로고침 시 유지하지 않는다(항상 시작 화면으로).
+// 명시적으로 남기려면 상단 "저장본" 슬롯 또는 .hds.json 내보내기를 쓴다.
 
 /**
  * 캔버스를 새 shapes 로 교체 (프로그램 로드 — dirty 아님)
@@ -32,7 +33,6 @@ function loadCanvas(shapes, name, size) {
   if (name != null) scrNm.value = name;
   syncAbL();
   canvasDirty = false;
-  autosave();
 }
 
 /**
@@ -54,7 +54,7 @@ function syncAbL() {
   span.textContent = `${w} × ${h}`;
   abL.append(span);
 }
-scrNm.addEventListener('input', () => { syncAbL(); autosave(); });
+scrNm.addEventListener('input', syncAbL);
 
 $('btnClear').addEventListener('click', () => {
   if (!editor.count()) return;
@@ -95,7 +95,6 @@ document.querySelector('.tools').addEventListener('click', (e) => {
   const act = e.target.closest('button')?.dataset.act;
   if (!act || !TOOL[act]) return;
   TOOL[act]();
-  autosave();
 });
 
 // ── 작업 구분 (신규 / 변경) ───────────────────────────────
@@ -117,7 +116,6 @@ document.querySelectorAll('#modeSeg button').forEach((el) => {
     workMode = el.dataset.mode;
     markMode(workMode);
     applyMode();
-    autosave();
   });
 });
 
@@ -160,7 +158,6 @@ const sysCombo = makeCombo($('sysBox'), {
       toast('화면 목록을 불러오지 못했습니다');
       console.error(e);
     }
-    autosave();
   },
 });
 
@@ -479,59 +476,6 @@ function build() {
   runBuild(payload(), scrNm.value || '생성 결과', snapshotSketch());
 }
 
-// ── 임시저장 (localStorage) ───────────────────────────────
-let saveTimer;
-let savedFlashTimer;
-function flashSaved() {
-  const el = $('autosaveHint');
-  if (!el) return;
-  el.textContent = '저장됨';
-  el.classList.add('on');
-  clearTimeout(savedFlashTimer);
-  savedFlashTimer = setTimeout(() => { el.textContent = '자동 저장'; el.classList.remove('on'); }, 1200);
-}
-function autosave(immediate) {
-  clearTimeout(saveTimer);
-  const doSave = () => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({
-        screenName: scrNm.value,
-        systemId: sysCombo.get()?.id || null,
-        mode: workMode,
-        template: currentTpl,
-        canvas: editor.getBoardSize(),
-        shapes: editor.toPayloadShapes(),
-      }));
-      flashSaved();
-    } catch { /* 프라이빗 모드 등 — 무시 */ }
-  };
-  if (immediate) doSave();
-  else saveTimer = setTimeout(doSave, 600);
-}
-
-function restore() {
-  let saved;
-  try {
-    saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-  } catch { saved = null; }
-  if (!saved) return false;
-
-  if (saved.screenName) scrNm.value = saved.screenName;
-
-  if (saved.mode === 'edit') {
-    workMode = 'edit';
-    markMode('edit');
-    applyMode();
-  }
-  if (saved.template && document.querySelector(`.tpl[data-tpl="${saved.template}"]`)) {
-    currentTpl = saved.template;
-    highlightTpl(saved.template);
-  }
-  if (saved.canvas?.w && saved.canvas?.h) editor.setBoardSize(saved.canvas.w, saved.canvas.h);
-  if (Array.isArray(saved.shapes) && saved.shapes.length) editor.setShapes(saved.shapes);
-  return { systemId: saved.systemId };
-}
-
 // ── 온보딩 코치 / 단축키 도움말 ──────────────────────────
 function initHelp() {
   const helpPop = $('helpPop');
@@ -566,23 +510,23 @@ function initHelp() {
 
 // ── 부팅 ─────────────────────────────────────────────────
 async function boot() {
-  editor.initEditor({ onChange: () => { canvasDirty = true; autosave(); } });
+  // 예전 버전의 자동 저장 초안이 남아 있으면 정리 (더 이상 복원하지 않음)
+  try { localStorage.removeItem('aiScreenDraft:v1'); } catch { /* 무시 */ }
+
+  editor.initEditor({ onChange: () => { canvasDirty = true; } });
   initResultModal();
   initHelp();
 
-  const restored = restore();
   applyMode();
-  if (!restored) {
-    // 최초 실행: 선택된 유형(목록조회)의 프리셋을 올려 타일 ↔ 캔버스 상태를 맞춘다
-    loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
-  }
+  // 항상 시작 화면으로: 선택된 유형(목록조회)의 프리셋을 올려 타일 ↔ 캔버스 상태를 맞춘다
+  loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
   syncAbL();
   canvasDirty = false; // 부팅 시점의 로드는 사용자 수정이 아님
 
   try {
     const systems = await api.getSystems();
     sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name, sub: s.sub })));
-    const want = restored?.systemId || (systems.find((s) => s.id === 'portal') ? 'portal' : systems[0]?.id);
+    const want = systems.find((s) => s.id === 'portal') ? 'portal' : systems[0]?.id;
     if (want) sysCombo.choose(want);
   } catch (e) {
     toast('API 서버에 연결하지 못했습니다 — npm run dev 로 실행했는지 확인하세요');
