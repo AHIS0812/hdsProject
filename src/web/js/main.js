@@ -11,12 +11,10 @@ import { toast } from './toast.js';
 
 const $ = (id) => document.getElementById(id);
 const scrNm = $('scrNm');
-const noteEl = $('prompt');
 const abL = $('abL');
 
 let workMode = 'new';
 let currentTpl = 'list';
-let attachments = [];
 let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드된 화면 id
 // 사용자가 캔버스를 직접 수정했는지. 템플릿/화면/샘플을 "프로그램으로" 로드한 직후엔 false.
 // true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
@@ -183,42 +181,68 @@ const scrCombo = makeCombo($('scrBox'), {
   },
 });
 
-// ── 참고 파일 업로드 (U-11) ───────────────────────────────
-const ACCEPT = '.png,.jpg,.jpeg,.gif,.webp,.xlsx,.xls,.csv,.ppt,.pptx,.pdf';
-const MAX_BYTES = 20 * 1024 * 1024;
+// ── 이미지 추가 (드래그·선택·붙여넣기 → 캔버스 image 요소) ──
+const IMG_MAX_BYTES = 15 * 1024 * 1024;
+const IMG_MAX_PX = 1400;   // 긴 변이 이보다 크면 축소해서 저장 (data URL 용량 절약)
 const drop = $('drop');
-const DROP_LABEL = '＋ 참고 파일 (Excel · PPT · 이미지 · PDF, 20MB 이하)';
+const DROP_LABEL = '＋ 이미지 추가 (드래그 · 선택 · 붙여넣기)';
 drop.textContent = DROP_LABEL;
 
 const fileInput = document.createElement('input');
 fileInput.type = 'file';
 fileInput.multiple = true;
-fileInput.accept = ACCEPT;
+fileInput.accept = 'image/*';
 fileInput.hidden = true;
 document.body.append(fileInput);
 
-const fmtSize = (n) => (n > 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB');
+/** 이미지 파일 → (필요 시 축소된) data URL + 크기 */
+function fileToImage(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(new Error('파일을 읽지 못했습니다'));
+    fr.onload = () => {
+      const im = new Image();
+      im.onerror = () => rej(new Error('이미지를 열지 못했습니다'));
+      im.onload = () => {
+        const { naturalWidth: nw, naturalHeight: nh } = im;
+        const k = Math.min(1, IMG_MAX_PX / Math.max(nw, nh));
+        if (k === 1 && file.size < 400 * 1024) {
+          res({ src: fr.result, w: nw, h: nh });
+          return;
+        }
+        const c = document.createElement('canvas');
+        c.width = Math.round(nw * k);
+        c.height = Math.round(nh * k);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        const type = /png|gif|webp/.test(file.type) ? 'image/png' : 'image/jpeg';
+        res({ src: c.toDataURL(type, 0.85), w: c.width, h: c.height });
+      };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
 
-async function uploadFiles(fileList) {
-  const files = [...fileList];
-  if (!files.length) return;
+/** 보드 60% 안으로 비율 유지 축소 */
+function fitBoard(w, h) {
+  const { w: bw, h: bh } = editor.getBoardSize();
+  const k = Math.min(1, (bw * 0.6) / w, (bh * 0.6) / h);
+  return { w: Math.max(24, Math.round(w * k)), h: Math.max(20, Math.round(h * k)) };
+}
 
-  const big = files.filter((f) => f.size > MAX_BYTES);
-  if (big.length) toast(`20MB 초과로 제외: ${big.map((f) => f.name).join(', ')}`);
-  const ok = files.filter((f) => f.size <= MAX_BYTES);
-  if (!ok.length) return;
-
-  const form = new FormData();
-  ok.forEach((f) => form.append('files', f));
-  drop.textContent = `업로드 중… (${ok.length}개)`;
+async function addImages(list) {
+  const files = [...list].filter((f) => f.type?.startsWith('image/'));
+  if (![...list].length) return;
+  if (!files.length) { toast('이미지 파일만 캔버스에 추가할 수 있어요'); return; }
+  drop.textContent = '불러오는 중…';
   drop.style.pointerEvents = 'none';
   try {
-    const r = await fetch('/api/attachments', { method: 'POST', body: form });
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.error || `업로드 실패 (${r.status})`);
-    attachments.push(...(body.attachments || []));
-    drawFiles();
-    autosave();
+    for (const f of files) {
+      if (f.size > IMG_MAX_BYTES) { toast(`이미지가 너무 큽니다: ${f.name} (15MB 이하)`); continue; }
+      // eslint-disable-next-line no-await-in-loop
+      const img = await fileToImage(f);
+      editor.addImage({ src: img.src, ...fitBoard(img.w, img.h) });
+    }
   } catch (e) {
     toast(e.message);
   } finally {
@@ -231,10 +255,7 @@ drop.addEventListener('click', () => fileInput.click());
 drop.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
 });
-fileInput.addEventListener('change', () => {
-  uploadFiles(fileInput.files);
-  fileInput.value = '';
-});
+fileInput.addEventListener('change', () => { addImages(fileInput.files); fileInput.value = ''; });
 ['dragenter', 'dragover'].forEach((ev) =>
   drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('drag'); }),
 );
@@ -244,38 +265,19 @@ fileInput.addEventListener('change', () => {
 drop.addEventListener('drop', (e) => {
   e.preventDefault();
   drop.classList.remove('drag');
-  uploadFiles(e.dataTransfer.files);
+  addImages(e.dataTransfer.files);
 });
-
-async function removeAttachment(i) {
-  const a = attachments[i];
-  attachments.splice(i, 1);
-  drawFiles();
-  autosave();
-  if (a?.id) fetch(`/api/attachments/${encodeURIComponent(a.id)}`, { method: 'DELETE' }).catch(() => {});
-}
-
-function drawFiles() {
-  $('files').replaceChildren(
-    ...attachments.map((a, i) => {
-      const row = document.createElement('div');
-      row.className = 'file';
-      row.textContent = `▤ ${a.name}` + (a.size ? `  ·  ${fmtSize(a.size)}` : '');
-      const x = document.createElement('b');
-      x.textContent = '✕';
-      x.title = '삭제';
-      x.setAttribute('role', 'button');
-      x.tabIndex = 0;
-      x.setAttribute('aria-label', `${a.name} 첨부 삭제`);
-      x.addEventListener('click', () => removeAttachment(i));
-      x.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removeAttachment(i); }
-      });
-      row.append(x);
-      return row;
-    }),
-  );
-}
+// 페이지 어디서나 이미지 붙여넣기 → 캔버스에
+document.addEventListener('paste', (e) => {
+  if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+  const imgs = [...(e.clipboardData?.items || [])]
+    .filter((it) => it.type.startsWith('image/'))
+    .map((it) => it.getAsFile())
+    .filter(Boolean);
+  if (!imgs.length) return;
+  e.preventDefault();
+  addImages(imgs);
+});
 
 // ── 내보내기 / 불러오기 (.hds.json) ──────────────────────
 function currentDoc() {
@@ -287,9 +289,7 @@ function currentDoc() {
     systemId: sysCombo.get()?.id || null,
     mode: workMode,
     template: currentTpl,
-    note: noteEl.value,
     canvas: editor.getBoardSize(),
-    attachments,
     shapes: editor.toPayloadShapes(),
   };
 }
@@ -431,10 +431,6 @@ function applyDoc(doc) {
     toast('형식이 맞지 않는 파일입니다');
     return;
   }
-  noteEl.value = doc.note || '';
-  attachments = Array.isArray(doc.attachments) ? doc.attachments : [];
-  drawFiles();
-
   workMode = doc.mode === 'edit' ? 'edit' : 'new';
   markMode(workMode);
   applyMode();
@@ -447,9 +443,7 @@ function applyDoc(doc) {
   loadCanvas(doc.shapes, doc.screenName || '새 화면', doc.canvas || DEFAULT_BOARD);
   loadedScreenId = null;
   if (doc.systemId) sysCombo.choose(doc.systemId);
-
-  const hasFileRefs = attachments.some((a) => a.url);
-  toast(hasFileRefs ? '불러왔습니다 · 첨부 파일 실물은 포함되지 않습니다' : '불러왔습니다');
+  toast('불러왔습니다');
 }
 
 // ── payload / 생성 ────────────────────────────────────────
@@ -466,9 +460,6 @@ function payload() {
   };
   if (workMode === 'new') p.template = currentTpl;
   if (workMode === 'edit' && scr) p.baseScreen = { id: scr.id, name: scr.name };
-  const note = noteEl.value.trim();
-  if (note) p.note = note;
-  if (attachments.length) p.attachments = attachments;
   return p;
 }
 
@@ -508,8 +499,6 @@ function autosave(immediate) {
         systemId: sysCombo.get()?.id || null,
         mode: workMode,
         template: currentTpl,
-        note: noteEl.value,
-        attachments,
         canvas: editor.getBoardSize(),
         shapes: editor.toPayloadShapes(),
       }));
@@ -528,9 +517,6 @@ function restore() {
   if (!saved) return false;
 
   if (saved.screenName) scrNm.value = saved.screenName;
-  if (saved.note) noteEl.value = saved.note;
-  attachments = Array.isArray(saved.attachments) ? saved.attachments : [];
-  drawFiles();
 
   if (saved.mode === 'edit') {
     workMode = 'edit';

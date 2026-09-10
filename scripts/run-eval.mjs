@@ -148,14 +148,14 @@ const em = editShapes('hicall', 'SCR-C-MAIN-01', [
 
 // ── 케이스 정의 ─────────────────────────────────────────────────────
 const CASES = [
-  { id: 'N-LIST', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'list', screenName: '계약 조회', note: '조회조건은 최소 1개 이상 입력 시 조회 버튼 활성화', canvas: B(960, 600), shapes: shapesFrom(LIST) } },
-  { id: 'N-DETAIL', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'detail', screenName: '계약 상세', note: '상단 목록에서 행 선택 시 하단 상세가 채워짐', canvas: B(960, 600), shapes: shapesFrom(DETAIL) } },
-  { id: 'N-FORM', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'form', screenName: '계약자 등록', note: '주민번호는 필수, 등록일은 오늘로 기본값', canvas: B(960, 600), shapes: shapesFrom(FORM) } },
-  { id: 'N-POPUP', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'popup', screenName: '고객 검색 팝업', note: '선택 버튼은 목록에서 1건 선택했을 때만 활성화', canvas: B(560, 420), shapes: shapesFrom(POPUP) } },
-  { id: 'N-MAIN', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'main', screenName: '영업 메인', note: '요약 카드 값은 로그인 사용자 기준', canvas: B(1280, 720), shapes: shapesFrom(MAIN) } },
-  { id: 'N-BLANK', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'blank', screenName: '자유 배치 화면', note: '', canvas: B(960, 600), shapes: shapesFrom(BLANK) } },
-  { id: 'E-QUERY', payload: { systemId: 'portal', systemName: '하이포탈', mode: 'edit', screenName: eq.scr.name, baseScreen: { id: eq.scr.id, name: eq.scr.name }, note: '조회 영역에 담당자 1쌍 추가, 결과 컬럼에 담당자 추가', canvas: eq.scr.canvas, shapes: eq.shapes } },
-  { id: 'E-MAIN', payload: { systemId: 'hicall', systemName: '하이콜', mode: 'edit', screenName: em.scr.name, baseScreen: { id: em.scr.id, name: em.scr.name }, note: '"오늘 처리" 영역에 누적콜 지표 1개 추가', canvas: em.scr.canvas, shapes: em.shapes } },
+  { id: 'N-LIST', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'list', screenName: '계약 조회', canvas: B(960, 600), shapes: shapesFrom(LIST) } },
+  { id: 'N-DETAIL', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'detail', screenName: '계약 상세', canvas: B(960, 600), shapes: shapesFrom(DETAIL) } },
+  { id: 'N-FORM', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'form', screenName: '계약자 등록', canvas: B(960, 600), shapes: shapesFrom(FORM) } },
+  { id: 'N-POPUP', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'popup', screenName: '고객 검색 팝업', canvas: B(560, 420), shapes: shapesFrom(POPUP) } },
+  { id: 'N-MAIN', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'main', screenName: '영업 메인', canvas: B(1280, 720), shapes: shapesFrom(MAIN) } },
+  { id: 'N-BLANK', payload: { systemId: 'salesportal', systemName: '영업포탈', mode: 'new', template: 'blank', screenName: '자유 배치 화면', canvas: B(960, 600), shapes: shapesFrom(BLANK) } },
+  { id: 'E-QUERY', payload: { systemId: 'portal', systemName: '하이포탈', mode: 'edit', screenName: eq.scr.name, baseScreen: { id: eq.scr.id, name: eq.scr.name }, canvas: eq.scr.canvas, shapes: eq.shapes } },
+  { id: 'E-MAIN', payload: { systemId: 'hicall', systemName: '하이콜', mode: 'edit', screenName: em.scr.name, baseScreen: { id: em.scr.id, name: em.scr.name }, canvas: em.scr.canvas, shapes: em.shapes } },
 ];
 
 // ── 실행 ────────────────────────────────────────────────────────────

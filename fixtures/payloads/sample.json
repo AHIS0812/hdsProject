@@ -4,7 +4,6 @@
   "mode": "new",
   "template": "list",
   "screenName": "샘플 화면",
-  "note": "규칙 기반 변환 스모크용 샘플 payload",
   "canvas": { "w": 960, "h": 600 },
   "shapes": [
     { "id": "s1", "type": "area", "x": 30, "y": 30, "w": 900, "h": 70, "label": "조회 영역" },

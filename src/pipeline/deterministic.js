@@ -134,6 +134,9 @@ export function shapeToXml(shape, n) {
     const opts = items.map((o) => `  <option value="${esc(o)}">${esc(o)}</option>`).join('\n');
     return `<${m.tag} ${attrs}>\n${opts}\n</${m.tag}>`;
   }
+  if (shape.type === 'image' && shape.src) {
+    return `<${m.tag} ${attrs} src="${esc(shape.src)}"/>`;
+  }
   return `<${m.tag} ${attrs}/>`;
 }
 
@@ -159,12 +162,17 @@ function shapeToHtml(shape) {
   const base =
     'position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;' +
     'font-size:12px;color:#333;border:1px solid #c6c4bf;border-radius:3px;background:#fff;padding:0 6px;overflow:hidden;white-space:nowrap';
+  const pos = `left:${shape.x}px;top:${shape.y}px;width:${shape.w}px;height:${shape.h}px`;
+  if (shape.type === 'image' && shape.src) {
+    return (
+      `<div style="${base};border:none;padding:0;${pos}">` +
+      `<img src="${esc(shape.src)}" alt="${esc(shape.label || '이미지')}" ` +
+      `style="width:100%;height:100%;object-fit:contain"></div>`
+    );
+  }
   const extra = PREVIEW_STYLE[shape.type] || '';
   const text = (shape.required ? '＊ ' : '') + (shape.label || shape.type);
-  return (
-    `<div style="${base};${extra};` +
-    `left:${shape.x}px;top:${shape.y}px;width:${shape.w}px;height:${shape.h}px">${esc(text)}</div>`
-  );
+  return `<div style="${base};${extra};${pos}">${esc(text)}</div>`;
 }
 
 function buildPreviewHtml(title, payload) {

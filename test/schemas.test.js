@@ -34,16 +34,25 @@ for (const key of TEMPLATE_KEYS) {
   });
 }
 
-test('shape 에 group 필드가 있어도 스키마를 통과한다', () => {
+test('shape 에 group·src 필드가 있어도 스키마를 통과한다', () => {
   const payload = {
     systemId: 'portal', mode: 'new', template: 'blank',
     canvas: { w: 960, h: 600 },
     shapes: [
       { type: 'label', x: 10, y: 10, w: 80, h: 24, label: 'A', group: 'g1' },
       { type: 'input', x: 100, y: 8, w: 160, h: 28, group: 'g1' },
+      { type: 'image', x: 10, y: 60, w: 200, h: 120, src: 'data:image/png;base64,iVBORw0KGgo=' },
     ],
   };
   assert.equal(validateScreenDraft(payload), null);
+});
+
+test('screen-draft 는 note·attachments 를 더 이상 허용하지 않는다', () => {
+  const errs = validateScreenDraft({
+    systemId: 'portal', mode: 'new', template: 'blank',
+    canvas: { w: 960, h: 600 }, shapes: [], note: '규칙',
+  });
+  assert.ok(Array.isArray(errs) && errs.length > 0);
 });
 
 test('systemId 없는 payload 는 오류 목록을 돌려준다', () => {

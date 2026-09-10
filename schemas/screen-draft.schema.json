@@ -20,22 +20,6 @@
       }
     },
     "screenName": { "type": "string" },
-    "note": { "type": "string" },
-    "attachments": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "name", "kind"],
-        "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "kind": { "enum": ["excel", "ppt", "image", "other"] },
-          "url": { "type": "string" },
-          "size": { "type": "integer", "minimum": 0 }
-        }
-      }
-    },
     "canvas": {
       "type": "object",
       "additionalProperties": false,
@@ -80,7 +64,8 @@
         "label": { "type": "string" },
         "items": { "type": "string" },
         "required": { "type": "boolean" },
-        "group": { "type": "string", "description": "같은 값을 가진 요소들은 한 그룹(함께 이동·선택)" }
+        "group": { "type": "string", "description": "같은 값을 가진 요소들은 한 그룹(함께 이동·선택)" },
+        "src": { "type": "string", "description": "type=image 일 때 이미지 data URL 또는 URL" }
       }
     }
   }

@@ -33,21 +33,21 @@ npm run dev
   신규·변경 모드, 시스템·화면 검색 콤보박스, 유형별 캔버스 크기,
   "화면 생성" → 결과 모달 3탭 (화면 = 결과/동시 보기(내 스케치↔결과)·이미지 복사 / 전달 데이터 = payload JSON / WebSquare XML = 구문 강조·복사),
   코드 내려받기(파일 2개↑ zip, `fflate`),
-  참고 파일 업로드(클릭/드래그, `/api/attachments` → `uploads/`),
+  이미지 추가(드래그·선택·붙여넣기 → 캔버스 image 요소, data URL, 리사이즈),
   **이름 붙인 저장본**(localStorage 슬롯) · `.hds.json` 파일 내보내기·불러오기, localStorage 자동 저장.
 - **규칙 기반 변환기** (`src/pipeline/deterministic.js`) — payload 를 읽기순으로 정렬 →
   `catalog/websquare/mapping.json` 기반 WebSquare XML(select/radio/list/tab 항목 펼침, `area` 자식 중첩,
   필수(＊) 라벨 → 인접 필드 전파) + 좌표 그대로의 Preview HTML.
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` 데이터
 - 생성 API: `POST /api/generate` — 스키마 검증 + 규칙 기반 변환
-- 첨부 API: `POST /api/attachments` (multipart) / `DELETE /api/attachments/:id` — `uploads/`(gitignore), PNG/JPG/GIF·XLSX/XLS/CSV·PPT/PPTX·PDF, ≤20MB
+- 이미지 첨부: 서버 없음. 클라이언트가 축소 → data URL → 캔버스 `image` shape (`src`)
 - API 스모크 페이지 (`/smoke.html`)
 
 ## 구조
 
 ```
 src/
-  server/    Express, 라우트 (/generate, /systems·/screens, /attachments)
+  server/    Express, 라우트 (/generate, /systems·/screens, /health)
   pipeline/  deterministic.js — 규칙 기반 변환기
   shared/    스키마 검증, 상수, 경로 유틸
   web/       캔버스 에디터 (index.html, styles.css, js/*)

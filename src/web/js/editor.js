@@ -31,6 +31,20 @@ const isSel = (id) => selIds.includes(id);
 const selShapes = () => selIds.map(find).filter(Boolean);
 const groupMembers = (g) => shapes.filter((s) => s.g === g).map((s) => s.id);
 
+/** shape 요소 안의 표시 내용을 채운다 (이미지는 <img>, 나머지는 텍스트) */
+function setShapeContent(el, s) {
+  if (s.t === 'image' && s.src) {
+    const im = el.querySelector('img') || document.createElement('img');
+    im.src = s.src;
+    im.alt = s.label || '이미지';
+    im.draggable = false;
+    if (!im.parentNode) el.prepend(im);
+    [...el.childNodes].forEach((n) => { if (n.nodeType === 3) n.remove(); }); // 텍스트 노드 제거
+  } else {
+    el.textContent = (s.req ? '＊' : '') + (s.label || NAME[s.t]);
+  }
+}
+
 /** 선택 id 목록에 같은 그룹의 나머지 요소들을 더한다 (그룹은 한 덩어리로 선택) */
 function withGroups(ids) {
   const gids = new Set(ids.map((id) => find(id)?.g).filter(Boolean));
@@ -49,7 +63,7 @@ function render() {
     d.dataset.t = s.t;
     d.dataset.id = s.id;
     Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
-    d.textContent = (s.req ? '＊' : '') + (s.label || NAME[s.t]);
+    setShapeContent(d, s);
     d.onmousedown = (ev) => {
       ev.stopPropagation();
       if (ev.target.classList.contains('hh')) {
@@ -203,7 +217,7 @@ function applyLabel() {
   s.label = fL.value;
   s.cols = fC.value;
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
-  if (el) el.textContent = (s.req ? '＊' : '') + (s.label || NAME[s.t]);
+  if (el) setShapeContent(el, s);
   notify();
 }
 
@@ -350,6 +364,7 @@ function normalize(arr) {
     cols: s.cols ?? s.items ?? '',
     req: !!(s.req ?? s.required),
     g: s.g ?? s.group ?? null,
+    src: s.src ?? null,
   }));
 }
 
@@ -641,6 +656,24 @@ export function addComponent(t) {
   setSel([shapes.at(-1).id]);
 }
 
+/** 이미지 요소를 캔버스에 추가 (main.js 의 드래그·붙여넣기에서 호출) */
+export function addImage({ src, w = 240, h = 160 }) {
+  if (!src) return;
+  push();
+  const cw = Math.max(24, Math.min(BOARD_W, Math.round(w)));
+  const ch = Math.max(20, Math.min(BOARD_H, Math.round(h)));
+  const y = shapes.length
+    ? Math.min(BOARD_H - ch - 20, Math.max(...shapes.map((s) => s.y + s.h)) + 20)
+    : 40;
+  shapes.push({
+    id: uid++, t: 'image',
+    x: Math.round((BOARD_W - cw) / 2), y: Math.max(0, y), w: cw, h: ch,
+    label: '', cols: '', req: false, src,
+  });
+  render();
+  setSel([shapes.at(-1).id]);
+}
+
 export function setShapes(arr) {
   push();
   shapes = normalize(arr);
@@ -688,7 +721,7 @@ export function zoomReset() {
 export const count = () => shapes.length;
 export const selectedCount = () => selIds.length;
 
-/** payload.shapes 형식으로 반환 (개발지시서 §6.1). id 는 questions/report 참조용. */
+/** payload.shapes 형식으로 반환 (개발지시서 §6.1). */
 export function toPayloadShapes() {
   return shapes.map((s) => ({
     id: 's' + s.id,
@@ -698,5 +731,6 @@ export function toPayloadShapes() {
     items: s.cols || undefined,
     required: s.req || undefined,
     group: s.g || undefined,
+    src: s.src || undefined,
   }));
 }

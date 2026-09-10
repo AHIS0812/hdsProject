@@ -4,7 +4,6 @@
   "mode": "new",
   "template": "list",
   "screenName": "계약자 조회",
-  "note": "조회조건은 최소 1개 이상 입력해야 조회 버튼 활성화",
   "canvas": { "w": 960, "h": 600 },
   "shapes": [
     { "id": "s1", "type": "area", "x": 30, "y": 30, "w": 900, "h": 70, "label": "조회 영역" },
