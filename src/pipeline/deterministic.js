@@ -4,7 +4,8 @@
 // - AI 파이프라인 장애 / 오프라인 시 폴백으로 동작 (routes/generate.js)
 // - AI 산출물 회귀 판단의 기준선
 //
-// "정리"는 하지 않는다: 캔버스에 놓인 그대로를 읽기 순서로 정렬해 기계적으로 변환한다.
+// "추론"은 하지 않는다(자연어 규칙 해석·질문 생성 없음). 다만 배치에서 직접 읽히는
+// 두 가지는 반영한다: ① 필수(＊) 라벨 → 인접 필드 전파  ② area 안의 요소 → 자식으로 중첩.
 
 import { readJson } from '../shared/paths.js';
 
@@ -40,6 +41,76 @@ function attrString(attrs, n, label, extraClass) {
   );
   if (extraClass) parts.push(`class="${esc(extraClass)}"`);
   return parts.join(' ');
+}
+
+// ── 필수(＊) 라벨 → 인접 필드 전파 ─────────────────────────────────
+const FIELD_TYPES = new Set(['input', 'select', 'date', 'text', 'file', 'radio', 'check']);
+
+/**
+ * `required` 인 label 을 찾아, 같은 줄 오른쪽(없으면 바로 아래)에서 가장 가까운
+ * 입력 필드에 `required` 를 옮긴다. shapes 를 직접 수정하고 전파 건수를 반환.
+ */
+export function propagateRequired(shapes) {
+  let n = 0;
+  const fields = shapes.filter((s) => FIELD_TYPES.has(s.type));
+  for (const lb of shapes.filter((s) => s.type === 'label' && s.required)) {
+    let best = null;
+    let bestKey = Infinity;
+    // 1) 같은 줄 오른쪽
+    for (const f of fields) {
+      const rowOverlap = f.y < lb.y + lb.h && f.y + f.h > lb.y;
+      const gap = f.x - (lb.x + lb.w);
+      if (rowOverlap && gap >= -20 && gap < bestKey) { bestKey = gap; best = f; }
+    }
+    // 2) 바로 아래 (같은 열)
+    if (!best) {
+      for (const f of fields) {
+        const colOverlap = f.x < lb.x + lb.w && f.x + f.w > lb.x;
+        const gap = f.y - (lb.y + lb.h);
+        if (colOverlap && gap >= -4 && gap < 40 && gap < bestKey) { bestKey = gap; best = f; }
+      }
+    }
+    if (best && !best.required) { best.required = true; n += 1; }
+  }
+  return n;
+}
+
+// ── area 포함 관계 트리 ───────────────────────────────────────────
+const areaOf = (s) => s.w * s.h;
+/** area a 가 shape s 를 담고 있나 (s 의 중심이 a 안) */
+function areaContains(a, s) {
+  const cx = (s.x ?? 0) + (s.w ?? 0) / 2;
+  const cy = (s.y ?? 0) + (s.h ?? 0) / 2;
+  return cx >= a.x && cx <= a.x + a.w && cy >= a.y && cy <= a.y + a.h;
+}
+
+/**
+ * 각 shape 의 부모 area(가장 작은 포함 area)를 찾아 트리를 만든다.
+ * @returns {{ roots: object[], childrenOf: Map<object, object[]> }}
+ */
+export function buildContainmentTree(shapes) {
+  const areas = shapes.filter((s) => s.type === 'area');
+  const smallFirst = [...areas].sort((x, y) => areaOf(x) - areaOf(y));
+  const childrenOf = new Map(areas.map((a) => [a, []]));
+  const parentOf = new Map();
+
+  const findParent = (s) => {
+    for (const a of smallFirst) {
+      if (a === s) continue;
+      if (a.type === 'area' && s.type === 'area' && areaOf(a) <= areaOf(s)) continue;
+      if (areaContains(a, s)) return a;
+    }
+    return null;
+  };
+
+  // area 를 먼저 배치(중첩 섹션), 그다음 일반 요소
+  for (const s of [...smallFirst.slice().reverse(), ...shapes.filter((x) => x.type !== 'area')]) {
+    const p = findParent(s);
+    parentOf.set(s, p);
+    if (p) childrenOf.get(p).push(s);
+  }
+  const roots = shapes.filter((s) => !parentOf.get(s));
+  return { roots, childrenOf };
 }
 
 /** 한 shape → WebSquare XML 조각 */
@@ -111,21 +182,50 @@ function buildPreviewHtml(title, payload) {
   );
 }
 
+const indent = (frag, pad) => frag.split('\n').map((l) => pad + l).join('\n');
+
+/** 트리 노드 → XML (area 는 자식을 중첩) */
+function emitNode(shape, numOf, childrenOf, depth) {
+  const pad = '  '.repeat(depth);
+  const n = numOf.get(shape);
+  if (shape.type === 'area') {
+    const m = MAPPING.area || { tag: 'w2:group', attrs: { id: 'grp{n}' } };
+    const attrs = attrString(m.attrs, n, shape.label || '');
+    const kids = readingOrder(childrenOf.get(shape) || []);
+    if (!kids.length) return `${pad}<${m.tag} ${attrs}/>`;
+    const inner = kids.map((k) => emitNode(k, numOf, childrenOf, depth + 1)).join('\n');
+    return `${pad}<${m.tag} ${attrs}>\n${inner}\n${pad}</${m.tag}>`;
+  }
+  return indent(shapeToXml(shape, n), pad);
+}
+
 /**
  * @param {object} payload 화면정의 payload (screen-draft.schema.json)
- * @returns {{ websquareXml: string, previewHtml: string }}
+ * @returns {{ websquareXml: string, previewHtml: string, propagatedRequired: number }}
  */
 export function compileDeterministic(payload) {
   const title = payload.screenName || payload.baseScreen?.name || '무제 화면';
-  const ordered = readingOrder(payload.shapes || []);
-  const body = ordered
-    .map((s, i) => shapeToXml(s, i + 1))
-    .map((frag) => frag.split('\n').map((l) => '  ' + l).join('\n'))
+  // 원본을 건드리지 않도록 복제 후 처리
+  const shapes = readingOrder((payload.shapes || []).map((s) => ({ ...s })));
+  const propagated = propagateRequired(shapes);
+
+  // 읽기 순서대로 id 번호 부여(중첩과 무관하게 안정적)
+  const numOf = new Map(shapes.map((s, i) => [s, i + 1]));
+  const { roots, childrenOf } = buildContainmentTree(shapes);
+  const body = readingOrder(roots)
+    .map((s) => emitNode(s, numOf, childrenOf, 1))
     .join('\n');
+
   const websquareXml =
-    `<!-- ${esc(title)} · 결정론적 변환 (AI 미사용) · 요소 ${ordered.length}개 -->\n` +
-    `<w2:group id="screenRoot">\n${body}\n</w2:group>`;
-  return { websquareXml, previewHtml: buildPreviewHtml(title, payload) };
+    `<!-- ${esc(title)} · 결정론적 변환 (AI 미사용) · 요소 ${shapes.length}개` +
+    (propagated ? ` · 필수 전파 ${propagated}건` : '') +
+    ` -->\n<w2:group id="screenRoot">\n${body}\n</w2:group>`;
+
+  return {
+    websquareXml,
+    previewHtml: buildPreviewHtml(title, { ...payload, shapes }),
+    propagatedRequired: propagated,
+  };
 }
 
 /**

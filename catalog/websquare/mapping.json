@@ -1,12 +1,12 @@
 {
-  "$comment": "요소 타입 → WebSquare 매핑 규칙. 개발지시서 §7. 시스템별 차이는 override.<systemId>.json 로. (담당 1 검증 대상)",
+  "$comment": "요소 타입 → WebSquare 매핑 규칙. 개발지시서 §7. 시스템별 차이는 override.<systemId>.json 로. (담당 1 검증 대상 — requiredClass 명칭은 사내 표준으로 확인 필요)",
   "default": {
     "input":       { "tag": "w2:inputBox",  "attrs": { "id": "ipb{n}" }, "requiredClass": "w2input_essential" },
-    "select":      { "tag": "w2:selectBox", "attrs": { "id": "sel{n}", "dataList": "dl{n}" }, "options": "{items}" },
+    "select":      { "tag": "w2:selectBox", "attrs": { "id": "sel{n}", "dataList": "dl{n}" }, "options": "{items}", "requiredClass": "w2selectbox_essential" },
     "radio":       { "tag": "w2:radiobutton", "attrs": { "id": "rdo{n}", "dataList": "dl{n}" }, "options": "{items}" },
-    "date":        { "tag": "w2:calendar",  "attrs": { "id": "cal{n}", "displayFormat": "yyyy-MM-dd" } },
+    "date":        { "tag": "w2:calendar",  "attrs": { "id": "cal{n}", "displayFormat": "yyyy-MM-dd" }, "requiredClass": "w2input_essential" },
     "check":       { "tag": "w2:checkbox",  "attrs": { "id": "chk{n}", "label": "{label}" } },
-    "text":        { "tag": "w2:textarea",  "attrs": { "id": "txa{n}" } },
+    "text":        { "tag": "w2:textarea",  "attrs": { "id": "txa{n}" }, "requiredClass": "w2textarea_essential" },
     "file":        { "tag": "w2:fileUpload", "attrs": { "id": "fup{n}", "title": "{label}" } },
     "list":        { "tag": "w2:gridView",  "attrs": { "id": "grd{n}", "dataList": "dl{n}" }, "columnTag": "w2:gridColumn", "columns": "{items}" },
     "pager":       { "tag": "w2:pagination", "attrs": { "id": "pgn{n}", "pageListCnt": 10 } },
