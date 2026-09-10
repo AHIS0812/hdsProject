@@ -1,10 +1,10 @@
 // 캔버스 에디터 엔진 — 배치 / 이동 / 8방향 리사이즈 / 정렬 스냅 / 히스토리 / 줌 /
-// 다중 선택(Shift·드래그) / 정렬·분배 / 플로팅 컨텍스트 툴바 / 단축키.
+// 다중 선택(Shift·드래그) / 그룹화 / 정렬·분배 / 플로팅 컨텍스트 툴바 / 우클릭 메뉴 / 단축키.
 // 개발지시서 U-2 ~ U-5.
 
 import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, defaultLabel, defaultCols } from './constants.js';
 
-let board, ctx, hint, ctxT, fL, fC, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl;
+let board, ctx, hint, ctxT, fL, fC, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl, cmenu, bGroup, bUngroup;
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
 let BOARD_W = DEFAULT_BOARD.w;
 let BOARD_H = DEFAULT_BOARD.h;
@@ -13,6 +13,7 @@ let selIds = [];          // 선택된 요소 id 목록 (다중 선택)
 let hist = [];
 let future = [];
 let uid = 1;
+let gid = 1;              // 그룹 id 카운터
 let zm = 100;
 let clip = null;          // 복사 버퍼 (배열)
 let move = null;
@@ -28,9 +29,19 @@ const pt = (e) => {
 const find = (id) => shapes.find((s) => s.id === id);
 const isSel = (id) => selIds.includes(id);
 const selShapes = () => selIds.map(find).filter(Boolean);
+const groupMembers = (g) => shapes.filter((s) => s.g === g).map((s) => s.id);
+
+/** 선택 id 목록에 같은 그룹의 나머지 요소들을 더한다 (그룹은 한 덩어리로 선택) */
+function withGroups(ids) {
+  const gids = new Set(ids.map((id) => find(id)?.g).filter(Boolean));
+  if (!gids.size) return ids;
+  const set = new Set(ids);
+  shapes.forEach((s) => { if (s.g && gids.has(s.g)) set.add(s.id); });
+  return [...set];
+}
 
 function render() {
-  board.querySelectorAll('.sh').forEach((e) => e.remove());
+  board.querySelectorAll('.sh,.grp-outline').forEach((e) => e.remove());
   const single = selIds.length === 1 ? selIds[0] : null;
   shapes.forEach((s) => {
     const d = document.createElement('div');
@@ -67,6 +78,20 @@ function render() {
       });
     }
     board.appendChild(d);
+  });
+  // 선택된 그룹마다 점선 외곽선
+  new Set(selShapes().map((s) => s.g).filter(Boolean)).forEach((g) => {
+    const gs = shapes.filter((s) => s.g === g);
+    const x = Math.min(...gs.map((s) => s.x));
+    const y = Math.min(...gs.map((s) => s.y));
+    const r = Math.max(...gs.map((s) => s.x + s.w));
+    const b2 = Math.max(...gs.map((s) => s.y + s.h));
+    const o = document.createElement('div');
+    o.className = 'grp-outline';
+    Object.assign(o.style, {
+      left: x - 4 + 'px', top: y - 4 + 'px', width: r - x + 8 + 'px', height: b2 - y + 8 + 'px',
+    });
+    board.appendChild(o);
   });
   hint.style.display = shapes.length ? 'none' : 'block';
   bU.disabled = !hist.length;
@@ -115,12 +140,15 @@ function line(dir, p) {
 
 // ── 선택 ─────────────────────────────────────────────────
 function setSel(ids) {
-  selIds = [...new Set(ids)].filter((id) => find(id));
+  selIds = withGroups([...new Set(ids)].filter((id) => find(id)));
   render();
   syncCtx();
 }
 function toggleSel(id) {
-  setSel(isSel(id) ? selIds.filter((x) => x !== id) : [...selIds, id]);
+  const s = find(id);
+  const members = s?.g ? groupMembers(s.g) : [id];
+  const has = members.every((m) => isSel(m));
+  setSel(has ? selIds.filter((x) => !members.includes(x)) : [...selIds, ...members]);
 }
 
 function syncCtx() {
@@ -137,7 +165,18 @@ function syncCtx() {
     fC.classList.toggle('hidden', !HAS_ITEMS[s.t]);
     bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
   }
+  if (multi) {
+    bGroup.hidden = isOneWholeGroup();
+    bUngroup.hidden = !selShapes().some((s) => s.g);
+  }
   placeCtx();
+}
+
+/** 현재 선택이 "정확히 한 그룹 전체"인가 (이 경우 재-묶기 불필요) */
+function isOneWholeGroup() {
+  const ss = selShapes();
+  const gs = new Set(ss.map((s) => s.g).filter(Boolean));
+  return gs.size === 1 && ss.every((s) => s.g) && groupMembers([...gs][0]).length === ss.length;
 }
 
 function placeCtx() {
@@ -224,16 +263,51 @@ function alignAct(act) {
   render();
 }
 
+// ── 그룹 ─────────────────────────────────────────────────
+function groupSel() {
+  const ss = selShapes();
+  if (ss.length < 2) return;
+  push();
+  const g = 'g' + gid++;
+  ss.forEach((s) => { s.g = g; });
+  setSel(selIds);
+}
+function ungroupSel() {
+  const ss = selShapes();
+  if (!ss.some((s) => s.g)) return;
+  push();
+  ss.forEach((s) => { s.g = null; });
+  setSel(selIds);
+}
+
 // ── 복제 / 순서 / 삭제 ───────────────────────────────────
+/** shapes 를 복제하며 그룹 id 를 새로 매핑 (원본 그룹에 섞이지 않게) */
+function cloneWithNewGroups(list, ox, oy) {
+  const gmap = new Map();
+  return list.map((s) => {
+    let g = s.g || null;
+    if (g) { if (!gmap.has(g)) gmap.set(g, 'g' + gid++); g = gmap.get(g); }
+    return {
+      ...s, id: uid++, g,
+      x: Math.min(BOARD_W - s.w, s.x + ox),
+      y: Math.min(BOARD_H - s.h, s.y + oy),
+    };
+  });
+}
+
 function dup() {
   const ss = selShapes();
   if (!ss.length) return;
   push();
-  const copies = ss.map((s) => ({
-    ...s, id: uid++,
-    x: Math.min(BOARD_W - s.w, s.x + 16),
-    y: Math.min(BOARD_H - s.h, s.y + 16),
-  }));
+  const copies = cloneWithNewGroups(ss, 16, 16);
+  shapes.push(...copies);
+  setSel(copies.map((c) => c.id));
+}
+
+function pasteClip() {
+  if (!clip || !clip.length) return;
+  push();
+  const copies = cloneWithNewGroups(clip, 20, 20);
   shapes.push(...copies);
   setSel(copies.map((c) => c.id));
 }
@@ -275,6 +349,7 @@ function normalize(arr) {
     label: s.label ?? '',
     cols: s.cols ?? s.items ?? '',
     req: !!(s.req ?? s.required),
+    g: s.g ?? s.group ?? null,
   }));
 }
 
@@ -294,6 +369,9 @@ export function initEditor(opts = {}) {
   cv = document.getElementById('cv');
   ctxSingle = document.getElementById('ctxSingle');
   ctxAlign = document.getElementById('ctxAlign');
+  cmenu = document.getElementById('cmenu');
+  bGroup = document.getElementById('bGroup');
+  bUngroup = document.getElementById('bUngroup');
   notify = opts.onChange || (() => {});
 
   marqEl = document.createElement('div');
@@ -388,24 +466,17 @@ export function initEditor(opts = {}) {
   });
 
   document.addEventListener('keydown', (e) => {
+    if (!cmenu.hidden && e.key === 'Escape') { e.preventDefault(); hideMenu(); board.focus(); return; }
     if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     const c = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (c && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if (c && k === 'y') { e.preventDefault(); redo(); }
     else if (c && k === 'a') { e.preventDefault(); setSel(shapes.map((s) => s.id)); }
+    else if (c && k === 'g') { e.preventDefault(); e.shiftKey ? ungroupSel() : groupSel(); }
     else if (c && k === 'c') { const ss = selShapes(); if (ss.length) clip = ss.map((s) => ({ ...s })); }
-    else if (c && k === 'v') {
-      if (!clip || !clip.length) return;
-      push();
-      const copies = clip.map((cc) => ({
-        ...cc, id: uid++,
-        x: Math.min(BOARD_W - cc.w, cc.x + 20),
-        y: Math.min(BOARD_H - cc.h, cc.y + 20),
-      }));
-      shapes.push(...copies);
-      setSel(copies.map((cc) => cc.id));
-    } else if (c && k === 'd') { e.preventDefault(); dup(); }
+    else if (c && k === 'v') { e.preventDefault(); pasteClip(); }
+    else if (c && k === 'd') { e.preventDefault(); dup(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') { if (selIds.length) { e.preventDefault(); delSel(); } }
     else if (e.key === 'Escape') setSel([]);
     else if (e.key.indexOf('Arrow') === 0 && selIds.length) {
@@ -444,11 +515,87 @@ export function initEditor(opts = {}) {
     const act = e.target.closest('button')?.dataset.act;
     if (!act) return;
     if (ALIGN[act]) { alignAct(ALIGN[act]); return; }
-    ({ req: toggleReq, dup, front, back, del: delSel })[act]?.();
+    ({ req: toggleReq, dup, front, back, del: delSel, group: groupSel, ungroup: ungroupSel })[act]?.();
+  });
+
+  // ── 우클릭 메뉴 ─────────────────────────────────────────
+  board.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const shEl = e.target.closest('.sh');
+    if (shEl) {
+      const id = +shEl.dataset.id;
+      if (!isSel(id)) setSel([id]);
+    }
+    showMenu(e.clientX, e.clientY);
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (!cmenu.hidden && !cmenu.contains(e.target)) hideMenu();
+  });
+  cv.addEventListener('scroll', hideMenu);
+  window.addEventListener('resize', hideMenu);
+  cmenu.addEventListener('keydown', (e) => {
+    const items = [...cmenu.querySelectorAll('button:not(:disabled)')];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
   });
 
   applyBoardSize();
   render();
+}
+
+// ── 우클릭 메뉴 구성 ──────────────────────────────────────
+function hideMenu() { if (cmenu) cmenu.hidden = true; }
+
+function menuItems() {
+  const n = selIds.length;
+  const hasGroup = selShapes().some((s) => s.g);
+  const out = [];
+  if (n >= 1) {
+    out.push({ label: '복제', sc: 'Ctrl+D', act: dup });
+    out.push({ label: '맨 앞으로', act: front });
+    out.push({ label: '맨 뒤로', act: back });
+  }
+  const canGroup = n >= 2 && !isOneWholeGroup();
+  if (canGroup) { out.push('-'); out.push({ label: '그룹으로 묶기', sc: 'Ctrl+G', act: groupSel }); }
+  if (hasGroup) {
+    if (!canGroup) out.push('-');
+    out.push({ label: '그룹 해제', sc: 'Ctrl+Shift+G', act: ungroupSel });
+  }
+  out.push('-');
+  out.push({ label: '전체 선택', sc: 'Ctrl+A', act: () => setSel(shapes.map((s) => s.id)) });
+  if (clip && clip.length) out.push({ label: '붙여넣기', sc: 'Ctrl+V', act: pasteClip });
+  if (n >= 1) {
+    out.push('-');
+    out.push({ label: '삭제', sc: 'Del', act: delSel, danger: true });
+  }
+  return out;
+}
+
+function showMenu(clientX, clientY) {
+  cmenu.replaceChildren(
+    ...menuItems().map((it) => {
+      if (it === '-') return document.createElement('hr');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      if (it.danger) b.className = 'red';
+      const l = document.createElement('span');
+      l.textContent = it.label;
+      const s = document.createElement('span');
+      s.className = 'sc';
+      s.textContent = it.sc || '';
+      b.append(l, s);
+      b.addEventListener('click', () => { hideMenu(); it.act(); });
+      return b;
+    }),
+  );
+  cmenu.hidden = false;
+  const mw = cmenu.offsetWidth || 180;
+  const mh = cmenu.offsetHeight || 240;
+  cmenu.style.left = Math.max(6, Math.min(clientX, window.innerWidth - mw - 8)) + 'px';
+  cmenu.style.top = Math.max(6, Math.min(clientY, window.innerHeight - mh - 8)) + 'px';
+  cmenu.querySelector('button')?.focus();
 }
 
 function applyBoardSize() {
@@ -498,6 +645,8 @@ export function setShapes(arr) {
   push();
   shapes = normalize(arr);
   uid = shapes.length + 1;
+  const maxG = Math.max(0, ...shapes.map((s) => parseInt(String(s.g || '').replace(/\D/g, ''), 10) || 0));
+  gid = maxG + 1;
   setSel([]);
 }
 
@@ -548,5 +697,6 @@ export function toPayloadShapes() {
     label: s.label || undefined,
     items: s.cols || undefined,
     required: s.req || undefined,
+    group: s.g || undefined,
   }));
 }

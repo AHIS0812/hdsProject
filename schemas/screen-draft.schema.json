@@ -79,7 +79,8 @@
         "h": { "type": "number", "exclusiveMinimum": 0 },
         "label": { "type": "string" },
         "items": { "type": "string" },
-        "required": { "type": "boolean" }
+        "required": { "type": "boolean" },
+        "group": { "type": "string", "description": "같은 값을 가진 요소들은 한 그룹(함께 이동·선택)" }
       }
     }
   }

@@ -139,8 +139,10 @@
         <dt>복제</dt><dd><kbd>Ctrl</kbd>+<kbd>D</kbd></dd>
         <dt>복사 · 붙여넣기</dt><dd><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></dd>
         <dt>삭제</dt><dd><kbd>Del</kbd></dd>
+        <dt>그룹 · 해제</dt><dd><kbd>Ctrl</kbd>+<kbd>G</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> (2개 이상)</dd>
         <dt>되돌리기 · 다시</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></dd>
         <dt>정렬 · 분배</dt><dd>2개 이상 선택 시 상단 툴바 (분배는 3개 이상)</dd>
+        <dt>우클릭 메뉴</dt><dd>캔버스·요소에서 오른쪽 클릭</dd>
         <dt>확대 · 축소</dt><dd>하단 <b>−</b> / <b>＋</b> 버튼</dd>
       </dl>
     </div>
@@ -169,12 +171,17 @@
     <button class="cb" data-act="distH" title="가로 균등 분배 (3개 이상)" aria-label="가로 균등 분배">⇿</button>
     <button class="cb" data-act="distV" title="세로 균등 분배 (3개 이상)" aria-label="세로 균등 분배">↕</button>
     <div class="cdiv" aria-hidden="true"></div>
+    <button class="cb" id="bGroup" data-act="group" title="그룹으로 묶기 (Ctrl+G)" aria-label="그룹으로 묶기">⊞</button>
+    <button class="cb" id="bUngroup" data-act="ungroup" title="그룹 해제 (Ctrl+Shift+G)" aria-label="그룹 해제" hidden>⊟</button>
+    <div class="cdiv" aria-hidden="true"></div>
   </span>
   <button class="cb" data-act="dup" title="복제 (Ctrl+D)" aria-label="복제">⧉</button>
   <button class="cb" data-act="front" title="맨 앞으로" aria-label="맨 앞으로">⬆</button>
   <button class="cb" data-act="back" title="맨 뒤로" aria-label="맨 뒤로">⬇</button>
   <button class="cb red" data-act="del" title="삭제 (Del)" aria-label="삭제">🗑</button>
 </div>
+
+<div class="cmenu" id="cmenu" role="menu" aria-label="캔버스 메뉴" hidden></div>
 
 <div class="mask" id="mask">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">

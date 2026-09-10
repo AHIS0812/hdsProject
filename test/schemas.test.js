@@ -37,6 +37,18 @@ for (const key of TEMPLATE_KEYS) {
   });
 }
 
+test('shape 에 group 필드가 있어도 스키마를 통과한다', () => {
+  const payload = {
+    systemId: 'portal', mode: 'new', template: 'blank',
+    canvas: { w: 960, h: 600 },
+    shapes: [
+      { type: 'label', x: 10, y: 10, w: 80, h: 24, label: 'A', group: 'g1' },
+      { type: 'input', x: 100, y: 8, w: 160, h: 28, group: 'g1' },
+    ],
+  };
+  assert.equal(validateScreenDraft(payload), null);
+});
+
 test('systemId 없는 payload 는 오류 목록을 돌려준다', () => {
   const errs = validateScreenDraft({ mode: 'new' });
   assert.ok(Array.isArray(errs) && errs.length > 0);

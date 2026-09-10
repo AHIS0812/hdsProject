@@ -208,6 +208,20 @@ textarea:focus{border-color:var(--or);}
 .gd{position:absolute;background:#FF3D7F;pointer-events:none;z-index:9;}
 .gd.v{width:1.5px;top:0;bottom:0;}.gd.h{height:1.5px;left:0;right:0;}
 
+.grp-outline{position:absolute;border:1.5px dashed var(--nv);border-radius:7px;pointer-events:none;
+             z-index:4;opacity:.45;}
+
+/* 우클릭 메뉴 */
+.cmenu{position:fixed;background:#fff;border:1px solid var(--line);border-radius:11px;
+       box-shadow:0 10px 34px rgba(16,24,40,.22);padding:5px;z-index:70;min-width:176px;}
+.cmenu button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:20px;
+              background:none;border:0;font-family:inherit;font-size:12.5px;color:var(--ink);
+              padding:8px 10px;border-radius:7px;cursor:pointer;text-align:left;}
+.cmenu button:hover,.cmenu button:focus-visible{background:var(--or-l);color:var(--or-d);}
+.cmenu button.red:hover,.cmenu button.red:focus-visible{background:#FFF0EC;color:#E5484D;}
+.cmenu .sc{font-size:10.5px;color:var(--mut);white-space:nowrap;}
+.cmenu hr{border:0;border-top:1px solid var(--line2);margin:4px 2px;}
+
 .hint{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);color:#BFC6D0;text-align:center;
       font-size:14px;line-height:2;pointer-events:none;font-weight:600;}
 .hint b{display:block;font-size:12px;font-weight:400;color:#CBD1DA;}
