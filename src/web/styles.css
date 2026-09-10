@@ -156,7 +156,7 @@ h4.gap{margin-top:30px;}
 .sh{position:absolute;border:2px solid #A8B1BF;border-radius:6px;background:#fff;
     display:flex;align-items:center;justify-content:center;font-size:12px;color:#5A6472;
     cursor:move;user-select:none;overflow:hidden;padding:0 8px;white-space:nowrap;}
-.sh.sel{border-color:var(--or);z-index:6;}
+.sh.sel{border-color:var(--or);}
 .sh[data-t=area]{border-style:dashed;border-color:#BFC7D3;background:#FAFBFD;
                  align-items:flex-start;justify-content:flex-start;padding:6px 10px;color:#AEB7C4;font-size:11px;}
 .sh[data-t=button]{background:var(--nv);border-color:var(--nv);color:#fff;font-weight:700;}

@@ -57,12 +57,12 @@ function withGroups(ids) {
 function render() {
   board.querySelectorAll('.sh,.grp-outline').forEach((e) => e.remove());
   const single = selIds.length === 1 ? selIds[0] : null;
-  shapes.forEach((s) => {
+  shapes.forEach((s, i) => {
     const d = document.createElement('div');
     d.className = 'sh' + (isSel(s.id) ? ' sel' : '');
     d.dataset.t = s.t;
     d.dataset.id = s.id;
-    Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
+    Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px', zIndex: String(i + 1) });
     setShapeContent(d, s);
     d.onmousedown = (ev) => {
       ev.stopPropagation();
@@ -104,6 +104,7 @@ function render() {
     o.className = 'grp-outline';
     Object.assign(o.style, {
       left: x - 4 + 'px', top: y - 4 + 'px', width: r - x + 8 + 'px', height: b2 - y + 8 + 'px',
+      zIndex: String(shapes.length + 2),
     });
     board.appendChild(o);
   });
