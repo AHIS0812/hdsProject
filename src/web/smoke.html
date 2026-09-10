@@ -39,7 +39,7 @@
   <p class="lead" style="margin-bottom:6px"><strong>이건 API 스모크 테스트 페이지입니다.</strong>
      실제 에디터는 <a href="/">/</a> (src/web/index.html).</p>
   <p class="lead">
-    <code>/api/*</code> 엔드포인트를 백엔드(담당 1) 없이 확인하는 용도입니다.
+    <code>/api/*</code> 엔드포인트를 빠르게 확인하는 용도입니다.
     캔버스 에디터는 <a href="/"><code>/</code></a> 에 있습니다.
   </p>
 
@@ -51,8 +51,8 @@
   </section>
 
   <section>
-    <h2>2. 신규화면 — /api/generate mock 응답 (T-1 완료 조건)</h2>
-    <button class="pri" onclick="testGenerate()">테스트 payload 로 생성 요청 (mode: new)</button>
+    <h2>2. 신규화면 — /api/generate (규칙 기반 변환)</h2>
+    <button class="pri" onclick="testGenerate()">테스트 payload 로 변환 요청 (mode: new)</button>
     <pre id="genOut">아직 호출하지 않음</pre>
   </section>
 
@@ -68,11 +68,11 @@
   </section>
 
   <section>
-    <h2>다음 작업</h2>
+    <h2>참고</h2>
     <ul>
-      <li>담당 1: <code>src/pipeline/*</code>, <code>src/llm/*</code> 구현 (A-2 ~ A-10)</li>
-      <li>담당 2: <code>src/web/</code> 캔버스 에디터 (U-1 ~ U-11)</li>
-      <li>공통: <code>schemas/</code>, <code>fixtures/</code>, <code>catalog/</code> 채우기 (T-2 ~ T-4)</li>
+      <li>변환: <code>src/pipeline/deterministic.js</code> (규칙 기반, 외부 LLM 미사용)</li>
+      <li>에디터: <code>src/web/</code></li>
+      <li>계약: <code>schemas/</code> · 데이터: <code>fixtures/</code> · 표준: <code>catalog/</code></li>
     </ul>
   </section>
 </main>

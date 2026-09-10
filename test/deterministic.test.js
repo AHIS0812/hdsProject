@@ -49,11 +49,11 @@ test('compileDeterministic — XML/HTML 을 만든다, 주입 방지', () => {
 });
 
 test('deterministicResult — generation-result 스키마를 통과한다', () => {
-  const r = deterministicResult(listPayload, '개발용 트리거');
+  const r = deterministicResult(listPayload);
   assert.equal(validateGenerationResult(r), null);
   assert.equal(r.status, 'ok');
-  assert.equal(r.report.usedDeterministicFallback, true);
-  assert.deepEqual(r.report.fallbacksApplied, ['deterministic']);
+  assert.equal(r.report.converter, 'deterministic');
+  assert.equal(typeof r.report.propagatedRequired, 'number');
   assert.equal(r.code.files.length, 1);
 });
 

@@ -2,7 +2,7 @@
 //
 //   node scripts/run-eval.mjs
 //
-// 담당 1 파이프라인(Stage A/B) 연동 전 "결정론적 변환기 기준선(baseline)" 을 만든다.
+// 규칙 기반 변환기(deterministic.js)로 케이스를 일괄 변환한다.
 // 결과: runs/<timestamp>/<CASE>/{payload.json, screen.xml, preview.html, report.json}
 //       runs/<timestamp>/summary.json
 
@@ -161,14 +161,14 @@ const CASES = [
 // ── 실행 ────────────────────────────────────────────────────────────
 const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const outRoot = path.join(ROOT, 'runs', ts);
-const summary = { ts, mode: 'deterministic-baseline', cases: [] };
+const summary = { ts, mode: 'deterministic', cases: [] };
 
 function runCase(id, payload) {
   const dir = path.join(outRoot, id);
   mkdirSync(dir, { recursive: true });
 
   const payloadErrors = validateScreenDraft(payload);
-  const result = deterministicResult(payload, '평가 실행(결정론적 기준선)');
+  const result = deterministicResult(payload);
   const resultErrors = validateGenerationResult(result);
 
   writeFileSync(path.join(dir, 'payload.json'), JSON.stringify(payload, null, 2));
@@ -195,7 +195,7 @@ function runCase(id, payload) {
     xmlTags: tagCounts,
     unmappedTypes: unmapped,
     wellFormedGroup: wellFormed,
-    usedDeterministicFallback: result.report.usedDeterministicFallback === true,
+    converter: result.report.converter,
   };
   summary.cases.push(row);
   return row;
@@ -217,7 +217,7 @@ const consistDir = path.join(outRoot, 'CONSIST');
 mkdirSync(consistDir, { recursive: true });
 const nlist = CASES[0].payload;
 const runs3 = [1, 2, 3].map((n) => {
-  const res = deterministicResult(nlist, '평가 실행(결정론적 기준선)');
+  const res = deterministicResult(nlist);
   writeFileSync(path.join(consistDir, `run${n}.xml`), res.code.websquareXml);
   return res.code.websquareXml;
 });

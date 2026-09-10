@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hdsproject/schemas/generation-result.schema.json",
-  "title": "생성결과 (담당 1 → 담당 2)",
+  "title": "생성결과 (백엔드 → 프론트엔드)",
   "type": "object",
   "required": ["status"],
   "properties": {
-    "status": { "enum": ["ok", "needs_input", "error"] },
+    "status": { "enum": ["ok", "error"] },
     "preview": {
       "type": "object",
       "required": ["html"],
@@ -28,28 +28,14 @@
         }
       }
     },
-    "ir": { "type": "object" },
-    "questions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "question"],
-        "properties": {
-          "id": { "type": "string" },
-          "targetId": { "type": "string" },
-          "question": { "type": "string" },
-          "options": { "type": "array", "items": { "type": "string" } }
-        }
-      }
-    },
     "report": {
       "type": "object",
       "properties": {
-        "retries": { "type": "integer", "minimum": 0 },
+        "converter": { "type": "string" },
         "elapsedMs": { "type": "integer", "minimum": 0 },
-        "fallbacksApplied": { "type": "array" },
+        "propagatedRequired": { "type": "integer", "minimum": 0 },
         "unresolved": { "type": "array", "items": { "type": "string" } },
-        "usedDeterministicFallback": { "type": "boolean" }
+        "note": { "type": "string" }
       }
     },
     "error": {
@@ -65,10 +51,6 @@
     {
       "if": { "properties": { "status": { "const": "ok" } } },
       "then": { "required": ["preview", "code"] }
-    },
-    {
-      "if": { "properties": { "status": { "const": "needs_input" } } },
-      "then": { "required": ["questions"] }
     },
     {
       "if": { "properties": { "status": { "const": "error" } } },

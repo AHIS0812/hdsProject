@@ -26,7 +26,7 @@ app.get('/vendor/html2canvas.js', (req, res) =>
 app.get('/vendor/fflate.js', (req, res) =>
   res.sendFile(path.join(ROOT, 'node_modules/fflate/umd/index.js')));
 
-// 에디터 정적 파일 ([담당 2] — src/web)
+// 에디터 정적 파일 (src/web)
 app.use(express.static(path.join(ROOT, 'src/web')));
 
 // eslint-disable-next-line no-unused-vars
@@ -36,5 +36,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(port, () => {
-  console.log(`AI Screen Draft  →  http://localhost:${port}`);
+  console.log(`하이스케치  →  http://localhost:${port}`);
 });

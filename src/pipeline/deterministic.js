@@ -1,8 +1,7 @@
-// [담당 1 영역 · 담당 2 가 폴백용으로 선구현] 결정론적 변환기 — 개발지시서 §4.2, D-7, §8 A-3
+// 규칙 기반 변환기 — 개발지시서 §4, §8 A-3
 //
-// AI 없이 payload → { websquareXml, previewHtml } 를 만드는 기준 변환기.
-// - AI 파이프라인 장애 / 오프라인 시 폴백으로 동작 (routes/generate.js)
-// - AI 산출물 회귀 판단의 기준선
+// 외부 LLM 미사용. payload → { websquareXml, previewHtml } 를 규칙으로 만든다.
+// `/api/generate` 가 이 변환기를 전담 호출한다 (routes/generate.js).
 //
 // "추론"은 하지 않는다(자연어 규칙 해석·질문 생성 없음). 다만 배치에서 직접 읽히는
 // 두 가지는 반영한다: ① 필수(＊) 라벨 → 인접 필드 전파  ② area 안의 요소 → 자식으로 중첩.
@@ -177,7 +176,7 @@ function buildPreviewHtml(title, payload) {
     `.d-note{font-size:11px;color:#8a8a8a;text-align:center;padding:7px}` +
     `.d-cv{position:relative;width:${w}px;height:${h}px;background:#fff;margin:0 auto 16px;` +
     `border:1px solid #ddd;box-shadow:0 1px 4px rgba(0,0,0,.08)}</style></head>` +
-    `<body><div class="d-note">결정론적 변환 미리보기 · AI 정리 없음 (배치 그대로)</div>` +
+    `<body><div class="d-note">규칙 기반 변환 미리보기 (배치 그대로)</div>` +
     `<div class="d-cv">${els}</div></body></html>`
   );
 }
@@ -217,7 +216,7 @@ export function compileDeterministic(payload) {
     .join('\n');
 
   const websquareXml =
-    `<!-- ${esc(title)} · 결정론적 변환 (AI 미사용) · 요소 ${shapes.length}개` +
+    `<!-- ${esc(title)} · 규칙 기반 변환 · 요소 ${shapes.length}개` +
     (propagated ? ` · 필수 전파 ${propagated}건` : '') +
     ` -->\n<w2:group id="screenRoot">\n${body}\n</w2:group>`;
 
@@ -229,12 +228,11 @@ export function compileDeterministic(payload) {
 }
 
 /**
- * 폴백용: 완전한 생성결과(generation-result.schema.json) 객체를 만든다.
+ * 완전한 생성결과(generation-result.schema.json) 객체를 만든다.
  * @param {object} payload
- * @param {string} [reason] 폴백 사유 (파이프라인 오류 메시지)
  */
-export function deterministicResult(payload, reason) {
-  const { websquareXml, previewHtml } = compileDeterministic(payload || {});
+export function deterministicResult(payload) {
+  const { websquareXml, previewHtml, propagatedRequired } = compileDeterministic(payload || {});
   return {
     status: 'ok',
     preview: { html: previewHtml },
@@ -243,13 +241,11 @@ export function deterministicResult(payload, reason) {
       files: [{ path: 'screen.xml', content: websquareXml }],
     },
     report: {
-      retries: 0,
+      converter: 'deterministic',
       elapsedMs: 0,
-      fallbacksApplied: ['deterministic'],
+      propagatedRequired,
       unresolved: [],
-      usedDeterministicFallback: true,
-      note: 'AI 파이프라인을 사용하지 못해 결정론적 변환기로 생성했습니다.',
-      ...(reason ? { fallbackReason: reason } : {}),
+      note: '외부 LLM 미사용 — 규칙 기반 변환 결과입니다.',
     },
   };
 }

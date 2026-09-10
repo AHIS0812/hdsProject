@@ -3,11 +3,8 @@ import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 
-import {
-  validateScreenDraft,
-  validateGenerationResult,
-  validateRefineRequest,
-} from '../src/shared/validate.js';
+import { validateScreenDraft, validateGenerationResult } from '../src/shared/validate.js';
+import { deterministicResult } from '../src/pipeline/deterministic.js';
 import { readJson, ROOT } from '../src/shared/paths.js';
 import { boardSizeFor } from '../src/web/js/constants.js';
 import { TEMPLATE_KEYS, templateShapes } from '../src/web/js/templates.js';
@@ -98,22 +95,15 @@ test('모든 screen 픽스처: shapes 가 canvas 안에 들어가고 edit payloa
 });
 
 test('fixtures/payloads/*.json 이 스키마를 통과한다', () => {
-  for (const f of ['list.json', 'fallback.json']) {
+  for (const f of ['list.json', 'sample.json']) {
     assert.equal(validateScreenDraft(readJson(`fixtures/payloads/${f}`)), null, `${f} 위반`);
   }
 });
 
-test('fixtures/results/*.json 이 generation-result 스키마를 통과한다', () => {
-  for (const f of ['generic.json', 'needs-input.json']) {
-    assert.equal(validateGenerationResult(readJson(`fixtures/results/${f}`)), null, `${f} 위반`);
+test('변환기 결과가 generation-result 스키마를 통과한다', () => {
+  for (const f of ['list.json', 'sample.json']) {
+    const result = deterministicResult(readJson(`fixtures/payloads/${f}`));
+    assert.equal(validateGenerationResult(result), null, `${f} 결과 위반`);
+    assert.equal(result.status, 'ok');
   }
-});
-
-test('refine 요청 형태가 스키마를 통과한다', () => {
-  const req = {
-    basePayload: readJson('fixtures/payloads/list.json'),
-    answers: [{ questionId: 'q1', value: '그리드' }],
-    instruction: '조회 버튼을 오른쪽으로',
-  };
-  assert.equal(validateRefineRequest(req), null);
 });

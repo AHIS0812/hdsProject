@@ -1,5 +1,4 @@
-// 스캐폴딩 단계의 mock 데이터 로더.
-// 실연동(T-5) 전까지 메타 API / 생성 API 는 fixtures/ 를 반환한다.
+// fixtures/ 데이터 로더 — 시스템·화면 목록의 데이터 소스 (OI-11, OI-12: 실 연동은 정식 개발 과제).
 
 import { readJson, ROOT } from '../shared/paths.js';
 import { readdirSync } from 'node:fs';

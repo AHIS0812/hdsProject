@@ -1,5 +1,5 @@
 {
-  "$comment": "요소 타입 → WebSquare 매핑 규칙. 개발지시서 §7. 시스템별 차이는 override.<systemId>.json 로. (담당 1 검증 대상 — requiredClass 명칭은 사내 표준으로 확인 필요)",
+  "$comment": "요소 타입 → WebSquare 매핑 규칙. 개발지시서 §7. 시스템별 차이는 override.<systemId>.json 로. (백엔드 검증 대상 — requiredClass 명칭은 사내 표준으로 확인 필요)",
   "default": {
     "input":       { "tag": "w2:inputBox",  "attrs": { "id": "ipb{n}" }, "requiredClass": "w2input_essential" },
     "select":      { "tag": "w2:selectBox", "attrs": { "id": "sel{n}", "dataList": "dl{n}" }, "options": "{items}", "requiredClass": "w2selectbox_essential" },

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hdsproject/schemas/screen-draft.schema.json",
-  "title": "화면정의 payload (담당 2 → 담당 1)",
+  "title": "화면정의 payload (프론트엔드 → 백엔드)",
   "type": "object",
   "additionalProperties": false,
   "required": ["systemId", "mode", "canvas", "shapes"],

@@ -1,16 +1,15 @@
-// "화면 생성" 결과 모달 — [화면] Preview / [전달 데이터] payload / [WebSquare XML]
-// + 질문 응답 / 자연어 수정 요청 → /api/refine.
-// 개발지시서 U-7, U-8, U-9. 결과는 POST /api/generate|refine 응답에서 온다.
+// "화면 생성" 결과 모달 — [화면] Preview / [전달 데이터] payload / [WebSquare XML].
+// 결과는 POST /api/generate 응답(규칙 기반 변환기)에서 온다. 개발지시서 U-7, U-8.
 
-import * as api from './api.js';
+import { generate } from './api.js';
 import { toast } from './toast.js';
 import { highlightXml } from './highlight.js';
 
 const $ = (id) => document.getElementById(id);
 
-const STEPS = ['배치된 요소 해석', '보충 설명 · 첨부 파일 반영', '사내 표준 컴포넌트 치환', 'WebSquare XML 변환 및 검증'];
+const STEPS = ['배치된 요소 읽기', '읽기 순서로 정렬', '사내 표준 컴포넌트로 치환', 'WebSquare XML · 미리보기 생성'];
 
-// last.payload = 최초 생성 payload, last.result = 가장 최근 결과 (generate/refine 공통)
+// last.payload = 생성 payload, last.result = /api/generate 결과
 // last.sketch = 생성 요청 시점의 캔버스 스냅샷 { html, w, h } — "내 스케치" 비교용
 let last = { payload: null, result: null, sketch: null };
 let currentTab = 'v';
@@ -117,13 +116,7 @@ function renderTab(p) {
   if (r.status === 'error') {
     const pre = document.createElement('pre');
     pre.className = 'err';
-    pre.textContent = '생성 실패\n\n' + (r.error?.message || '') + '\n\n' + (r.error?.log || '');
-    b.replaceChildren(pre);
-    return;
-  }
-  if (r.status === 'needs_input') {
-    const pre = document.createElement('pre');
-    pre.textContent = '아래 질문에 답하면 반영해서 다시 생성합니다.';
+    pre.textContent = '변환 실패\n\n' + (r.error?.message || '') + '\n\n' + (r.error?.log || '');
     b.replaceChildren(pre);
     return;
   }
@@ -225,15 +218,20 @@ function renderStatus() {
   const st = $('mStatus');
   const r = last.result;
   if (!r?.status) { st.hidden = true; return; }
-  const fallback = r.report?.usedDeterministicFallback;
-  const label = fallback
-    ? '✓ 생성 완료 (결정론적 변환 · AI 정리 없음)'
-    : { ok: '✓ 생성 완료', needs_input: '추가 확인이 필요합니다', error: '⚠ 생성 실패' }[r.status] || r.status;
-  const ms = r.report?.elapsedMs;
-  const suffix = ms > 0 ? ` · ${Math.round(ms / 100) / 10}초` : r.report?.mock && !fallback ? ' · mock' : '';
-  st.textContent = label + suffix;
-  st.className = 'mstatus' + (r.status === 'ok' ? ' ok' : r.status === 'error' ? ' err' : '');
+  const ok = r.status === 'ok';
+  const ms = r.report?.elapsedMs || 0;
+  const time = ms >= 50 ? ` · ${(ms / 1000).toFixed(1)}초` : ' · 즉시';
+  const prop = r.report?.propagatedRequired
+    ? ` · 필수 표시 ${r.report.propagatedRequired}건 자동 반영`
+    : '';
+  st.textContent = ok ? `✓ 변환 완료 (규칙 기반)${time}${prop}` : '⚠ 변환 실패';
+  st.className = 'mstatus' + (ok ? ' ok' : ' err');
   st.hidden = false;
+}
+
+function refreshFoot() {
+  renderStatus();
+  mfoot().hidden = !last.result;
 }
 
 // ── 복사 ─────────────────────────────────────────────────
@@ -360,106 +358,6 @@ function copyCurrent() {
   if (text) copyText(text);
 }
 
-// ── 질문 / 수정 요청 footer ───────────────────────────────
-function renderQuestions(questions) {
-  const box = $('mQuestions');
-  box.replaceChildren(
-    ...(questions || []).map((q) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'mq';
-      wrap.dataset.qid = q.id;
-
-      const qq = document.createElement('div');
-      qq.className = 'mq-q';
-      qq.textContent = q.question;
-      wrap.append(qq);
-
-      if (q.options?.length) {
-        const opts = document.createElement('div');
-        opts.className = 'mq-opts';
-        q.options.forEach((o) => {
-          const label = document.createElement('label');
-          const radio = document.createElement('input');
-          radio.type = 'radio';
-          radio.name = 'mq_' + q.id;
-          radio.value = o;
-          label.append(radio, document.createTextNode(' ' + o));
-          opts.append(label);
-        });
-        wrap.append(opts);
-      } else {
-        const inp = document.createElement('input');
-        inp.className = 'mq-input';
-        inp.placeholder = '답변 입력';
-        wrap.append(inp);
-      }
-      return wrap;
-    }),
-  );
-}
-
-function collectAnswers() {
-  return [...$('mQuestions').querySelectorAll('.mq')]
-    .map((w) => {
-      const radio = w.querySelector('input[type=radio]:checked');
-      const text = w.querySelector('.mq-input');
-      const value = radio ? radio.value : text ? text.value.trim() : '';
-      return value ? { questionId: w.dataset.qid, value } : null;
-    })
-    .filter(Boolean);
-}
-
-function refreshFoot() {
-  const r = last.result || {};
-  renderStatus();
-  renderQuestions(r.status === 'needs_input' ? r.questions : []);
-  mfoot().hidden = !last.result;
-  $('mInstruction').placeholder =
-    r.status === 'needs_input'
-      ? '추가로 하고 싶은 말 (선택)'
-      : '자연어로 수정 요청 (예: 조회 버튼을 오른쪽 정렬)';
-}
-
-async function doRefine() {
-  const answers = collectAnswers();
-  const instruction = $('mInstruction').value.trim();
-  const needs = last.result?.status === 'needs_input';
-
-  if (needs && answers.length === 0 && !instruction) {
-    alert('질문에 답하거나 수정 요청을 입력해주세요.');
-    return;
-  }
-  if (!needs && !instruction) {
-    alert('수정 요청을 입력해주세요.');
-    return;
-  }
-
-  const req = { basePayload: last.payload };
-  if (last.result?.ir) req.baseIr = last.result.ir;
-  if (answers.length) req.answers = answers;
-  if (instruction) req.instruction = instruction;
-
-  const stop = showProgress('수정 내용 반영');
-  mfoot().hidden = true;
-  $('mView').hidden = true;
-  try {
-    const result = await api.refine(req);
-    last = { payload: last.payload, result, sketch: last.sketch };
-    $('mInstruction').value = '';
-    stop();
-    refreshFoot();
-    setTab('v');
-  } catch (e) {
-    stop();
-    const pre = document.createElement('pre');
-    pre.className = 'err';
-    pre.textContent = e.message;
-    mbody().replaceChildren(pre);
-    $('mCopy').hidden = true;
-    mfoot().hidden = false;
-  }
-}
-
 // ── 다운로드 ──────────────────────────────────────────────
 function saveBlob(blob, filename) {
   const a = document.createElement('a');
@@ -515,7 +413,6 @@ function download() {
  */
 export async function runBuild(payload, title, sketch = null) {
   $('mTitle').textContent = title;
-  $('mInstruction').value = '';
   viewMode = 'after';
   openModal();
   $('mClose').focus();
@@ -526,7 +423,7 @@ export async function runBuild(payload, title, sketch = null) {
   setActiveTab('v');
   const stop = showProgress();
   try {
-    const result = await api.generate(payload);
+    const result = await generate(payload);
     last = { payload, result, sketch };
     stop();
     refreshFoot();
@@ -547,8 +444,6 @@ export function initResultModal() {
   $('mClose').addEventListener('click', closeModal);
   $('mDownload').addEventListener('click', download);
   $('mCopy').addEventListener('click', copyCurrent);
-  $('mRefine').addEventListener('click', doRefine);
-  $('mInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') doRefine(); });
   document.querySelectorAll('.mtab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.p)));
   $('mSeg').addEventListener('click', (e) => {
     const v = e.target.closest('button')?.dataset.v;

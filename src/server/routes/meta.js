@@ -2,10 +2,10 @@
 //   GET /api/systems
 //   GET /api/screens?system=&q=
 //   GET /api/screens/:id
-// 스캐폴딩 단계에서는 fixtures/ 를 반환한다. TODO(담당 1): 실제 데이터 소스 연동(OI-11, OI-12).
+// fixtures/ 를 반환한다. 실제 데이터 소스 연동(OI-11, OI-12)은 정식 개발 과제.
 
 import { Router } from 'express';
-import { fixture, allScreens } from '../mock.js';
+import { fixture, allScreens } from '../fixtures.js';
 
 const router = Router();
 

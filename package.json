@@ -1,8 +1,8 @@
 {
-  "name": "ai-screen-draft",
+  "name": "hisketch",
   "version": "0.0.1",
   "private": true,
-  "description": "AI Screen Draft — 캔버스 스케치 → 사내 표준 화면/코드 생성 (1개월 PoC)",
+  "description": "하이스케치 — 캔버스 스케치 → 사내 표준 WebSquare 화면/코드 변환 (규칙 기반, 외부 LLM 미사용) (1개월 PoC)",
   "type": "module",
   "engines": {
     "node": ">=20"

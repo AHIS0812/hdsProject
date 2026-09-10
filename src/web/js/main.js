@@ -1,4 +1,4 @@
-// 화면 스케치 스튜디오 — 에디터 조립. 담당 2.
+// 하이스케치 — 에디터 조립 (프론트엔드).
 // 예시 프로토타입(samples/화면스케치스튜디오_예시_v1.html)을 src/web 모듈 구조로 이전.
 
 import { COMPS, DEFAULT_BOARD, boardSizeFor } from './constants.js';

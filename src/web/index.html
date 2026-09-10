@@ -88,8 +88,8 @@
     </div>
 
     <div class="note">
-      <label for="prompt" class="sr-only">보충 설명</label>
-      <textarea id="prompt" placeholder="화면으로 그리기 어려운 규칙을 적어주세요.
+      <label for="prompt" class="sr-only">보충 설명 (메모)</label>
+      <textarea id="prompt" placeholder="화면으로 표현하기 어려운 규칙을 메모로 남겨주세요. (전달 데이터에 함께 포함)
 예) 종료일은 등록일 + 1년으로 자동 계산"></textarea>
       <div class="drop" id="drop" role="button" tabindex="0" aria-label="참고 파일 추가 (Excel · PPT · 이미지 · PDF)">＋ 참고 파일 (Excel · PPT · 이미지)</div>
       <div class="files" id="files"></div>
@@ -100,7 +100,7 @@
     <div class="abL" id="abL" aria-live="polite">새 화면 <span>960 × 600</span></div>
     <div id="board" tabindex="0" role="group" aria-label="화면 캔버스 (요소 배치 영역)">
       <div class="hint" id="hint">화면을 자유롭게 그려보세요
-        <b>반듯하지 않아도 괜찮습니다 · AI가 사내 표준으로 정리합니다</b></div>
+        <b>반듯하지 않아도 괜찮습니다 · 표준 규칙으로 정리합니다</b></div>
     </div>
 
     <div class="coach" id="coach" hidden>
@@ -109,7 +109,7 @@
         <li>왼쪽 <em>요소 추가</em>에서 클릭하면 캔버스에 놓입니다</li>
         <li>드래그로 옮기고, 모서리 점으로 크기를 바꿉니다</li>
         <li>여러 개는 <em>Shift+클릭</em> 또는 빈 곳을 <em>드래그</em>해 선택 → 정렬</li>
-        <li><em>화면 생성</em>을 누르면 AI가 사내 표준으로 정리합니다</li>
+        <li><em>화면 생성</em>을 누르면 표준 규칙으로 정리해 WebSquare 코드까지 만듭니다</li>
       </ol>
       <button class="btn sm nv" id="coachOk">알겠어요</button>
     </div>
@@ -208,12 +208,6 @@
     <div class="mbody" id="mbody" role="tabpanel"></div>
     <div class="mfoot" id="mfoot" hidden>
       <div class="mstatus" id="mStatus" role="status" aria-live="polite" hidden></div>
-      <div id="mQuestions"></div>
-      <div class="mfoot-row">
-        <label for="mInstruction" class="sr-only">자연어로 수정 요청</label>
-        <input id="mInstruction" placeholder="자연어로 수정 요청 (예: 조회 버튼을 오른쪽 정렬하고 초기화 버튼을 옆에 붙여줘)">
-        <button class="btn sm nv" id="mRefine">재생성</button>
-      </div>
     </div>
   </div>
 </div>

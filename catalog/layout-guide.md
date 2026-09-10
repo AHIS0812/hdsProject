@@ -22,4 +22,4 @@
 - 라벨 앞 `＊`, 색상 `token.color.required`.
 - WebSquare: `class="w2input_essential"`.
 
-_(TODO: 담당 1 — 실제 표준 반영해 확장)_
+_(TODO: 백엔드 — 실제 표준 반영해 확장)_

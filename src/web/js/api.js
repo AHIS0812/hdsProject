@@ -44,4 +44,3 @@ const post = (url, data) =>
   }).then((r) => r.body);
 
 export const generate = (payload) => post('/api/generate', payload);
-export const refine = (request) => post('/api/refine', request);
