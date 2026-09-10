@@ -1,4 +1,4 @@
-// "화면 생성" 결과 모달 — [화면] Preview / [전달 데이터] payload / [WebSquare XML].
+// "화면 생성" 결과 모달 — [화면] Preview / [WebSquare XML].
 // 결과는 POST /api/generate 응답(규칙 기반 변환기)에서 온다. 개발지시서 U-7, U-8.
 
 import { generate } from './api.js';
@@ -86,12 +86,6 @@ function showProgress(label) {
 function renderTab(p) {
   const b = mbody();
   const r = last.result || {};
-  if (p === 'j') {
-    const pre = document.createElement('pre');
-    pre.textContent = JSON.stringify(last.payload, null, 2);
-    b.replaceChildren(pre);
-    return;
-  }
   if (p === 'x') {
     const xml = r.code?.websquareXml;
     const pre = document.createElement('pre');
@@ -237,7 +231,6 @@ function refreshFoot() {
 // ── 복사 ─────────────────────────────────────────────────
 function textForTab(p) {
   const r = last.result || {};
-  if (p === 'j') return last.payload ? JSON.stringify(last.payload, null, 2) : '';
   if (p === 'x') return r.code?.websquareXml || '';
   return '';
 }
