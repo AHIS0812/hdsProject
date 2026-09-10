@@ -135,7 +135,7 @@ function syncCtx() {
     fL.value = s.label;
     fC.value = s.cols;
     fC.classList.toggle('hidden', !HAS_ITEMS[s.t]);
-    bReq.classList.toggle('on', s.req);
+    bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
   }
   placeCtx();
 }
@@ -152,7 +152,8 @@ function placeCtx() {
   const l = b.left + ((minX + maxR) / 2) * k - cw / 2;
   let t = b.top + minY * k - 54;
   if (t < 68) t = b.top + minY * k + 40;
-  ctx.style.left = Math.max(316, Math.min(window.innerWidth - cw - 14, l)) + 'px';
+  const minLeft = window.innerWidth < 900 ? 8 : 316; // 좁은 화면에선 좌측 패널이 위로 빠짐
+  ctx.style.left = Math.max(minLeft, Math.min(window.innerWidth - cw - 14, l)) + 'px';
   ctx.style.top = t + 'px';
 }
 
@@ -173,7 +174,7 @@ function toggleReq() {
   if (!s) return;
   push();
   s.req = !s.req;
-  bReq.classList.toggle('on', s.req);
+  bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
   render();
 }
 

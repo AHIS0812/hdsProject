@@ -2,11 +2,24 @@
   --or:#F5821F;--or-d:#DE6E10;--or-l:#FFF3E7;
   --nv:#0F3B7C;--nv-d:#0A2A5C;--nv-l:#EEF3FB;
   --bg:#EDEFF3;--line:#E3E6EC;--line2:#F0F2F6;
-  --ink:#141A22;--sub:#6E7787;--mut:#A3ABB8;
+  --ink:#141A22;--sub:#616B7C;--mut:#79828F;
   --sh:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.07);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 [hidden]{display:none!important;}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+         clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+
+/* 키보드 포커스 링 (마우스 클릭 시에는 안 뜸). !important 로 개별 outline:none 을 이긴다 */
+:focus-visible{outline:2px solid var(--or)!important;outline-offset:2px!important;}
+.tools button:focus-visible,.cb:focus-visible,.mtab:focus-visible{outline-color:#fff!important;}
+#board:focus-visible{outline-offset:-2px!important;}
+
+@media (prefers-reduced-motion:reduce){
+  *,::before,::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
+                     transition-duration:.001ms!important;scroll-behavior:auto!important;}
+}
 body{font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-serif;background:var(--bg);
      color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased;overflow:hidden;}
 
@@ -72,9 +85,9 @@ h4:first-child{margin-top:0;}
 h4.gap{margin-top:30px;}
 
 .seg{display:flex;background:#F2F4F7;border-radius:10px;padding:3px;gap:2px;}
-.seg div{flex:1;height:32px;display:grid;place-items:center;font-size:12.5px;font-weight:600;
-         color:var(--sub);border-radius:8px;cursor:pointer;transition:.12s;}
-.seg div.on{background:#fff;color:var(--nv);box-shadow:0 1px 3px rgba(16,24,40,.12);}
+.seg button{flex:1;height:32px;display:grid;place-items:center;font-size:12.5px;font-weight:600;
+         color:var(--sub);border-radius:8px;cursor:pointer;transition:.12s;border:none;background:none;font-family:inherit;}
+.seg button[aria-checked="true"]{background:#fff;color:var(--nv);box-shadow:0 1px 3px rgba(16,24,40,.12);}
 
 .cbox{position:relative;}
 .cbin{width:100%;height:36px;border:1px solid var(--line);border-radius:10px;background:#fff;
@@ -141,7 +154,6 @@ textarea:focus{border-color:var(--or);}
         user-select:none;-webkit-user-select:none;}
 .abL{font-size:12px;color:var(--sub);font-weight:600;margin-bottom:10px;}
 .abL span{color:var(--mut);font-weight:400;margin-left:8px;}
-#board:focus{outline:none;}
 #board{width:960px;height:600px;background:#fff;position:relative;flex:0 0 auto;border-radius:12px;margin:auto;
        box-shadow:0 1px 3px rgba(16,24,40,.08),0 14px 44px rgba(16,24,40,.12);
        background-image:linear-gradient(#F1F3F7 1px,transparent 1px),linear-gradient(90deg,#F1F3F7 1px,transparent 1px);
@@ -231,7 +243,8 @@ textarea:focus{border-color:var(--or);}
        display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(10,18,32,.36);}
 .mhd{height:58px;flex:0 0 auto;border-bottom:1px solid var(--line2);display:flex;align-items:center;padding:0 18px;gap:10px;}
 .mtabs{display:flex;gap:3px;margin-left:14px;background:#F2F4F7;padding:3px;border-radius:10px;}
-.mtab{padding:7px 14px;font-size:12px;border-radius:8px;cursor:pointer;color:var(--sub);font-weight:600;}
+.mtab{padding:7px 14px;font-size:12px;border-radius:8px;cursor:pointer;color:var(--sub);font-weight:600;
+       border:0;background:none;font-family:inherit;}
 .mtab.on{background:#fff;color:var(--nv);box-shadow:0 1px 3px rgba(16,24,40,.1);}
 .mhd .r{margin-left:auto;display:flex;gap:7px;}
 .mbody{flex:1;min-height:0;overflow:auto;padding:18px;background:#F5F7F9;}
@@ -334,3 +347,33 @@ textarea:focus{border-color:var(--or);}
 .sketchwrap{position:relative;background:#fff;overflow:auto;height:100%;border:1px solid var(--line);border-radius:10px;}
 .sketchwrap .sketchscale{position:absolute;top:0;left:0;transform-origin:top left;}
 .mcompare .sketchwrap{border:none;}
+
+/* ── 반응형 ─────────────────────────────────────────────── */
+/* 좁은 데스크톱·태블릿 가로: 좌측 패널·툴바를 줄인다 */
+@media (max-width:1180px){
+  .pane{width:248px;}
+  .canvas{left:276px;}
+  .tools{left:calc(50% + 124px);}
+}
+/* 태블릿 세로 이하: 세로로 쌓는다 (좌측 패널 위 → 캔버스 아래) */
+@media (max-width:900px){
+  body{overflow:auto;}
+  .stage{position:static;height:auto;overflow:visible;padding-bottom:24px;}
+  .pane{position:static;width:auto;margin:12px 12px 0;max-height:none;}
+  .pbd{max-height:46vh;}
+  .canvas{position:static;inset:auto;margin:12px;min-height:62vh;padding:16px 12px 40px;
+          border-radius:16px;background:#fff;box-shadow:var(--sh);}
+  .abL{position:sticky;top:0;background:#fff;padding:2px 0 8px;z-index:2;}
+  .tools{position:sticky;left:auto;bottom:12px;transform:none;margin:16px auto 0;width:max-content;}
+  .coach{position:fixed;left:12px;right:12px;bottom:12px;width:auto;transform:none;}
+}
+/* 휴대폰 가로폭: 상단 바를 접고 글자 입력칸을 줄인다 */
+@media (max-width:560px){
+  .top{height:auto;min-height:56px;flex-wrap:wrap;padding:8px 12px;gap:8px;}
+  .top .r{width:100%;flex-wrap:wrap;}
+  .fname{width:100%;order:3;}
+  .modal{height:92vh;width:96vw;}
+  .mhd{flex-wrap:wrap;height:auto;padding:10px 12px;}
+  .mtabs{margin-left:0;order:3;width:100%;}
+  .help,.pop{left:12px;right:12px;width:auto;}
+}

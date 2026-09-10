@@ -20,8 +20,44 @@ const mask = () => $('mask');
 const mbody = () => $('mbody');
 const mfoot = () => $('mfoot');
 
+let lastFocus = null; // 모달 열기 전 포커스 (닫을 때 복원)
+
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+function focusablesIn(el) {
+  return [...el.querySelectorAll(FOCUSABLE)].filter(
+    (n) => !n.hidden && n.offsetParent !== null && !n.closest('[hidden]'),
+  );
+}
+
+// Tab 이 모달 밖으로 못 나가게 가둔다
+function trapTab(e) {
+  if (e.key !== 'Tab') return;
+  const modal = mask().querySelector('.modal');
+  const items = focusablesIn(modal);
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function onModalKeydown(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
+  trapTab(e);
+}
+
+export function openModal() {
+  lastFocus = document.activeElement;
+  mask().classList.add('on');
+  document.addEventListener('keydown', onModalKeydown, true);
+}
+
 export function closeModal() {
   mask().classList.remove('on');
+  document.removeEventListener('keydown', onModalKeydown, true);
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  lastFocus = null;
 }
 
 function showProgress(label) {
@@ -156,12 +192,24 @@ function buildCompare(html) {
 
 function updateViewBar(p = currentTab) {
   $('mView').hidden = !(p === 'v' && !!last.sketch);
-  [...$('mSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.v === viewMode));
+  [...$('mSeg').children].forEach((b) => {
+    const on = b.dataset.v === viewMode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
+function setActiveTab(p) {
+  document.querySelectorAll('.mtab').forEach((x) => {
+    const on = x.dataset.p === p;
+    x.classList.toggle('on', on);
+    x.setAttribute('aria-selected', String(on));
+  });
 }
 
 function setTab(p) {
   currentTab = p;
-  document.querySelectorAll('.mtab').forEach((x) => x.classList.toggle('on', x.dataset.p === p));
+  setActiveTab(p);
   updateViewBar(p);
   renderTab(p);
   const hasPreview = !!last.result?.preview?.html;
@@ -469,12 +517,13 @@ export async function runBuild(payload, title, sketch = null) {
   $('mTitle').textContent = title;
   $('mInstruction').value = '';
   viewMode = 'after';
-  mask().classList.add('on');
+  openModal();
+  $('mClose').focus();
   mfoot().hidden = true;
   $('mView').hidden = true;
   $('mCopy').hidden = true;
   $('mDownload').hidden = true;
-  document.querySelectorAll('.mtab').forEach((x) => x.classList.toggle('on', x.dataset.p === 'v'));
+  setActiveTab('v');
   const stop = showProgress();
   try {
     const result = await api.generate(payload);

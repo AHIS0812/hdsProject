@@ -66,13 +66,24 @@ $('btnClear').addEventListener('click', () => {
 $('btnBuild').addEventListener('click', build);
 
 // ── 요소 팔레트 ───────────────────────────────────────────
+// div 를 클릭 요소로 쓰는 곳에 키보드(Enter/Space) 지원을 붙인다.
+function clickable(el, onActivate) {
+  el.setAttribute('role', 'button');
+  el.tabIndex = 0;
+  el.addEventListener('click', onActivate);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate(e); }
+  });
+}
+
 const clist = $('clist');
 clist.replaceChildren(
   ...COMPS.map((c) => {
     const el = document.createElement('div');
     el.className = 'ci';
     el.innerHTML = `${c.g}<div class="t">${c.n}</div>`;
-    el.addEventListener('click', () => editor.addComponent(c.t));
+    el.setAttribute('aria-label', `${c.n} 요소 추가`);
+    clickable(el, () => editor.addComponent(c.t));
     return el;
   }),
 );
@@ -98,11 +109,15 @@ function applyMode() {
   scrNm.readOnly = workMode === 'edit';
   scrNm.title = workMode === 'edit' ? '변경 모드에서는 화면 이름을 바꿀 수 없습니다' : '화면 이름 (클릭해서 수정)';
 }
-document.querySelectorAll('#modeSeg div').forEach((el) => {
+// 세그먼트 선택 상태를 aria-checked 로 표시
+function markMode(mode) {
+  document.querySelectorAll('#modeSeg button').forEach((x) =>
+    x.setAttribute('aria-checked', String(x.dataset.mode === mode)));
+}
+document.querySelectorAll('#modeSeg button').forEach((el) => {
   el.addEventListener('click', () => {
-    document.querySelectorAll('#modeSeg div').forEach((x) => x.classList.remove('on'));
-    el.classList.add('on');
     workMode = el.dataset.mode;
+    markMode(workMode);
     applyMode();
     autosave();
   });
@@ -110,10 +125,14 @@ document.querySelectorAll('#modeSeg div').forEach((el) => {
 
 // ── 화면 유형 (신규 모드) ─────────────────────────────────
 function highlightTpl(key) {
-  document.querySelectorAll('.tpl').forEach((x) => x.classList.toggle('on', x.dataset.tpl === key));
+  document.querySelectorAll('.tpl').forEach((x) => {
+    const on = x.dataset.tpl === key;
+    x.classList.toggle('on', on);
+    x.setAttribute('aria-pressed', String(on));
+  });
 }
 document.querySelectorAll('.tpl').forEach((el) => {
-  el.addEventListener('click', () => {
+  clickable(el, () => {
     if (workMode !== 'new') return;
     const key = el.dataset.tpl;
     if (key === currentTpl && !canvasDirty) { highlightTpl(key); return; }
@@ -209,6 +228,9 @@ async function uploadFiles(fileList) {
 }
 
 drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+});
 fileInput.addEventListener('change', () => {
   uploadFiles(fileInput.files);
   fileInput.value = '';
@@ -242,7 +264,13 @@ function drawFiles() {
       const x = document.createElement('b');
       x.textContent = '✕';
       x.title = '삭제';
+      x.setAttribute('role', 'button');
+      x.tabIndex = 0;
+      x.setAttribute('aria-label', `${a.name} 첨부 삭제`);
       x.addEventListener('click', () => removeAttachment(i));
+      x.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removeAttachment(i); }
+      });
       row.append(x);
       return row;
     }),
@@ -369,6 +397,7 @@ function renderSlots() {
     del.className = 'pop-item-del';
     del.textContent = '✕';
     del.title = '삭제';
+    del.setAttribute('aria-label', `저장본 "${s.name}" 삭제`);
     del.addEventListener('click', (e) => { e.stopPropagation(); deleteSlot(s.id); });
     row.append(main, del);
     return row;
@@ -378,18 +407,23 @@ function renderSlots() {
 function closeSavesPop() {
   $('savesPop').hidden = true;
   $('btnSaves').classList.remove('on');
+  $('btnSaves').setAttribute('aria-expanded', 'false');
 }
 $('btnSaves').addEventListener('click', () => {
   const pop = $('savesPop');
   const open = pop.hidden;
   pop.hidden = !open;
   $('btnSaves').classList.toggle('on', open);
+  $('btnSaves').setAttribute('aria-expanded', String(open));
   if (open) { renderSlots(); $('saveName').focus(); }
 });
 $('saveNow').addEventListener('click', saveSlot);
 $('saveName').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveSlot(); });
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.savesbox')) closeSavesPop();
+});
+$('savesPop').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeSavesPop(); $('btnSaves').focus(); }
 });
 
 function applyDoc(doc) {
@@ -402,7 +436,7 @@ function applyDoc(doc) {
   drawFiles();
 
   workMode = doc.mode === 'edit' ? 'edit' : 'new';
-  document.querySelectorAll('#modeSeg div').forEach((x) => x.classList.toggle('on', x.dataset.mode === workMode));
+  markMode(workMode);
   applyMode();
 
   if (doc.template && document.querySelector(`.tpl[data-tpl="${doc.template}"]`)) {
@@ -500,7 +534,7 @@ function restore() {
 
   if (saved.mode === 'edit') {
     workMode = 'edit';
-    document.querySelectorAll('#modeSeg div').forEach((x) => x.classList.toggle('on', x.dataset.mode === 'edit'));
+    markMode('edit');
     applyMode();
   }
   if (saved.template && document.querySelector(`.tpl[data-tpl="${saved.template}"]`)) {
@@ -515,16 +549,23 @@ function restore() {
 // ── 온보딩 코치 / 단축키 도움말 ──────────────────────────
 function initHelp() {
   const helpPop = $('helpPop');
-  const toggleHelp = () => { helpPop.hidden = !helpPop.hidden; };
-  $('btnHelp').addEventListener('click', toggleHelp);
-  $('helpClose').addEventListener('click', () => { helpPop.hidden = true; });
+  const btnHelp = $('btnHelp');
+  const setHelp = (open) => {
+    helpPop.hidden = !open;
+    btnHelp.setAttribute('aria-expanded', String(open));
+    if (open) $('helpClose').focus();
+  };
+  const toggleHelp = () => setHelp(helpPop.hidden);
+  const closeHelp = (refocus) => { setHelp(false); if (refocus) btnHelp.focus(); };
+  btnHelp.addEventListener('click', toggleHelp);
+  $('helpClose').addEventListener('click', () => closeHelp(true));
   document.addEventListener('mousedown', (e) => {
-    if (!helpPop.hidden && !helpPop.contains(e.target) && e.target.id !== 'btnHelp') helpPop.hidden = true;
+    if (!helpPop.hidden && !helpPop.contains(e.target) && e.target.id !== 'btnHelp') closeHelp(false);
   });
   document.addEventListener('keydown', (e) => {
     if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     if (e.key === '?') { e.preventDefault(); toggleHelp(); }
-    else if (e.key === 'Escape' && !helpPop.hidden) helpPop.hidden = true;
+    else if (e.key === 'Escape' && !helpPop.hidden) closeHelp(true);
   });
 
   let seen = false;

@@ -8,15 +8,15 @@
 </head>
 <body>
 
-<div class="top">
-  <div class="mark"><i></i></div><b class="bn">하이스케치</b>
-  <div class="sep"></div>
-  <input class="fname" id="scrNm" value="새 화면" placeholder="화면 이름" maxlength="60" autocomplete="off">
+<header class="top">
+  <div class="mark" aria-hidden="true"><i></i></div><b class="bn">하이스케치</b>
+  <div class="sep" aria-hidden="true"></div>
+  <input class="fname" id="scrNm" value="새 화면" placeholder="화면 이름" maxlength="60" autocomplete="off" aria-label="화면 이름">
   <div class="r">
-    <span class="autosave" id="autosaveHint" title="변경 사항은 이 브라우저에 자동 저장됩니다">자동 저장</span>
+    <span class="autosave" id="autosaveHint" role="status" aria-live="polite" title="변경 사항은 이 브라우저에 자동 저장됩니다">자동 저장</span>
     <span class="savesbox">
-      <button class="btn sm" id="btnSaves">저장본 ▾</button>
-      <div class="pop" id="savesPop" hidden>
+      <button class="btn sm" id="btnSaves" aria-haspopup="true" aria-expanded="false" aria-controls="savesPop">저장본 ▾</button>
+      <div class="pop" id="savesPop" role="dialog" aria-label="이름 붙인 저장본" hidden>
         <div class="pop-row">
           <input id="saveName" placeholder="저장본 이름" maxlength="40" autocomplete="off">
           <button class="btn sm nv" id="saveNow">저장</button>
@@ -29,15 +29,15 @@
       </div>
     </span>
     <button class="btn sm" id="btnClear" title="캔버스 비우기 (되돌리기로 복구 가능)">비우기</button>
-    <div class="sep"></div>
+    <div class="sep" aria-hidden="true"></div>
     <button class="btn pri" id="btnBuild">화면 생성</button>
   </div>
-</div>
+</header>
 
 <div class="stage">
-  <div class="pane">
+  <aside class="pane" aria-label="화면 설정">
     <div class="pbd">
-      <h4>어느 시스템인가요?</h4>
+      <h4 id="h-sys">어느 시스템인가요?</h4>
       <div class="cbox" id="sysBox">
         <button type="button" class="cbin empty">시스템 선택</button>
         <div class="cbpop">
@@ -46,10 +46,10 @@
         </div>
       </div>
 
-      <h4>어떤 작업인가요?</h4>
-      <div class="seg" id="modeSeg">
-        <div class="on" data-mode="new">신규 화면</div>
-        <div data-mode="edit">변경 화면</div>
+      <h4 id="h-mode">어떤 작업인가요?</h4>
+      <div class="seg" id="modeSeg" role="radiogroup" aria-labelledby="h-mode">
+        <button type="button" role="radio" aria-checked="true" data-mode="new">신규 화면</button>
+        <button type="button" role="radio" aria-checked="false" data-mode="edit">변경 화면</button>
       </div>
 
       <div id="editBlock" class="hidden">
@@ -64,40 +64,41 @@
       </div>
 
       <div id="newBlock">
-        <h4 class="gap">어떤 화면인가요?</h4>
-        <div class="tpls" id="tpls">
-          <div class="tpl on" data-tpl="list"><div class="wf"><i class="q"></i><i class="h"></i>
+        <h4 class="gap" id="h-tpl">어떤 화면인가요?</h4>
+        <div class="tpls" id="tpls" role="group" aria-labelledby="h-tpl">
+          <div class="tpl on" data-tpl="list" aria-pressed="true" aria-label="목록 조회 화면"><div class="wf" aria-hidden="true"><i class="q"></i><i class="h"></i>
             <div class="g"><i></i><i></i><i></i></div><div class="g"><i></i><i></i><i></i></div></div>
             <div class="nm">목록 조회</div></div>
-          <div class="tpl" data-tpl="detail"><div class="wf"><i class="h"></i><i class="m"></i><i></i><i class="q"></i></div>
+          <div class="tpl" data-tpl="detail" aria-pressed="false" aria-label="상세 조회 화면"><div class="wf" aria-hidden="true"><i class="h"></i><i class="m"></i><i></i><i class="q"></i></div>
             <div class="nm">상세 조회</div></div>
-          <div class="tpl" data-tpl="form"><div class="wf"><i class="h"></i><i class="m"></i><i class="m"></i><i class="q"></i></div>
+          <div class="tpl" data-tpl="form" aria-pressed="false" aria-label="등록 · 수정 화면"><div class="wf" aria-hidden="true"><i class="h"></i><i class="m"></i><i class="m"></i><i class="q"></i></div>
             <div class="nm">등록 · 수정</div></div>
-          <div class="tpl" data-tpl="popup"><div class="wf" style="padding:8px 10px"><i class="h"></i><i></i><i class="m"></i></div>
+          <div class="tpl" data-tpl="popup" aria-pressed="false" aria-label="팝업 화면"><div class="wf" aria-hidden="true" style="padding:8px 10px"><i class="h"></i><i></i><i class="m"></i></div>
             <div class="nm">팝업</div></div>
-          <div class="tpl" data-tpl="main"><div class="wf"><i class="h"></i>
+          <div class="tpl" data-tpl="main" aria-pressed="false" aria-label="메인 화면"><div class="wf" aria-hidden="true"><i class="h"></i>
             <div class="g"><i></i><i></i></div><div class="g"><i></i><i></i></div></div>
             <div class="nm">메인</div></div>
-          <div class="tpl" data-tpl="blank"><div class="wf" style="border:2px dashed #D8DDE5;background:#fff"></div>
+          <div class="tpl" data-tpl="blank" aria-pressed="false" aria-label="빈 화면"><div class="wf" aria-hidden="true" style="border:2px dashed #D8DDE5;background:#fff"></div>
             <div class="nm">빈 화면</div></div>
         </div>
       </div>
 
       <h4>요소 추가 <span style="font-weight:400;color:var(--mut);font-size:11px">클릭하면 놓입니다</span></h4>
-      <div class="grid2" id="clist"></div>
+      <div class="grid2" id="clist" role="group" aria-label="요소 팔레트"></div>
     </div>
 
     <div class="note">
+      <label for="prompt" class="sr-only">보충 설명</label>
       <textarea id="prompt" placeholder="화면으로 그리기 어려운 규칙을 적어주세요.
 예) 종료일은 등록일 + 1년으로 자동 계산"></textarea>
-      <div class="drop" id="drop">＋ 참고 파일 (Excel · PPT · 이미지)</div>
+      <div class="drop" id="drop" role="button" tabindex="0" aria-label="참고 파일 추가 (Excel · PPT · 이미지 · PDF)">＋ 참고 파일 (Excel · PPT · 이미지)</div>
       <div class="files" id="files"></div>
     </div>
-  </div>
+  </aside>
 
-  <div class="canvas" id="cv">
-    <div class="abL" id="abL">새 화면 <span>960 × 600</span></div>
-    <div id="board" tabindex="-1">
+  <div class="canvas" id="cv" aria-label="편집 캔버스">
+    <div class="abL" id="abL" aria-live="polite">새 화면 <span>960 × 600</span></div>
+    <div id="board" tabindex="0" role="group" aria-label="화면 캔버스 (요소 배치 영역)">
       <div class="hint" id="hint">화면을 자유롭게 그려보세요
         <b>반듯하지 않아도 괜찮습니다 · AI가 사내 표준으로 정리합니다</b></div>
     </div>
@@ -114,19 +115,19 @@
     </div>
   </div>
 
-  <div class="tools">
-    <button id="bU" data-act="undo" title="되돌리기 (Ctrl+Z)">↶</button>
-    <button id="bR" data-act="redo" title="다시 실행 (Ctrl+Y)">↷</button>
-    <div class="dv"></div>
-    <button data-act="zoomOut" title="축소">−</button>
-    <button class="zz" id="zv" data-act="zoomReset">100%</button>
-    <button data-act="zoomIn" title="확대">＋</button>
-    <div class="dv"></div>
-    <button id="btnHelp" data-act="help" title="단축키 도움말 (?)">?</button>
+  <div class="tools" role="toolbar" aria-label="캔버스 도구">
+    <button id="bU" data-act="undo" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶</button>
+    <button id="bR" data-act="redo" title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">↷</button>
+    <div class="dv" aria-hidden="true"></div>
+    <button data-act="zoomOut" title="축소" aria-label="축소">−</button>
+    <button class="zz" id="zv" data-act="zoomReset" aria-label="확대·축소 100퍼센트로">100%</button>
+    <button data-act="zoomIn" title="확대" aria-label="확대">＋</button>
+    <div class="dv" aria-hidden="true"></div>
+    <button id="btnHelp" data-act="help" title="단축키 도움말 (?)" aria-label="단축키 도움말" aria-haspopup="dialog" aria-expanded="false">?</button>
   </div>
 
-  <div class="help" id="helpPop" hidden>
-    <div class="help-hd"><b>단축키 · 사용법</b><button class="cb" id="helpClose" title="닫기">✕</button></div>
+  <div class="help" id="helpPop" role="dialog" aria-label="단축키 · 사용법" hidden>
+    <div class="help-hd"><b>단축키 · 사용법</b><button class="cb" id="helpClose" title="닫기" aria-label="도움말 닫기">✕</button></div>
     <div class="help-bd">
       <dl>
         <dt>요소 추가</dt><dd>왼쪽 팔레트에서 클릭</dd>
@@ -146,43 +147,43 @@
   </div>
 </div>
 
-<div class="ctx" id="ctx">
+<div class="ctx" id="ctx" role="toolbar" aria-label="선택 요소 편집">
   <span class="ctx-grp" id="ctxSingle">
     <span class="lb" id="ctxT">버튼</span>
-    <input id="fL" placeholder="문구">
-    <input id="fC" class="wide hidden" placeholder="항목을 쉼표로 구분">
-    <div class="cdiv"></div>
-    <button class="cb" id="bReq" data-act="req" title="필수 입력 표시">＊</button>
-    <div class="cdiv"></div>
+    <input id="fL" placeholder="문구" aria-label="요소 문구">
+    <input id="fC" class="wide hidden" placeholder="항목을 쉼표로 구분" aria-label="항목 (쉼표 구분)">
+    <div class="cdiv" aria-hidden="true"></div>
+    <button class="cb" id="bReq" data-act="req" title="필수 입력 표시" aria-label="필수 입력 표시" aria-pressed="false">＊</button>
+    <div class="cdiv" aria-hidden="true"></div>
   </span>
   <span class="ctx-grp" id="ctxAlign" hidden>
     <span class="lb" id="ctxN"></span>
-    <button class="cb" data-act="alignL" title="왼쪽 정렬">⇤</button>
-    <button class="cb" data-act="alignC" title="가로 가운데 정렬">⇔</button>
-    <button class="cb" data-act="alignR" title="오른쪽 정렬">⇥</button>
-    <div class="cdiv"></div>
-    <button class="cb" data-act="alignT" title="위쪽 정렬">⤒</button>
-    <button class="cb" data-act="alignM" title="세로 가운데 정렬">⇕</button>
-    <button class="cb" data-act="alignB" title="아래쪽 정렬">⤓</button>
-    <div class="cdiv"></div>
-    <button class="cb" data-act="distH" title="가로 균등 분배 (3개 이상)">⇿</button>
-    <button class="cb" data-act="distV" title="세로 균등 분배 (3개 이상)">↕</button>
-    <div class="cdiv"></div>
+    <button class="cb" data-act="alignL" title="왼쪽 정렬" aria-label="왼쪽 정렬">⇤</button>
+    <button class="cb" data-act="alignC" title="가로 가운데 정렬" aria-label="가로 가운데 정렬">⇔</button>
+    <button class="cb" data-act="alignR" title="오른쪽 정렬" aria-label="오른쪽 정렬">⇥</button>
+    <div class="cdiv" aria-hidden="true"></div>
+    <button class="cb" data-act="alignT" title="위쪽 정렬" aria-label="위쪽 정렬">⤒</button>
+    <button class="cb" data-act="alignM" title="세로 가운데 정렬" aria-label="세로 가운데 정렬">⇕</button>
+    <button class="cb" data-act="alignB" title="아래쪽 정렬" aria-label="아래쪽 정렬">⤓</button>
+    <div class="cdiv" aria-hidden="true"></div>
+    <button class="cb" data-act="distH" title="가로 균등 분배 (3개 이상)" aria-label="가로 균등 분배">⇿</button>
+    <button class="cb" data-act="distV" title="세로 균등 분배 (3개 이상)" aria-label="세로 균등 분배">↕</button>
+    <div class="cdiv" aria-hidden="true"></div>
   </span>
-  <button class="cb" data-act="dup" title="복제 (Ctrl+D)">⧉</button>
-  <button class="cb" data-act="front" title="맨 앞으로">⬆</button>
-  <button class="cb" data-act="back" title="맨 뒤로">⬇</button>
-  <button class="cb red" data-act="del" title="삭제 (Del)">🗑</button>
+  <button class="cb" data-act="dup" title="복제 (Ctrl+D)" aria-label="복제">⧉</button>
+  <button class="cb" data-act="front" title="맨 앞으로" aria-label="맨 앞으로">⬆</button>
+  <button class="cb" data-act="back" title="맨 뒤로" aria-label="맨 뒤로">⬇</button>
+  <button class="cb red" data-act="del" title="삭제 (Del)" aria-label="삭제">🗑</button>
 </div>
 
 <div class="mask" id="mask">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <div class="mhd">
       <b style="font-size:14px" id="mTitle">생성 결과</b>
-      <div class="mtabs" id="mtabs">
-        <div class="mtab on" data-p="v">화면</div>
-        <div class="mtab" data-p="j">전달 데이터</div>
-        <div class="mtab" data-p="x">WebSquare XML</div>
+      <div class="mtabs" id="mtabs" role="tablist" aria-label="결과 보기">
+        <button class="mtab on" data-p="v" role="tab" aria-selected="true">화면</button>
+        <button class="mtab" data-p="j" role="tab" aria-selected="false">전달 데이터</button>
+        <button class="mtab" data-p="x" role="tab" aria-selected="false">WebSquare XML</button>
       </div>
       <div class="r">
         <button class="btn sm" id="mCopy" title="현재 탭 내용을 클립보드로 복사">복사</button>
@@ -191,17 +192,18 @@
       </div>
     </div>
     <div class="mview" id="mView" hidden>
-      <span>보기</span>
-      <div class="mseg" id="mSeg">
-        <button class="on" data-v="after">결과</button>
-        <button data-v="split">동시 보기</button>
+      <span id="mViewLabel">보기</span>
+      <div class="mseg" id="mSeg" role="group" aria-labelledby="mViewLabel">
+        <button class="on" data-v="after" aria-pressed="true">결과</button>
+        <button data-v="split" aria-pressed="false">동시 보기</button>
       </div>
     </div>
-    <div class="mbody" id="mbody"></div>
+    <div class="mbody" id="mbody" role="tabpanel"></div>
     <div class="mfoot" id="mfoot" hidden>
-      <div class="mstatus" id="mStatus" hidden></div>
+      <div class="mstatus" id="mStatus" role="status" aria-live="polite" hidden></div>
       <div id="mQuestions"></div>
       <div class="mfoot-row">
+        <label for="mInstruction" class="sr-only">자연어로 수정 요청</label>
         <input id="mInstruction" placeholder="자연어로 수정 요청 (예: 조회 버튼을 오른쪽 정렬하고 초기화 버튼을 옆에 붙여줘)">
         <button class="btn sm nv" id="mRefine">재생성</button>
       </div>
@@ -209,7 +211,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script src="/vendor/html2canvas.js"></script>
 <script src="/vendor/fflate.js"></script>
