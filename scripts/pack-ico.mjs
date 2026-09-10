@@ -2,9 +2,9 @@
 //
 //   node scripts/pack-ico.mjs
 //
-// PNG 원본은 assets/icon.svg 를 래스터화한 것. 다시 만들려면
-// scripts/sea/... 대신 아무 SVG 래스터라이저(또는 브라우저 canvas)로
-// 16·24·32·48·64·128·256 크기 PNG 를 assets/ 에 저장하면 된다.
+// PNG 원본은 assets/icon-source.png (1254px 브랜드 아이콘) 를 축소한 것.
+// 다시 만들려면 아무 이미지 도구(또는 System.Drawing / 브라우저 canvas)로
+// 16·24·32·48·64·128·256 크기 PNG 를 assets/icon-<size>.png 로 저장한다.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
