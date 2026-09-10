@@ -70,7 +70,8 @@ function renderTab(p) {
     if (files.length) {
       const note = document.createElement('div');
       note.className = 'xmlfiles';
-      note.textContent = `생성 파일 ${files.length}개: ` + files.map((f) => f.path).join(', ') + ' · [내려받기] 로 zip 저장';
+      const how = files.length > 1 ? '[내려받기] 로 zip 저장' : '[내려받기] 로 파일 저장';
+      note.textContent = `생성 파일 ${files.length}개: ` + files.map((f) => f.path).join(', ') + ` · ${how}`;
       wrap.append(note);
     }
     b.replaceChildren(wrap);
@@ -216,27 +217,40 @@ async function copyText(text) {
   flashCopied();
 }
 /**
- * preview iframe → PNG Blob.
- * 화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 보이므로, 캡처 직전에 iframe 을
- * 콘텐츠 전체 크기로 잠깐 키운 뒤 캡처하고 원상복구한다(잘림 방지).
+ * 생성 결과 preview HTML → PNG Blob.
+ * 화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 있고(동시 보기에서는 준비 전일 수도 있음),
+ * 전용 iframe 에 preview HTML 을 다시 렌더해 콘텐츠 전체 크기로 캡처한다(잘림 방지).
  */
 async function renderScreenBlob() {
-  const frame = mbody().querySelector('iframe');
-  const doc = frame?.contentDocument;
-  if (!doc?.body || !window.html2canvas) throw new Error('미리보기가 준비되지 않았습니다');
+  const html = last.result?.preview?.html;
+  if (!html || !window.html2canvas) throw new Error('미리보기가 준비되지 않았습니다');
 
-  const el = doc.documentElement;
-  const body = doc.body;
-  const fullW = Math.max(el.scrollWidth, body.scrollWidth, el.offsetWidth, body.offsetWidth, 320);
-  const fullH = Math.max(el.scrollHeight, body.scrollHeight, el.offsetHeight, body.offsetHeight, 240);
-
-  const prev = { w: frame.style.width, h: frame.style.height, min: frame.style.minHeight };
-  frame.style.width = fullW + 'px';
-  frame.style.height = fullH + 'px';
-  frame.style.minHeight = '0';
-  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+  const cap = document.createElement('iframe');
+  cap.setAttribute('aria-hidden', 'true');
+  cap.style.cssText =
+    'position:fixed;left:0;top:0;width:1280px;height:800px;border:0;background:#fff;' +
+    'opacity:0;pointer-events:none;z-index:-1';
+  document.body.append(cap);
 
   try {
+    await new Promise((res, rej) => {
+      cap.addEventListener('load', () => res(), { once: true });
+      setTimeout(() => rej(new Error('미리보기 렌더 시간 초과')), 8000);
+      cap.srcdoc = html;
+    });
+    await new Promise((r) => setTimeout(r, 80));
+
+    const doc = cap.contentDocument;
+    const el = doc?.documentElement;
+    const body = doc?.body;
+    if (!body) throw new Error('미리보기 렌더 실패');
+
+    const fullW = Math.max(el.scrollWidth, body.scrollWidth, el.offsetWidth, body.offsetWidth, 320);
+    const fullH = Math.max(el.scrollHeight, body.scrollHeight, el.offsetHeight, body.offsetHeight, 240);
+    cap.style.width = fullW + 'px';
+    cap.style.height = fullH + 'px';
+    await new Promise((r) => setTimeout(r, 80));
+
     const render = window.html2canvas(body, {
       backgroundColor: '#ffffff',
       scale: 2,
@@ -256,9 +270,7 @@ async function renderScreenBlob() {
       canvas.toBlob((b) => (b ? res(b) : rej(new Error('이미지 변환 실패'))), 'image/png'),
     );
   } finally {
-    frame.style.width = prev.w;
-    frame.style.height = prev.h;
-    frame.style.minHeight = prev.min;
+    cap.remove();
   }
 }
 

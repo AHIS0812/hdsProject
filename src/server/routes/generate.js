@@ -13,7 +13,7 @@ import { deterministicResult } from '../../pipeline/deterministic.js';
 const router = Router();
 
 // 개발용 트리거: 보충 설명에 이 말이 있으면 파이프라인이 실패한 것으로 간주 → 결정론적 폴백
-const FORCE_FALLBACK = /폴백|fallback|생성\s*실패|파이프라인\s*실패/i;
+const FORCE_FALLBACK = /폴백|fallback|결정론|deterministic|변환기|생성\s*실패|파이프라인\s*실패/i;
 
 /**
  * 생성 파이프라인. 지금은 mock.

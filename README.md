@@ -40,7 +40,7 @@ npm run dev
 - **결정론적 폴백 변환기** (`src/pipeline/deterministic.js`) — AI 파이프라인이 실패하면 payload 를
   읽기순으로 정렬해 `catalog/websquare/mapping.json` 기반 WebSquare XML + 좌표 그대로의 Preview HTML 로 변환.
   `report.usedDeterministicFallback=true`
-- **개발용 트리거**: 보충 설명에 "질문" → `needs_input`(질문 3개), "폴백" → 결정론적 폴백 강제
+- **개발용 트리거** (보충 설명에 입력): "질문" → `needs_input`(질문 3개) / "폴백"·"결정론적"·"생성 실패" → 결정론적 폴백 강제
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` mock
 - 생성 API: `POST /api/generate`, `POST /api/refine` — **스키마 검증은 실제**, 결과는 `fixtures/results` mock (실패 시 결정론적 폴백)
 - 첨부 API: `POST /api/attachments` (multipart, multer), `DELETE /api/attachments/:id` — **실제 저장**(`uploads/`, gitignore, PNG/JPG/GIF·XLSX/XLS/CSV·PPT/PPTX·PDF, ≤20MB)
