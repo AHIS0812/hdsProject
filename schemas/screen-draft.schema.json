@@ -70,7 +70,11 @@
         "required": { "type": "boolean" },
         "group": { "type": "string", "description": "같은 값을 가진 요소들은 한 그룹(함께 이동·선택)" },
         "src": { "type": "string", "description": "type=image 일 때 이미지 data URL 또는 URL" },
-        "desc": { "type": "string", "description": "요소 설명 — 결과 화면에서 클릭 시 안내 문구로 표시(주로 button)" }
+        "desc": { "type": "string", "description": "요소 설명 — 결과 화면에서 클릭 시 안내 문구로 표시(주로 button)" },
+        "fontSize": {
+          "type": "number", "minimum": 8, "maximum": 48,
+          "description": "스케치 캔버스에서 지정한 글자 크기(px) — 참고용이며 생성 결과의 표준 컴포넌트 스타일에는 적용되지 않는다"
+        }
       }
     }
   }

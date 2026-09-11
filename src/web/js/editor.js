@@ -8,6 +8,8 @@ let board, boardWrap, ctx, hint, ctxT, fL, fD, bReq, bU, bR, zv, cv, ctxSingle, 
 let bItems, itemsPop, itemsList, itemsInput, itemsAddBtn;
 let bPos, posPop;
 let bAlign, alignPop;
+let fS, fsUp, fsDown;
+const DEFAULT_FS = 11; // 글자 크기를 따로 지정하지 않은 요소의 기본값(px) — 조절 칸에 보여줄 값
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
 let BOARD_W = DEFAULT_BOARD.w;
 let BOARD_H = DEFAULT_BOARD.h;
@@ -109,6 +111,7 @@ function render() {
     d.dataset.t = s.t;
     d.dataset.id = s.id;
     Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px', zIndex: String(i + 1) });
+    if (s.fs) d.style.fontSize = s.fs + 'px';
     setShapeContent(d, s);
     d.onmousedown = (ev) => {
       ev.stopPropagation();
@@ -224,6 +227,7 @@ function syncCtx() {
     const s = find(selIds[0]);
     ctxT.textContent = NAME[s.t];
     fL.value = s.label;
+    fS.value = s.fs || DEFAULT_FS;
     fD.value = s.desc || '';
     fD.classList.toggle('hidden', s.t !== 'button');
     bItems.classList.toggle('hidden', !HAS_ITEMS[s.t]);
@@ -256,6 +260,31 @@ function applyDesc() {
   const s = find(selIds[0]);
   if (!s) return;
   s.desc = fD.value;
+  notify();
+}
+
+/** 스케치 캔버스에서만 참고용으로 보이는 글자 크기 — 생성 결과의 표준 컴포넌트 스타일에는 적용되지 않는다. */
+function clampFs(v) { return Math.max(8, Math.min(48, v || DEFAULT_FS)); }
+
+function applyFontSize() {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  s.fs = clampFs(parseInt(fS.value, 10));
+  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+  if (el) el.style.fontSize = s.fs + 'px';
+  notify();
+}
+
+function stepFontSize(d) {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  push();
+  s.fs = clampFs((s.fs || DEFAULT_FS) + d);
+  fS.value = s.fs;
+  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+  if (el) el.style.fontSize = s.fs + 'px';
   notify();
 }
 
@@ -571,6 +600,7 @@ function normalize(arr) {
     g: s.g ?? s.group ?? null,
     src: s.src ?? null,
     desc: s.desc ?? '',
+    fs: s.fs ?? s.fontSize ?? null,
   }));
 }
 
@@ -583,6 +613,9 @@ export function initEditor(opts = {}) {
   hint = document.getElementById('hint');
   ctxT = document.getElementById('ctxT');
   fL = document.getElementById('fL');
+  fS = document.getElementById('fS');
+  fsUp = document.getElementById('fsUp');
+  fsDown = document.getElementById('fsDown');
   fD = document.getElementById('fD');
   bItems = document.getElementById('bItems');
   itemsPop = document.getElementById('itemsPop');
@@ -736,6 +769,9 @@ export function initEditor(opts = {}) {
 
   // 컨텍스트 툴바
   fL.addEventListener('input', applyLabel);
+  fS.addEventListener('input', applyFontSize);
+  fsUp.addEventListener('click', () => stepFontSize(1));
+  fsDown.addEventListener('click', () => stepFontSize(-1));
   fD.addEventListener('input', applyDesc);
   bItems.addEventListener('click', toggleItemsPop);
   itemsAddBtn.addEventListener('click', addItemFromInput);
@@ -1017,5 +1053,6 @@ export function toPayloadShapes() {
     group: s.g || undefined,
     src: s.src || undefined,
     desc: s.desc || undefined,
+    fontSize: s.fs || undefined,
   }));
 }
