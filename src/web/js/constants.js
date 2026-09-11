@@ -19,12 +19,12 @@ export const COMPS = [
   { t: 'area',        n: '묶음',    g: '<div class="g d"></div>' },
 ];
 
-/** 요소 기본 크기 [w, h] */
+/** 요소 기본 크기 [w, h] — 실제 화면 밀도에 맞춰 축소(2026-09, 2차 조정) */
 export const DEF = {
-  area: [420, 90], title: [180, 26], label: [90, 24], input: [160, 28], select: [140, 28],
-  radio: [220, 26], date: [130, 28], check: [120, 24], text: [340, 70], file: [260, 28],
-  list: [620, 180], pager: [260, 30], tab: [420, 34], image: [160, 120],
-  button: [90, 30], divider: [900, 8],
+  area: [420, 68], title: [170, 17], label: [85, 15], input: [150, 19], select: [130, 19],
+  radio: [210, 17], date: [125, 19], check: [115, 15], text: [330, 48], file: [250, 19],
+  list: [620, 145], pager: [250, 20], tab: [400, 24], image: [160, 110],
+  button: [85, 20], divider: [900, 5],
 };
 
 /** 요소 타입 → 표시명 */
@@ -38,13 +38,13 @@ export const SNAP = 6;
 /** 캔버스 기본 크기 */
 export const DEFAULT_BOARD = { w: 960, h: 600 };
 
-/** 화면 유형별 캔버스 크기 (U-12) */
+/** 화면 유형별 캔버스 크기 (U-12) — 팝업만 별도 크기, 나머지는 전부 동일 해상도로 통일 */
 export const BOARD_SIZES = {
   list:   { w: 960, h: 600 },
   detail: { w: 960, h: 600 },
   form:   { w: 960, h: 600 },
   blank:  { w: 960, h: 600 },
-  main:   { w: 1280, h: 720 },
+  main:   { w: 960, h: 600 },
   popup:  { w: 560, h: 420 },
 };
 

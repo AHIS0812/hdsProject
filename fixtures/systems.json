@@ -1,7 +1,7 @@
 {
   "systems": [
-    { "id": "portal", "name": "하이포탈", "sub": "그룹 포탈" },
     { "id": "salesportal", "name": "영업포탈", "sub": "영업 채널" },
+    { "id": "portal", "name": "하이포탈", "sub": "그룹 포탈" },
     { "id": "hicall", "name": "하이콜", "sub": "컨택센터" }
   ]
 }

@@ -4,7 +4,10 @@
 
 import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, defaultLabel, defaultCols } from './constants.js';
 
-let board, ctx, hint, ctxT, fL, fC, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl, cmenu, bGroup, bUngroup;
+let board, boardWrap, ctx, hint, ctxT, fL, fD, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl, cmenu, bGroup, bUngroup;
+let bItems, itemsPop, itemsList, itemsInput, itemsAddBtn;
+let bPos, posPop;
+let bAlign, alignPop;
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
 let BOARD_W = DEFAULT_BOARD.w;
 let BOARD_H = DEFAULT_BOARD.h;
@@ -31,7 +34,7 @@ const isSel = (id) => selIds.includes(id);
 const selShapes = () => selIds.map(find).filter(Boolean);
 const groupMembers = (g) => shapes.filter((s) => s.g === g).map((s) => s.id);
 
-/** shape 요소 안의 표시 내용을 채운다 (이미지는 <img>, 나머지는 텍스트) */
+/** shape 요소 안의 표시 내용을 채운다 (이미지는 <img>, list/tab 은 실제 항목, 나머지는 텍스트) */
 function setShapeContent(el, s) {
   if (s.t === 'image' && s.src) {
     const im = el.querySelector('img') || document.createElement('img');
@@ -40,9 +43,45 @@ function setShapeContent(el, s) {
     im.draggable = false;
     if (!im.parentNode) el.prepend(im);
     [...el.childNodes].forEach((n) => { if (n.nodeType === 3) n.remove(); }); // 텍스트 노드 제거
-  } else {
-    el.textContent = (s.req ? '＊' : '') + (s.label || NAME[s.t]);
+    return;
   }
+  const cols = String(s.cols || '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (s.t === 'list' && cols.length) {
+    el.replaceChildren(listPreview(cols));
+    return;
+  }
+  if (s.t === 'tab' && cols.length) {
+    el.replaceChildren(tabPreview(cols));
+    return;
+  }
+  el.replaceChildren(document.createTextNode((s.req ? '＊' : '') + (s.label || NAME[s.t])));
+}
+
+/** 표(list) 미리보기 헤더 — 항목이 추가되면 그 컬럼명이 실제로 보이고, 글자 수에 비례해 폭도 달라진다 */
+function listPreview(cols) {
+  const row = document.createElement('div');
+  row.className = 'sh-cols';
+  cols.forEach((c) => {
+    const cell = document.createElement('span');
+    cell.className = 'sh-col';
+    cell.textContent = c;
+    cell.style.flexGrow = String(Math.max(1, c.length));
+    row.appendChild(cell);
+  });
+  return row;
+}
+
+/** 탭 미리보기 — 항목이 추가되면 그 탭 이름들이 실제로 보인다(첫 탭이 활성 상태) */
+function tabPreview(cols) {
+  const row = document.createElement('div');
+  row.className = 'sh-chips';
+  cols.forEach((c, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'sh-chip' + (i === 0 ? ' on' : '');
+    chip.textContent = c;
+    row.appendChild(chip);
+  });
+  return row;
 }
 
 /** 선택 id 목록에 같은 그룹의 나머지 요소들을 더한다 (그룹은 한 덩어리로 선택) */
@@ -111,7 +150,6 @@ function render() {
   hint.style.display = shapes.length ? 'none' : 'block';
   bU.disabled = !hist.length;
   bR.disabled = !future.length;
-  placeCtx();
   notify();
 }
 
@@ -167,24 +205,26 @@ function toggleSel(id) {
 }
 
 function syncCtx() {
+  closeItemsPop(false);
+  closePosPop(false);
+  closeAlignPop(false);
   const n = selIds.length;
   ctx.classList.toggle('on', n > 0);
-  const multi = n > 1;
-  ctxSingle.hidden = multi;
-  ctxAlign.hidden = !multi;
+  ctxSingle.hidden = n !== 1;
+  // 정렬 도구는 1개만 선택해도 쓸 수 있다 — 이때는 캔버스(페이지) 기준으로 정렬된다.
+  ctxAlign.hidden = n < 1;
   if (n === 1) {
     const s = find(selIds[0]);
     ctxT.textContent = NAME[s.t];
     fL.value = s.label;
-    fC.value = s.cols;
-    fC.classList.toggle('hidden', !HAS_ITEMS[s.t]);
+    fD.value = s.desc || '';
+    fD.classList.toggle('hidden', s.t !== 'button');
+    bItems.classList.toggle('hidden', !HAS_ITEMS[s.t]);
     bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
   }
-  if (multi) {
-    bGroup.hidden = isOneWholeGroup();
-    bUngroup.hidden = !selShapes().some((s) => s.g);
-  }
-  placeCtx();
+  // 그룹으로 묶기/해제는 그룹 도구라 2개 이상일 때만 의미가 있다 — 정렬 노출과 별개로 판단.
+  bGroup.hidden = n < 2 || isOneWholeGroup();
+  bUngroup.hidden = n < 1 || !selShapes().some((s) => s.g);
 }
 
 /** 현재 선택이 "정확히 한 그룹 전체"인가 (이 경우 재-묶기 불필요) */
@@ -194,31 +234,160 @@ function isOneWholeGroup() {
   return gs.size === 1 && ss.every((s) => s.g) && groupMembers([...gs][0]).length === ss.length;
 }
 
-function placeCtx() {
-  const ss = selShapes();
-  if (!ss.length) { ctx.classList.remove('on'); return; }
-  const minX = Math.min(...ss.map((s) => s.x));
-  const maxR = Math.max(...ss.map((s) => s.x + s.w));
-  const minY = Math.min(...ss.map((s) => s.y));
-  const b = board.getBoundingClientRect();
-  const k = zm / 100;
-  const cw = ctx.offsetWidth || 430;
-  const l = b.left + ((minX + maxR) / 2) * k - cw / 2;
-  let t = b.top + minY * k - 54;
-  if (t < 68) t = b.top + minY * k + 40;
-  const minLeft = window.innerWidth < 900 ? 8 : 316; // 좁은 화면에선 좌측 패널이 위로 빠짐
-  ctx.style.left = Math.max(minLeft, Math.min(window.innerWidth - cw - 14, l)) + 'px';
-  ctx.style.top = t + 'px';
-}
-
 function applyLabel() {
   if (selIds.length !== 1) return;
   const s = find(selIds[0]);
   if (!s) return;
   s.label = fL.value;
-  s.cols = fC.value;
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) setShapeContent(el, s);
+  notify();
+}
+
+function applyDesc() {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  s.desc = fD.value;
+  notify();
+}
+
+// ── 항목(select/radio/list/tab) 하나씩 입력 ─────────────────
+const itemsArray = (s) => String(s.cols || '').split(',').map((x) => x.trim()).filter(Boolean);
+const setItemsOf = (s, arr) => { s.cols = arr.join(','); };
+
+function renderItemsList() {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  const arr = itemsArray(s);
+  if (!arr.length) {
+    itemsList.replaceChildren(Object.assign(document.createElement('div'), {
+      className: 'items-empty', textContent: '항목 없음 — 아래에서 추가하세요',
+    }));
+    return;
+  }
+  itemsList.replaceChildren(...arr.map((label, i) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.dataset.idx = String(i);
+    const text = document.createElement('span');
+    text.className = 'item-text';
+    text.textContent = label;
+    row.append(
+      text,
+      Object.assign(document.createElement('button'), {
+        type: 'button', className: 'item-btn', textContent: '▲', title: '위로 이동',
+        disabled: i === 0,
+        onclick: () => moveItem(i, -1),
+      }),
+      Object.assign(document.createElement('button'), {
+        type: 'button', className: 'item-btn', textContent: '▼', title: '아래로 이동',
+        disabled: i === arr.length - 1,
+        onclick: () => moveItem(i, 1),
+      }),
+      Object.assign(document.createElement('button'), {
+        type: 'button', className: 'item-btn del', textContent: '×', title: '삭제',
+        onclick: () => delItem(i),
+      }),
+    );
+    return row;
+  }));
+}
+
+function setItemsPop(open) {
+  itemsPop.hidden = !open;
+  bItems.setAttribute('aria-expanded', String(open));
+  if (open) { renderItemsList(); itemsInput.focus(); }
+}
+function toggleItemsPop() { setItemsPop(itemsPop.hidden); }
+function closeItemsPop(refocus) {
+  if (itemsPop.hidden) return;
+  setItemsPop(false);
+  if (refocus) bItems.focus();
+}
+
+function setPosPop(open) {
+  posPop.hidden = !open;
+  bPos.setAttribute('aria-expanded', String(open));
+}
+function togglePosPop() { setPosPop(posPop.hidden); }
+function closePosPop(refocus) {
+  if (posPop.hidden) return;
+  setPosPop(false);
+  if (refocus) bPos.focus();
+}
+
+function setAlignPop(open) {
+  alignPop.hidden = !open;
+  bAlign.setAttribute('aria-expanded', String(open));
+}
+function toggleAlignPop() { setAlignPop(alignPop.hidden); }
+function closeAlignPop(refocus) {
+  if (alignPop.hidden) return;
+  setAlignPop(false);
+  if (refocus) bAlign.focus();
+}
+
+/** 선택 요소(들)를 한 단계만 앞/뒤로 옮긴다 (dir: +1 앞으로, -1 뒤로). 여러 개 선택 시
+ * 선택 묶음 전체가 서로의 순서는 유지한 채 인접한 미선택 요소 하나와 자리를 바꾼다. */
+function stepZ(dir) {
+  const ss = selShapes();
+  if (!ss.length) return;
+  push();
+  const selSet = new Set(ss.map((s) => s.id));
+  if (dir > 0) {
+    for (let i = shapes.length - 2; i >= 0; i--) {
+      if (selSet.has(shapes[i].id) && !selSet.has(shapes[i + 1].id)) {
+        [shapes[i], shapes[i + 1]] = [shapes[i + 1], shapes[i]];
+      }
+    }
+  } else {
+    for (let i = 1; i < shapes.length; i++) {
+      if (selSet.has(shapes[i].id) && !selSet.has(shapes[i - 1].id)) {
+        [shapes[i - 1], shapes[i]] = [shapes[i], shapes[i - 1]];
+      }
+    }
+  }
+  render();
+}
+
+function addItemFromInput() {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  const v = itemsInput.value.trim();
+  if (!s || !v) return;
+  push();
+  setItemsOf(s, [...itemsArray(s), v]);
+  itemsInput.value = '';
+  renderItemsList();
+  notify();
+  itemsInput.focus();
+}
+
+function moveItem(i, dir) {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  const arr = itemsArray(s);
+  const j = i + dir;
+  if (j < 0 || j >= arr.length) return;
+  push();
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  setItemsOf(s, arr);
+  renderItemsList();
+  notify();
+}
+
+function delItem(i) {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  push();
+  const arr = itemsArray(s);
+  arr.splice(i, 1);
+  setItemsOf(s, arr);
+  renderItemsList();
   notify();
 }
 
@@ -235,11 +404,25 @@ function toggleReq() {
 // ── 정렬 / 분배 ──────────────────────────────────────────
 /**
  * 정렬·분배 좌표 계산 (순수 함수 — 입력을 바꾸지 않고 새 {x,y} 배열 반환).
+ * 2개 이상 선택 시엔 선택된 요소들끼리의 바운딩박스 기준(서로 정렬), 1개만 선택했을 땐
+ * board 를 넘기면 캔버스(페이지) 기준으로 정렬한다 — 요소 하나를 캔버스 정중앙에 놓는 용도.
  * @param {{x:number,y:number,w:number,h:number}[]} list
  * @param {'left'|'hcenter'|'right'|'top'|'vcenter'|'bottom'|'hdist'|'vdist'} act
+ * @param {{w:number,h:number}} [board] — 1개 선택 시에만 쓰인다
  */
-export function computeAlign(list, act) {
+export function computeAlign(list, act, board) {
   const out = list.map((s) => ({ x: s.x, y: s.y }));
+  if (!list.length) return out;
+  if (list.length === 1 && board) {
+    const s = list[0];
+    if (act === 'left') out[0].x = 0;
+    else if (act === 'right') out[0].x = board.w - s.w;
+    else if (act === 'hcenter') out[0].x = Math.round((board.w - s.w) / 2);
+    else if (act === 'top') out[0].y = 0;
+    else if (act === 'bottom') out[0].y = board.h - s.h;
+    else if (act === 'vcenter') out[0].y = Math.round((board.h - s.h) / 2);
+    return out;
+  }
   if (list.length < 2) return out;
   const minX = Math.min(...list.map((s) => s.x));
   const maxR = Math.max(...list.map((s) => s.x + s.w));
@@ -268,12 +451,25 @@ export function computeAlign(list, act) {
 
 function alignAct(act) {
   const ss = selShapes();
-  if (ss.length < 2) return;
+  if (!ss.length) return;
   push();
-  const next = computeAlign(ss, act);
+  const next = computeAlign(ss, act, { w: BOARD_W, h: BOARD_H });
   ss.forEach((s, i) => {
     s.x = Math.max(0, Math.min(BOARD_W - s.w, next[i].x));
     s.y = Math.max(0, Math.min(BOARD_H - s.h, next[i].y));
+  });
+  render();
+}
+
+/** 선택된 요소들의 폭(또는 높이)을 가장 큰 값에 맞춘다 — 줄어들어 내용이 잘리는 요소가 없도록. */
+function matchSize(dim) {
+  const ss = selShapes();
+  if (ss.length < 2) return;
+  push();
+  const target = Math.max(...ss.map((s) => (dim === 'w' ? s.w : s.h)));
+  ss.forEach((s) => {
+    if (dim === 'w') s.w = Math.min(BOARD_W - s.x, target);
+    else s.h = Math.min(BOARD_H - s.y, target);
   });
   render();
 }
@@ -366,6 +562,7 @@ function normalize(arr) {
     req: !!(s.req ?? s.required),
     g: s.g ?? s.group ?? null,
     src: s.src ?? null,
+    desc: s.desc ?? '',
   }));
 }
 
@@ -373,11 +570,21 @@ function normalize(arr) {
 
 export function initEditor(opts = {}) {
   board = document.getElementById('board');
+  boardWrap = document.getElementById('boardWrap');
   ctx = document.getElementById('ctx');
   hint = document.getElementById('hint');
   ctxT = document.getElementById('ctxT');
   fL = document.getElementById('fL');
-  fC = document.getElementById('fC');
+  fD = document.getElementById('fD');
+  bItems = document.getElementById('bItems');
+  itemsPop = document.getElementById('itemsPop');
+  itemsList = document.getElementById('itemsList');
+  itemsInput = document.getElementById('itemsInput');
+  itemsAddBtn = document.getElementById('itemsAddBtn');
+  bPos = document.getElementById('bPos');
+  posPop = document.getElementById('posPop');
+  bAlign = document.getElementById('bAlign');
+  alignPop = document.getElementById('alignPop');
   bReq = document.getElementById('bReq');
   bU = document.getElementById('bU');
   bR = document.getElementById('bR');
@@ -433,7 +640,7 @@ export function initEditor(opts = {}) {
         const s = find(move.id);
         s.x = Math.max(0, Math.min(BOARD_W - s.w, Math.round(p.x - move.dx)));
         s.y = Math.max(0, Math.min(BOARD_H - s.h, Math.round(p.y - move.dy)));
-        guides(s); quick(s); placeCtx();
+        guides(s); quick(s);
       } else {
         const ss = selShapes();
         let dx = p.x - move.sx;
@@ -449,7 +656,6 @@ export function initEditor(opts = {}) {
           s.y = Math.round(move.orig[s.id].y + dy);
           quick(s);
         });
-        placeCtx();
       }
     }
     if (rs) {
@@ -462,7 +668,7 @@ export function initEditor(opts = {}) {
       if (d.includes('s')) s.h = Math.max(20, Math.round(rs.oh + dy));
       if (d.includes('w')) { const w = Math.max(24, Math.round(rs.ow - dx)); s.x = rs.ox + rs.ow - w; s.w = w; }
       if (d.includes('n')) { const h = Math.max(20, Math.round(rs.oh - dy)); s.y = rs.oy + rs.oh - h; s.h = h; }
-      guides(s); quick(s); placeCtx();
+      guides(s); quick(s);
     }
   });
 
@@ -483,6 +689,9 @@ export function initEditor(opts = {}) {
 
   document.addEventListener('keydown', (e) => {
     if (!cmenu.hidden && e.key === 'Escape') { e.preventDefault(); hideMenu(); board.focus(); return; }
+    if (!itemsPop.hidden && e.key === 'Escape') { e.preventDefault(); closeItemsPop(true); return; }
+    if (!posPop.hidden && e.key === 'Escape') { e.preventDefault(); closePosPop(true); return; }
+    if (!alignPop.hidden && e.key === 'Escape') { e.preventDefault(); closeAlignPop(true); return; }
     if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     const c = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
@@ -512,26 +721,41 @@ export function initEditor(opts = {}) {
       dx = Math.max(-minX, Math.min(BOARD_W - maxR, dx));
       dy = Math.max(-minY, Math.min(BOARD_H - maxB, dy));
       ss.forEach((s) => { s.x += dx; s.y += dy; quick(s); });
-      placeCtx(); notify();
+      notify();
     }
   });
 
-  window.addEventListener('resize', placeCtx);
-  cv.addEventListener('scroll', placeCtx);
-
   // 컨텍스트 툴바
   fL.addEventListener('input', applyLabel);
-  fC.addEventListener('input', applyLabel);
+  fD.addEventListener('input', applyDesc);
+  bItems.addEventListener('click', toggleItemsPop);
+  itemsAddBtn.addEventListener('click', addItemFromInput);
+  itemsInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addItemFromInput(); }
+  });
+  bPos.addEventListener('click', togglePosPop);
+  bAlign.addEventListener('click', toggleAlignPop);
+  document.addEventListener('mousedown', (e) => {
+    if (!itemsPop.hidden && !itemsPop.contains(e.target) && !bItems.contains(e.target)) closeItemsPop(false);
+    if (!posPop.hidden && !posPop.contains(e.target) && !bPos.contains(e.target)) closePosPop(false);
+    if (!alignPop.hidden && !alignPop.contains(e.target) && !bAlign.contains(e.target)) closeAlignPop(false);
+  });
   const ALIGN = {
     alignL: 'left', alignC: 'hcenter', alignR: 'right',
     alignT: 'top', alignM: 'vcenter', alignB: 'bottom',
     distH: 'hdist', distV: 'vdist',
   };
+  const POS_ACTS = ['front', 'back', 'stepUp', 'stepDown'];
   ctx.addEventListener('click', (e) => {
     const act = e.target.closest('button')?.dataset.act;
     if (!act) return;
     if (ALIGN[act]) { alignAct(ALIGN[act]); return; }
-    ({ req: toggleReq, dup, front, back, del: delSel, group: groupSel, ungroup: ungroupSel })[act]?.();
+    ({
+      req: toggleReq, dup, front, back, del: delSel, group: groupSel, ungroup: ungroupSel,
+      stepUp: () => stepZ(1), stepDown: () => stepZ(-1),
+      matchW: () => matchSize('w'), matchH: () => matchSize('h'),
+    })[act]?.();
+    if (POS_ACTS.includes(act)) closePosPop(true);
   });
 
   // ── 우클릭 메뉴 ─────────────────────────────────────────
@@ -617,6 +841,15 @@ function showMenu(clientX, clientY) {
 function applyBoardSize() {
   board.style.width = BOARD_W + 'px';
   board.style.height = BOARD_H + 'px';
+  zoomReset();
+}
+
+/** #boardWrap 을 "확대된 실제 크기"로 맞춘다 — transform 은 레이아웃 크기에 영향을 주지 않으므로,
+ * 이 래퍼가 없으면 확대 시 캔버스 중앙정렬·스크롤 범위가 확대 전 크기 기준으로 계산돼
+ * 상단 내용이 (고정된) 편집 툴바 뒤로 잘려 들어가 버린다. */
+function applyZoomSize() {
+  boardWrap.style.width = (BOARD_W * zm) / 100 + 'px';
+  boardWrap.style.height = (BOARD_H * zm) / 100 + 'px';
 }
 
 /** 캔버스(보드) 크기 변경. 화면 유형/불러온 화면에 맞춰 호출. */
@@ -626,8 +859,7 @@ export function setBoardSize(w, h) {
   if (nw === BOARD_W && nh === BOARD_H) return;
   BOARD_W = nw;
   BOARD_H = nh;
-  applyBoardSize();
-  if (zm !== 100) zoomReset(); // 크기가 바뀌면 배율은 100% 로
+  applyBoardSize(); // 내부에서 zoomReset() 까지 호출 — 보드 크기가 바뀌면 화면에 맞춰 배율도 다시 계산
   // 보드가 줄어든 경우 밖으로 나간 요소를 안으로 당긴다
   shapes.forEach((s) => {
     s.w = Math.min(s.w, BOARD_W);
@@ -642,15 +874,29 @@ export function getBoardSize() {
   return { w: BOARD_W, h: BOARD_H };
 }
 
+const overlapsAny = (x, y, w, h) =>
+  shapes.some((o) => x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y);
+
+/** 캔버스 정중앙을 기준으로, 이미 요소가 있어 겹치면 대각선으로 조금씩 밀어 자리를 찾는다. */
+function freeCenterSpot(w, h) {
+  const STEP = 18;
+  const baseX = Math.round((BOARD_W - w) / 2);
+  const baseY = Math.round((BOARD_H - h) / 2);
+  for (let k = 0; k < 40; k++) {
+    const x = Math.max(0, Math.min(BOARD_W - w, baseX + STEP * k));
+    const y = Math.max(0, Math.min(BOARD_H - h, baseY + STEP * k));
+    if (!overlapsAny(x, y, w, h)) return { x, y };
+  }
+  return { x: baseX, y: baseY };
+}
+
 export function addComponent(t) {
   push();
   const [w, h] = DEF[t];
-  const y = shapes.length
-    ? Math.min(BOARD_H - h - 20, Math.max(...shapes.map((s) => s.y + s.h)) + 20)
-    : 40;
+  const { x, y } = freeCenterSpot(w, h);
   shapes.push({
     id: uid++, t,
-    x: Math.round((BOARD_W - w) / 2), y, w, h,
+    x, y, w, h,
     label: defaultLabel(t), cols: defaultCols(t), req: false,
   });
   render();
@@ -674,6 +920,17 @@ export function addImage({ src, w = 240, h = 160 }) {
   render();
   setSel([shapes.at(-1).id]);
 }
+
+/** 변경화면: 소스 연동이 안 되는 화면의 캡처본을 캔버스 배경에 깔아 트레이싱용으로 쓴다.
+ * shapes 와 무관한 순수 시각적 참고용 — payload·저장본에 포함되지 않는다. */
+export function setBoardBackground(src) {
+  board.style.backgroundImage = `url("${src}")`;
+  board.style.backgroundSize = '100% 100%';
+}
+export function clearBoardBackground() {
+  board.style.backgroundImage = '';
+}
+export const hasBoardBackground = () => !!board.style.backgroundImage;
 
 export function setShapes(arr) {
   push();
@@ -706,17 +963,28 @@ export function redo() {
 }
 
 export function zoomBy(d) {
-  zm = Math.min(150, Math.max(50, zm + d));
+  zm = Math.min(150, Math.max(25, zm + d));
   board.style.transform = 'scale(' + zm / 100 + ')';
   zv.textContent = zm + '%';
-  placeCtx();
+  applyZoomSize();
 }
 
+/** 지금 보이는 캔버스 뷰포트에 맞춰 확대율을 계산한다(5% 단위, 25~150%) — "화면 필드가
+ * 한눈에 보이는 크기"가 기본값이라는 요구사항. 보드 크기가 바뀔 때(화면 유형·변경화면·비율
+ * 전환)와 하단 배율 버튼(리셋) 클릭 시 호출한다. 화면 유형 대부분이 같은 해상도(960×600)를
+ * 쓰므로 자연히 같은 배율로 통일되고, 팝업처럼 작은 보드만 더 크게 보인다. */
 export function zoomReset() {
-  zm = 100;
-  board.style.transform = 'scale(1)';
-  zv.textContent = '100%';
-  placeCtx();
+  if (cv && cv.clientWidth && cv.clientHeight) {
+    const availW = Math.max(160, cv.clientWidth - 60);
+    const availH = Math.max(160, cv.clientHeight - 60);
+    const scale = Math.min(availW / BOARD_W, availH / BOARD_H, 1.5);
+    zm = Math.max(25, Math.min(150, Math.round((scale * 100) / 5) * 5));
+  } else {
+    zm = 100;
+  }
+  board.style.transform = 'scale(' + zm / 100 + ')';
+  zv.textContent = zm + '%';
+  applyZoomSize();
 }
 
 export const count = () => shapes.length;
@@ -733,5 +1001,6 @@ export function toPayloadShapes() {
     required: s.req || undefined,
     group: s.g || undefined,
     src: s.src || undefined,
+    desc: s.desc || undefined,
   }));
 }

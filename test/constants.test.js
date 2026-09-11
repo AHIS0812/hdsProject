@@ -43,8 +43,8 @@ test('BOARD_SIZES 가 blank 을 제외한 모든 템플릿 키를 덮는다', ()
   }
 });
 
-test('boardSizeFor: 알려진 키 / 미지의 키', () => {
-  assert.deepEqual(boardSizeFor('main'), { w: 1280, h: 720 });
+test('boardSizeFor: 알려진 키 / 미지의 키 — 팝업만 별도 해상도, 나머지는 DEFAULT_BOARD 와 동일', () => {
+  assert.deepEqual(boardSizeFor('main'), DEFAULT_BOARD);
   assert.deepEqual(boardSizeFor('popup'), { w: 560, h: 420 });
   assert.deepEqual(boardSizeFor('list'), DEFAULT_BOARD);
   assert.deepEqual(boardSizeFor('없는키'), DEFAULT_BOARD);

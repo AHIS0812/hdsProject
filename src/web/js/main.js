@@ -19,6 +19,8 @@ let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드�
 // 사용자가 캔버스를 직접 수정했는지. 템플릿/화면/샘플을 "프로그램으로" 로드한 직후엔 false.
 // true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
 let canvasDirty = false;
+// "PC" 비율 프리셋이 돌아갈 기준 크기 — 신규는 화면 유형 기본값, 변경화면은 그 화면의 canvas
+let baseBoardSize = DEFAULT_BOARD;
 
 // 캔버스 편집 내용은 새로고침 시 유지하지 않는다(항상 시작 화면으로).
 // 명시적으로 남기려면 상단 "저장본" 슬롯 또는 .hds.json 내보내기를 쓴다.
@@ -28,21 +30,67 @@ let canvasDirty = false;
  * @param {object} [size] { w, h } — 지정 시 보드 크기도 변경
  */
 function loadCanvas(shapes, name, size) {
-  if (size && (size.w || size.h)) editor.setBoardSize(size.w || DEFAULT_BOARD.w, size.h || DEFAULT_BOARD.h);
+  editor.clearBoardBackground(); // 다른 화면으로 바뀌면 이전에 깔아둔 캡처 배경은 의미가 없어진다
+  syncBgButtons();
+  if (size && (size.w || size.h)) {
+    const w = size.w || DEFAULT_BOARD.w;
+    const h = size.h || DEFAULT_BOARD.h;
+    editor.setBoardSize(w, h);
+    baseBoardSize = { w, h };
+  }
   editor.setShapes(shapes || []);
   if (name != null) scrNm.value = name;
   syncAbL();
   canvasDirty = false;
 }
 
+/** 지금 캔버스 상태 스냅샷(되돌리기 토스트용) — 화면 전환류(guardedRun) 직전에만 호출 */
+function snapshotForUndo() {
+  return {
+    workMode, currentTpl, loadedScreenId, baseBoardSize,
+    scrName: scrNm.value,
+    canvas: editor.getBoardSize(),
+    shapes: editor.toPayloadShapes(),
+  };
+}
+
+/** snapshotForUndo() 로 찍어둔 상태로 복원 — combo 는 silent 모드로 맞춰 onPick 재귀를 피한다 */
+function restoreSnapshot(snap) {
+  workMode = snap.workMode;
+  markMode(workMode);
+  applyMode();
+  currentTpl = snap.currentTpl;
+  highlightTpl(currentTpl);
+  loadedScreenId = snap.loadedScreenId;
+  baseBoardSize = snap.baseBoardSize;
+  editor.clearBoardBackground();
+  syncBgButtons();
+  editor.setBoardSize(snap.canvas.w, snap.canvas.h);
+  editor.setShapes(snap.shapes);
+  scrNm.value = snap.scrName;
+  syncAbL();
+  if (workMode === 'edit' && loadedScreenId) scrCombo.choose(loadedScreenId, true);
+  else scrCombo.reset();
+  canvasDirty = true; // 되돌린 내용도 사용자가 실제로 작업했던 내용이므로 dirty 로 유지
+  toast('이전 화면으로 되돌렸습니다');
+}
+
 /**
- * 캔버스를 교체하기 직전에 호출. 사용자가 직접 편집한 내용이 있으면
- * "되돌리기로 복구 가능" 안내만 띄운다. (confirm 대신 — undo 히스토리가 복구를 보장)
+ * 캔버스를 교체하는 동작(템플릿/모드/화면 전환, 배경 이미지 업로드 등)을 감싼다.
+ * 사용자가 실제로 손댄 내용(canvasDirty)이 있을 때만 — 프로그램으로 막 불러온 직후처럼
+ * 아무 것도 고치지 않은 상태에서 넘어갈 땐 바로 적용하고 아무 것도 띄우지 않는다 — 적용 후
+ * "화면이 초기화되었습니다 · 되돌리기" 토스트를 띄운다. blocking confirm() 대신 즉시 적용하고,
+ * 실수로 눌렀으면 토스트의 되돌리기로 돌아갈 수 있게 한다.
+ * @returns {boolean} 되돌리기 토스트를 띄웠는지 — 호출부가 이어서 다른 토스트를 띄울지 판단할 때 쓴다.
  */
-function noteReplace() {
-  if (canvasDirty && editor.count() > 0) {
-    toast('이전 캔버스는 되돌리기(Ctrl+Z)로 복구할 수 있어요');
+function guardedRun(applyFn, msg = '화면이 초기화되었습니다 · 지금까지 작업한 내용은 사라집니다') {
+  const needsUndo = canvasDirty && editor.count();
+  const snap = needsUndo ? snapshotForUndo() : null;
+  applyFn();
+  if (snap) {
+    toast(msg, { actionLabel: '되돌리기', onAction: () => restoreSnapshot(snap) });
   }
+  return !!snap;
 }
 
 
@@ -97,6 +145,49 @@ document.querySelector('.tools').addEventListener('click', (e) => {
   TOOL[act]();
 });
 
+// ── 화면 비율 프리셋 (PC / PC·스크롤 고려 / 모바일) ───────────
+// 화면 유형·확대율과는 별개로, 캔버스 자체를 다른 기기 폭에 맞춰 그려보고 싶을 때 쓴다.
+const RATIO_SIZES = { pcScroll: { w: 960, h: 1400 }, mobile: { w: 390, h: 844 } };
+const btnRatio = $('btnRatio');
+const ratioPop = $('ratioPop');
+const ratioW = $('ratioW');
+const ratioH = $('ratioH');
+function setRatioPop(open) {
+  ratioPop.hidden = !open;
+  btnRatio.setAttribute('aria-expanded', String(open));
+  if (open) {
+    const { w, h } = editor.getBoardSize();
+    ratioW.value = w;
+    ratioH.value = h;
+  }
+}
+function applyBoardSize(w, h) {
+  editor.setBoardSize(w, h);
+  syncAbL();
+  canvasDirty = true;
+}
+btnRatio.addEventListener('click', () => setRatioPop(ratioPop.hidden));
+ratioPop.addEventListener('click', (e) => {
+  const key = e.target.closest('button')?.dataset.ratio;
+  if (!key) return;
+  const size = RATIO_SIZES[key] || baseBoardSize; // 'pc' = 원래 크기로 복귀
+  applyBoardSize(size.w, size.h);
+  setRatioPop(false);
+});
+$('ratioApply').addEventListener('click', () => {
+  const w = parseInt(ratioW.value, 10);
+  const h = parseInt(ratioH.value, 10);
+  if (!w || !h) { toast('폭·높이를 숫자로 입력해주세요'); return; }
+  applyBoardSize(w, h);
+  setRatioPop(false);
+});
+document.addEventListener('mousedown', (e) => {
+  if (!ratioPop.hidden && !ratioPop.contains(e.target) && !btnRatio.contains(e.target)) setRatioPop(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !ratioPop.hidden) { setRatioPop(false); btnRatio.focus(); }
+});
+
 // ── 작업 구분 (신규 / 변경) ───────────────────────────────
 // 화면 유형(템플릿)은 신규 모드에서만 노출한다. 변경 모드는 완성된 화면을 불러와 고치므로 불필요.
 function applyMode() {
@@ -113,9 +204,20 @@ function markMode(mode) {
 }
 document.querySelectorAll('#modeSeg button').forEach((el) => {
   el.addEventListener('click', () => {
-    workMode = el.dataset.mode;
-    markMode(workMode);
-    applyMode();
+    const next = el.dataset.mode;
+    if (next === workMode) return;
+    guardedRun(() => {
+      workMode = next;
+      markMode(workMode);
+      applyMode();
+      loadedScreenId = null;
+      if (workMode === 'new') {
+        loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
+      } else {
+        loadCanvas([], '', DEFAULT_BOARD);
+        scrCombo.reset();
+      }
+    });
   });
 });
 
@@ -132,12 +234,13 @@ document.querySelectorAll('.tpl').forEach((el) => {
     if (workMode !== 'new') return;
     const key = el.dataset.tpl;
     if (key === currentTpl && !canvasDirty) { highlightTpl(key); return; }
-    noteReplace();
-    currentTpl = key;
-    highlightTpl(key);
-    // 방금까지 기존 화면을 보고 있었다면 이름을 새 화면 기본값으로
-    loadCanvas(templateShapes(key), loadedScreenId ? '새 화면' : undefined, boardSizeFor(key));
-    loadedScreenId = null;
+    guardedRun(() => {
+      currentTpl = key;
+      highlightTpl(key);
+      // 방금까지 기존 화면을 보고 있었다면 이름을 새 화면 기본값으로
+      loadCanvas(templateShapes(key), loadedScreenId ? '새 화면' : undefined, boardSizeFor(key));
+      loadedScreenId = null;
+    });
   });
 });
 
@@ -164,13 +267,16 @@ const sysCombo = makeCombo($('sysBox'), {
 const scrCombo = makeCombo($('scrBox'), {
   placeholder: '화면 선택',
   emptyText: '해당 시스템에 등록된 화면이 없습니다',
-  // 변경 모드에서 화면을 고르는 건 "그 화면을 보여줘" 라는 뜻이므로 확인 없이 바로 로드한다.
+  // 변경할 화면을 바꾸는 건 지금 캔버스(전 화면 또는 편집 중이던 내용)를 지운다는 뜻이라,
+  // 작업한 내용이 있으면 적용 후 되돌리기 토스트를 띄운다.
   onPick: async (scr) => {
     if (!scr || scr.id === loadedScreenId) return;
     try {
       const def = await api.getScreen(scr.id);
-      loadCanvas(def.shapes || [], def.name || scr.name, def.canvas || DEFAULT_BOARD);
-      loadedScreenId = scr.id;
+      guardedRun(() => {
+        loadCanvas(def.shapes || [], def.name || scr.name, def.canvas || DEFAULT_BOARD);
+        loadedScreenId = scr.id;
+      });
     } catch (e) {
       toast('화면을 불러오지 못했습니다');
       console.error(e);
@@ -247,6 +353,37 @@ async function addImages(list) {
     drop.style.pointerEvents = '';
   }
 }
+
+// ── 변경화면: 소스 연동이 안 되는 화면은 캡처 이미지를 캔버스 배경으로 ──
+// shapes 와 무관한 순수 트레이싱 참고용(화면 전환 시 loadCanvas 가 자동으로 지운다).
+function syncBgButtons() {
+  const has = editor.hasBoardBackground();
+  $('btnBgUp').hidden = has;
+  $('btnBgClear').hidden = !has;
+}
+$('btnBgUp').addEventListener('click', () => $('bgFile').click());
+$('bgFile').addEventListener('change', async () => {
+  const file = $('bgFile').files[0];
+  $('bgFile').value = '';
+  if (!file || !file.type?.startsWith('image/')) return;
+  if (file.size > IMG_MAX_BYTES) { toast('이미지가 너무 큽니다 (15MB 이하)'); return; }
+  try {
+    const img = await fileToImage(file);
+    const showedUndo = guardedRun(() => {
+      editor.clearShapes();
+      editor.setBoardBackground(img.src);
+      syncBgButtons();
+      canvasDirty = true;
+    }, '캡처 이미지를 캔버스 배경으로 깔면서 기존 요소가 초기화되었습니다');
+    if (!showedUndo) toast('캡처 이미지를 캔버스 배경으로 깔았습니다 — 위에 요소를 그려보세요');
+  } catch (e) {
+    toast(e.message);
+  }
+});
+$('btnBgClear').addEventListener('click', () => {
+  editor.clearBoardBackground();
+  syncBgButtons();
+});
 
 drop.addEventListener('click', () => fileInput.click());
 drop.addEventListener('keydown', (e) => {
@@ -526,7 +663,7 @@ async function boot() {
   try {
     const systems = await api.getSystems();
     sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name, sub: s.sub })));
-    const want = systems.find((s) => s.id === 'portal') ? 'portal' : systems[0]?.id;
+    const want = systems.find((s) => s.id === 'salesportal') ? 'salesportal' : systems[0]?.id;
     if (want) sysCombo.choose(want);
   } catch (e) {
     toast('API 서버에 연결하지 못했습니다 — npm run dev 로 실행했는지 확인하세요');

@@ -2,7 +2,7 @@
   "screens": [
     {
       "id": "SCR-P-MAIN-01",
-      "name": "하이포탈 메인화면",
+      "name": "메인화면",
       "template": "main",
       "updatedAt": "2026-08-28",
       "canvas": { "w": 960, "h": 600 },

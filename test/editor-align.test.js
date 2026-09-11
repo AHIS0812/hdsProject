@@ -41,9 +41,26 @@ test('vdist — 3개 미만이면 그대로', () => {
   assert.deepEqual(computeAlign(b, 'vdist'), b.map((s) => ({ x: s.x, y: s.y })));
 });
 
-test('요소 1개 이하면 좌표 변화 없음', () => {
+test('요소 1개 — board 없이 호출하면 좌표 변화 없음(선택 자기자신 기준이라 무변화)', () => {
   assert.deepEqual(computeAlign([{ x: 5, y: 5, w: 10, h: 10 }], 'left'), [{ x: 5, y: 5 }]);
   assert.deepEqual(computeAlign([], 'top'), []);
+});
+
+test('요소 1개 — board 를 넘기면 캔버스(페이지) 기준으로 정렬된다', () => {
+  const one = [{ x: 5, y: 5, w: 10, h: 20 }];
+  const board = { w: 100, h: 200 };
+  assert.deepEqual(computeAlign(one, 'left', board), [{ x: 0, y: 5 }]);
+  assert.deepEqual(computeAlign(one, 'right', board), [{ x: 90, y: 5 }]);
+  assert.deepEqual(computeAlign(one, 'hcenter', board), [{ x: 45, y: 5 }]);
+  assert.deepEqual(computeAlign(one, 'top', board), [{ x: 5, y: 0 }]);
+  assert.deepEqual(computeAlign(one, 'bottom', board), [{ x: 5, y: 180 }]);
+  assert.deepEqual(computeAlign(one, 'vcenter', board), [{ x: 5, y: 90 }]);
+});
+
+test('요소 1개 — board 를 넘겨도 hdist/vdist 는 변화 없음(분배는 2개 이상 필요)', () => {
+  const one = [{ x: 5, y: 5, w: 10, h: 20 }];
+  const board = { w: 100, h: 200 };
+  assert.deepEqual(computeAlign(one, 'hdist', board), [{ x: 5, y: 5 }]);
 });
 
 test('입력 배열을 변형하지 않는다', () => {

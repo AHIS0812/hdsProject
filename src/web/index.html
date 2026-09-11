@@ -63,6 +63,14 @@
             <div class="cblist"></div>
           </div>
         </div>
+
+        <div class="bgUp">
+          <div class="bgUp-or">또는</div>
+          <button type="button" class="btn sm" id="btnBgUp">화면 캡처 이미지로 시작</button>
+          <input type="file" id="bgFile" accept="image/*" hidden>
+          <button type="button" class="btn sm" id="btnBgClear" hidden>캡처 배경 제거</button>
+          <p class="bgUp-hint">소스가 연동 안 되는 화면은, 캡처본을 캔버스 배경에 깔고 그 위에 요소를 그려서 만드세요.</p>
+        </div>
       </div>
 
       <div id="newBlock">
@@ -96,9 +104,11 @@
 
   <div class="canvas" id="cv" aria-label="편집 캔버스">
     <div class="abL" id="abL" aria-live="polite">새 화면 <span>960 × 600</span></div>
-    <div id="board" tabindex="0" role="group" aria-label="화면 캔버스 (요소 배치 영역)">
-      <div class="hint" id="hint">화면을 자유롭게 그려보세요
-        <b>반듯하지 않아도 괜찮습니다 · 표준 규칙으로 정리합니다</b></div>
+    <div id="boardWrap">
+      <div id="board" tabindex="0" role="group" aria-label="화면 캔버스 (요소 배치 영역)">
+        <div class="hint" id="hint">화면을 자유롭게 그려보세요
+          <b>반듯하지 않아도 괜찮습니다 · 표준 규칙으로 정리합니다</b></div>
+      </div>
     </div>
 
     <div class="coach" id="coach" hidden>
@@ -118,8 +128,23 @@
     <button id="bR" data-act="redo" title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">↷</button>
     <div class="dv" aria-hidden="true"></div>
     <button data-act="zoomOut" title="축소" aria-label="축소">−</button>
-    <button class="zz" id="zv" data-act="zoomReset" aria-label="확대·축소 100퍼센트로">100%</button>
+    <button class="zz" id="zv" data-act="zoomReset" aria-label="화면 전체가 보이는 배율로">100%</button>
     <button data-act="zoomIn" title="확대" aria-label="확대">＋</button>
+    <div class="dv" aria-hidden="true"></div>
+    <span class="pop-wrap">
+      <button id="btnRatio" type="button" title="화면 비율" aria-haspopup="dialog" aria-expanded="false" aria-controls="ratioPop">PC ▾</button>
+      <div class="ratio-pop" id="ratioPop" role="dialog" aria-label="화면 비율" hidden>
+        <button type="button" data-ratio="pc">PC <span>화면 유형 기본 크기</span></button>
+        <button type="button" data-ratio="pcScroll">PC · 스크롤 고려 <span>960 × 1400</span></button>
+        <button type="button" data-ratio="mobile">모바일 <span>390 × 844</span></button>
+        <div class="ratio-custom">
+          <input type="number" id="ratioW" placeholder="폭" min="320" max="3000" aria-label="캔버스 폭(px) 직접 입력">
+          <span aria-hidden="true">×</span>
+          <input type="number" id="ratioH" placeholder="높이" min="240" max="4000" aria-label="캔버스 높이(px) 직접 입력">
+          <button type="button" id="ratioApply">적용</button>
+        </div>
+      </div>
+    </span>
     <div class="dv" aria-hidden="true"></div>
     <button id="btnHelp" data-act="help" title="단축키 도움말 (?)" aria-label="단축키 도움말" aria-haspopup="dialog" aria-expanded="false">?</button>
   </div>
@@ -145,38 +170,68 @@
       </dl>
     </div>
   </div>
-</div>
 
-<div class="ctx" id="ctx" role="toolbar" aria-label="선택 요소 편집">
-  <span class="ctx-grp" id="ctxSingle">
-    <span class="lb" id="ctxT">버튼</span>
-    <input id="fL" placeholder="문구" aria-label="요소 문구">
-    <input id="fC" class="wide hidden" placeholder="항목을 쉼표로 구분" aria-label="항목 (쉼표 구분)">
-    <div class="cdiv" aria-hidden="true"></div>
-    <button class="cb" id="bReq" data-act="req" title="필수 입력 표시" aria-label="필수 입력 표시" aria-pressed="false">＊</button>
-    <div class="cdiv" aria-hidden="true"></div>
-  </span>
-  <span class="ctx-grp" id="ctxAlign" hidden>
-    <span class="lb" id="ctxN"></span>
-    <button class="cb" data-act="alignL" title="왼쪽 정렬" aria-label="왼쪽 정렬">⇤</button>
-    <button class="cb" data-act="alignC" title="가로 가운데 정렬" aria-label="가로 가운데 정렬">⇔</button>
-    <button class="cb" data-act="alignR" title="오른쪽 정렬" aria-label="오른쪽 정렬">⇥</button>
-    <div class="cdiv" aria-hidden="true"></div>
-    <button class="cb" data-act="alignT" title="위쪽 정렬" aria-label="위쪽 정렬">⤒</button>
-    <button class="cb" data-act="alignM" title="세로 가운데 정렬" aria-label="세로 가운데 정렬">⇕</button>
-    <button class="cb" data-act="alignB" title="아래쪽 정렬" aria-label="아래쪽 정렬">⤓</button>
-    <div class="cdiv" aria-hidden="true"></div>
-    <button class="cb" data-act="distH" title="가로 균등 분배 (3개 이상)" aria-label="가로 균등 분배">⇿</button>
-    <button class="cb" data-act="distV" title="세로 균등 분배 (3개 이상)" aria-label="세로 균등 분배">↕</button>
-    <div class="cdiv" aria-hidden="true"></div>
-    <button class="cb" id="bGroup" data-act="group" title="그룹으로 묶기 (Ctrl+G)" aria-label="그룹으로 묶기">⊞</button>
-    <button class="cb" id="bUngroup" data-act="ungroup" title="그룹 해제 (Ctrl+Shift+G)" aria-label="그룹 해제" hidden>⊟</button>
-    <div class="cdiv" aria-hidden="true"></div>
-  </span>
-  <button class="cb" data-act="dup" title="복제 (Ctrl+D)" aria-label="복제">⧉</button>
-  <button class="cb" data-act="front" title="맨 앞으로" aria-label="맨 앞으로">⬆</button>
-  <button class="cb" data-act="back" title="맨 뒤로" aria-label="맨 뒤로">⬇</button>
-  <button class="cb red" data-act="del" title="삭제 (Del)" aria-label="삭제">🗑</button>
+  <div class="ctx" id="ctx" role="toolbar" aria-label="선택 요소 편집">
+    <span class="ctx-grp" id="ctxSingle">
+      <span class="lb" id="ctxT">버튼</span>
+      <input id="fL" placeholder="문구" aria-label="요소 문구">
+      <input id="fD" class="wide hidden" placeholder="클릭 시 안내 문구 (예: 계약 목록 그리드가 갱신됩니다)"
+        aria-label="버튼 설명 — 결과 화면에서 클릭 시 안내 문구로 표시">
+      <div class="cdiv" aria-hidden="true"></div>
+      <span class="pop-wrap">
+        <button class="cb items-btn hidden" id="bItems" type="button" title="항목 편집"
+          aria-haspopup="dialog" aria-expanded="false" aria-controls="itemsPop">항목</button>
+        <div class="items-pop" id="itemsPop" role="dialog" aria-label="항목 편집" hidden>
+          <div class="items-list" id="itemsList" role="list"></div>
+          <div class="items-add">
+            <input id="itemsInput" type="text" placeholder="항목 입력 후 Enter" aria-label="새 항목 입력">
+            <button class="cb" id="itemsAddBtn" type="button" aria-label="항목 추가">＋</button>
+          </div>
+        </div>
+      </span>
+      <div class="cdiv" aria-hidden="true"></div>
+      <button class="cb" id="bReq" data-act="req" title="필수 입력 표시" aria-label="필수 입력 표시" aria-pressed="false">＊</button>
+      <div class="cdiv" aria-hidden="true"></div>
+    </span>
+    <span class="ctx-grp" id="ctxAlign" hidden>
+      <span class="pop-wrap">
+        <button class="cb" id="bAlign" type="button" title="정렬" aria-label="정렬"
+          aria-haspopup="dialog" aria-expanded="false" aria-controls="alignPop">⇔</button>
+        <div class="align-pop" id="alignPop" role="dialog" aria-label="정렬" hidden>
+          <div class="align-grid">
+            <button type="button" data-act="alignL" title="왼쪽 정렬" aria-label="왼쪽 정렬">⇤</button>
+            <button type="button" data-act="alignC" title="가로 가운데 정렬" aria-label="가로 가운데 정렬">⇔</button>
+            <button type="button" data-act="alignR" title="오른쪽 정렬" aria-label="오른쪽 정렬">⇥</button>
+            <button type="button" data-act="alignT" title="위쪽 정렬" aria-label="위쪽 정렬">⤒</button>
+            <button type="button" data-act="alignM" title="세로 가운데 정렬" aria-label="세로 가운데 정렬">⇕</button>
+            <button type="button" data-act="alignB" title="아래쪽 정렬" aria-label="아래쪽 정렬">⤓</button>
+          </div>
+          <div class="align-sep" aria-hidden="true"></div>
+          <div class="align-grid">
+            <button type="button" data-act="distH" title="가로 균등 분배 (3개 이상)" aria-label="가로 균등 분배">⇿</button>
+            <button type="button" data-act="distV" title="세로 균등 분배 (3개 이상)" aria-label="세로 균등 분배">↕</button>
+            <button type="button" data-act="matchW" title="폭 맞추기 (2개 이상)" aria-label="폭 맞추기">↔</button>
+            <button type="button" data-act="matchH" title="높이 맞추기 (2개 이상)" aria-label="높이 맞추기">↕</button>
+          </div>
+        </div>
+      </span>
+      <div class="cdiv" aria-hidden="true"></div>
+      <button class="cb" id="bGroup" data-act="group" title="그룹으로 묶기 (Ctrl+G)" aria-label="그룹으로 묶기">⊞</button>
+      <button class="cb" id="bUngroup" data-act="ungroup" title="그룹 해제 (Ctrl+Shift+G)" aria-label="그룹 해제" hidden>⊟</button>
+      <div class="cdiv" aria-hidden="true"></div>
+    </span>
+    <button class="cb" data-act="dup" title="복제 (Ctrl+D)" aria-label="복제">⧉</button>
+    <span class="pop-wrap">
+      <button class="cb" id="bPos" type="button" title="위치" aria-haspopup="dialog" aria-expanded="false" aria-controls="posPop">⇅</button>
+      <div class="pos-pop" id="posPop" role="dialog" aria-label="위치" hidden>
+        <button type="button" data-act="front">맨 앞으로</button>
+        <button type="button" data-act="stepUp">앞으로</button>
+        <button type="button" data-act="stepDown">뒤로</button>
+        <button type="button" data-act="back">맨 뒤로</button>
+      </div>
+    </span>
+    <button class="cb red" data-act="del" title="삭제 (Del)" aria-label="삭제">🗑</button>
+  </div>
 </div>
 
 <div class="cmenu" id="cmenu" role="menu" aria-label="캔버스 메뉴" hidden></div>

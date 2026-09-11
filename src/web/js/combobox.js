@@ -121,7 +121,15 @@ export function makeCombo(root, opts = {}) {
         btn.classList.add('empty');
       }
     },
-    choose(id) {
+    choose(id, silent) {
+      if (silent) {
+        value = id;
+        const it = items.find((x) => x.id === id) || null;
+        btn.textContent = it ? it.name : opts.placeholder || '선택';
+        btn.classList.toggle('empty', !it);
+        close();
+        return;
+      }
       pick(id);
     },
     get() {
