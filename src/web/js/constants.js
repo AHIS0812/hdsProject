@@ -23,7 +23,7 @@ export const COMPS = [
 export const DEF = {
   area: [420, 68], title: [170, 17], label: [85, 15], input: [150, 19], select: [130, 19],
   radio: [210, 17], date: [125, 19], check: [115, 15], text: [330, 48], file: [250, 19],
-  list: [620, 145], pager: [250, 20], tab: [400, 24], image: [160, 110],
+  list: [620, 145], pager: [120, 20], tab: [400, 24], image: [160, 110],
   button: [85, 20], divider: [900, 5],
 };
 

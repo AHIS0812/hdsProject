@@ -181,8 +181,10 @@ const noteAttr = (shape) => {
   const d = shape.type !== 'button' && shape.desc && String(shape.desc).trim();
   return d ? ` class="hs-note" data-note="${esc(shape.desc)}"` : '';
 };
+/** 화살표 연결(linkTo)의 대상을 런타임에 찾을 수 있도록, payload 의 shape.id 를 그대로 DOM id 로 쓴다. */
+const elId = (shape) => (shape.id ? ` id="hs-${esc(shape.id)}"` : '');
 const wrapAbs = (shape, inner, extra = '') =>
-  `<div${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
+  `<div${elId(shape)}${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
   `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;gap:3px;${extra}">${inner}</div>`;
 
 /** 필수 입력은 실제 화면처럼 옅은 크림색 배경으로 강조한다(별표 하나만으로는 눈에 잘 안 띔). */
@@ -249,9 +251,11 @@ function shapeToHtml(shape, n) {
       solid: 'background:#0F3B7C;border-color:#0F3B7C;color:#fff',
       default: 'background:#fff;border-color:#9fb3d1;color:#0F3B7C',
     }[role];
+    // linkTo(스케치에서 "연결할 요소"로 지정한 대상)가 있으면 클릭 시 그 요소로 화살표를 그린다.
+    const linkAttr = shape.linkTo ? ` data-link-target="hs-${esc(shape.linkTo)}"` : '';
     return wrapAbs(
       shape,
-      `<button type="button" class="hs-btn" data-note="${esc(shape.desc || '')}" style="${control({ required: false })};` +
+      `<button type="button" class="hs-btn" data-note="${esc(shape.desc || '')}"${linkAttr} style="${control({ required: false })};` +
         `${roleStyle};font-weight:700;cursor:pointer">${esc(shape.label || '버튼')}</button>`,
     );
   }
@@ -273,15 +277,46 @@ function shapeToHtml(shape, n) {
   const extra = STATIC_STYLE[t] || 'border:1px solid #c6c4bf;background:#fff;justify-content:center';
   // 실제 화면의 섹션 제목("▸ 주소" 처럼)을 흉내낸다 — title/area 만 화살표 프리픽스를 단다.
   const prefix = t === 'title' || t === 'area' ? '▸ ' : '';
-  return `<div${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
+  return `<div${elId(shape)}${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
     `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;font-size:11px;color:#333;` +
     `padding:4px 6px;overflow:hidden;white-space:nowrap;${extra}">${esc(prefix + (shape.label || t))}</div>`;
 }
 
-/** 버튼·주석(hs-note) 클릭 시 설명 문구·탭 전환을 처리하는 공통 스크립트. data-note 는 이미
- * HTML-escape 되어 있어 textContent 로만 다룬다. */
+/** 버튼·주석(hs-note) 클릭 시 설명 문구·탭 전환·(버튼이면) 연결 화살표를 처리하는 공통 스크립트.
+ * data-note/data-link-target 은 이미 HTML-escape 되어 있어 textContent/id 조회로만 다룬다. */
 const INTERACTION_SCRIPT = `
 <script>
+function hsEdgePoint(r, cx, cy, tx, ty) {
+  var dx = tx - cx, dy = ty - cy;
+  if (!dx && !dy) return { x: cx, y: cy };
+  var hw = r.width / 2, hh = r.height / 2;
+  var scale = Math.min(dx ? Math.abs(hw / dx) : Infinity, dy ? Math.abs(hh / dy) : Infinity);
+  return { x: cx + dx * scale, y: cy + dy * scale };
+}
+function hsClearArrow() {
+  var svg = document.getElementById('hsLinkLayer');
+  var line = svg && svg.querySelector('line');
+  if (line) line.remove();
+}
+function hsDrawArrow(srcEl, tgtEl) {
+  var svg = document.getElementById('hsLinkLayer');
+  var cv = document.querySelector('.d-cv');
+  if (!svg || !cv) return;
+  hsClearArrow();
+  var cvR = cv.getBoundingClientRect();
+  var sr = srcEl.getBoundingClientRect();
+  var tr = tgtEl.getBoundingClientRect();
+  var sc = { x: sr.left - cvR.left + sr.width / 2, y: sr.top - cvR.top + sr.height / 2 };
+  var tc = { x: tr.left - cvR.left + tr.width / 2, y: tr.top - cvR.top + tr.height / 2 };
+  var p1 = hsEdgePoint(sr, sc.x, sc.y, tc.x, tc.y);
+  var p2 = hsEdgePoint(tr, tc.x, tc.y, sc.x, sc.y);
+  var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('stroke', '#F5821F'); line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-dasharray', '5 4'); line.setAttribute('marker-end', 'url(#hsLinkArrow)');
+  svg.appendChild(line);
+}
 document.addEventListener('click', function (e) {
   var tab = e.target.closest('.hs-tab');
   if (tab) {
@@ -293,9 +328,13 @@ document.addEventListener('click', function (e) {
     return;
   }
   var noted = e.target.closest('.hs-btn, .hs-note');
-  if (!noted) return;
+  if (!noted) { hsClearArrow(); return; }
   var isBtn = noted.classList.contains('hs-btn');
   var msg = noted.dataset.note || (isBtn ? '실제 동작은 없는 미리보기 버튼입니다.' : '');
+
+  var targetEl = isBtn && noted.dataset.linkTarget ? document.getElementById(noted.dataset.linkTarget) : null;
+  if (targetEl) hsDrawArrow(noted, targetEl); else hsClearArrow();
+
   if (!msg) return;
   var bubble = document.getElementById('hsBubble');
   if (!bubble) {
@@ -312,7 +351,7 @@ document.addEventListener('click', function (e) {
   bubble.style.top = Math.max(6, r.top - 44) + 'px';
   bubble.style.opacity = '1';
   clearTimeout(bubble._t);
-  bubble._t = setTimeout(function () { bubble.style.opacity = '0'; }, 2400);
+  bubble._t = setTimeout(function () { bubble.style.opacity = '0'; hsClearArrow(); }, 2400);
 });
 </script>`;
 
@@ -331,9 +370,15 @@ function buildPreviewHtml(title, payload) {
     `.d-note{font-size:11px;color:#8a8a8a;text-align:center;padding:7px}` +
     `.d-cv{position:relative;width:${w}px;height:${h}px;background:#fff;margin:0 auto 16px;` +
     `border:1px solid #ddd;box-shadow:0 1px 4px rgba(0,0,0,.08)}` +
-    `.hs-note{cursor:pointer}</style></head>` +
-    `<body><div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능</div>` +
-    `<div class="d-cv"${bgStyle}>${els}</div>${INTERACTION_SCRIPT}</body></html>`
+    `.hs-note{cursor:pointer}` +
+    `#hsLinkLayer{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}</style></head>` +
+    `<body><div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
+    ` · 연결된 버튼을 누르면 화살표로 표시</div>` +
+    `<div class="d-cv"${bgStyle}>${els}` +
+    `<svg id="hsLinkLayer" width="${w}" height="${h}"><defs>` +
+    `<marker id="hsLinkArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
+    `<path d="M0,0L10,5L0,10z" fill="#F5821F"></path></marker></defs></svg>` +
+    `</div>${INTERACTION_SCRIPT}</body></html>`
   );
 }
 

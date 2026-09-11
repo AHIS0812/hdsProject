@@ -202,29 +202,30 @@ function edgePoint(s, tx, ty) {
 }
 
 /** 버튼 → 연결한 요소로 이어지는 화살표를 그린다. 기본은 화살표가 없고(link 미지정),
- * 사용자가 "연결할 요소 선택"으로 지정했을 때만 나타난다. */
+ * 그것도 상시로 보이는 게 아니라 "설명" 팝오버를 열어 그 요소를 확인하는 동안만 나타난다
+ * — 늘 그려두면 캔버스가 복잡해진다. */
 function renderLinks() {
   if (!linkLayer) return;
   linkLayer.setAttribute('width', BOARD_W);
   linkLayer.setAttribute('height', BOARD_H);
   linkLayer.querySelectorAll('line').forEach((el) => el.remove());
-  shapes.forEach((s) => {
-    if (s.link == null) return;
-    const t = find(s.link);
-    if (!t) return;
-    const c1 = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
-    const c2 = { x: t.x + t.w / 2, y: t.y + t.h / 2 };
-    const p1 = edgePoint(s, c2.x, c2.y);
-    const p2 = edgePoint(t, c1.x, c1.y);
-    const line = document.createElementNS(SVG_NS, 'line');
-    line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
-    line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
-    line.setAttribute('stroke', '#F5821F');
-    line.setAttribute('stroke-width', '2');
-    line.setAttribute('stroke-dasharray', '5 4');
-    line.setAttribute('marker-end', 'url(#linkArrow)');
-    linkLayer.appendChild(line);
-  });
+  if (!descPop || descPop.hidden || selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s || s.link == null) return;
+  const t = find(s.link);
+  if (!t) return;
+  const c1 = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+  const c2 = { x: t.x + t.w / 2, y: t.y + t.h / 2 };
+  const p1 = edgePoint(s, c2.x, c2.y);
+  const p2 = edgePoint(t, c1.x, c1.y);
+  const line = document.createElementNS(SVG_NS, 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('stroke', '#F5821F');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-dasharray', '5 4');
+  line.setAttribute('marker-end', 'url(#linkArrow)');
+  linkLayer.appendChild(line);
 }
 
 function paintSel() {
@@ -436,6 +437,7 @@ function setDescPop(open) {
   bDesc.setAttribute('aria-expanded', String(open));
   if (open) { updateDescLinkUI(); descInput.focus(); }
   else cancelPickLink();
+  renderLinks(); // 화살표는 이 팝오버가 열려 있을 때만 보인다
 }
 function toggleDescPop() { setDescPop(descPop.hidden); }
 function closeDescPop(refocus) {
