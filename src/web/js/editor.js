@@ -2,13 +2,13 @@
 // 다중 선택(Shift·드래그) / 그룹화 / 정렬·분배 / 플로팅 컨텍스트 툴바 / 우클릭 메뉴 / 단축키.
 // 개발지시서 U-2 ~ U-5.
 
-import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, defaultLabel, defaultCols } from './constants.js';
+import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, HAS_TEXT, HAS_REQ, defaultLabel, defaultCols } from './constants.js';
 
 let board, boardWrap, ctx, hint, ctxT, fL, fD, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl, cmenu, bGroup, bUngroup;
 let bItems, itemsPop, itemsList, itemsInput, itemsAddBtn;
 let bPos, posPop;
 let bAlign, alignPop;
-let fS, fsUp, fsDown;
+let fS, fsUp, fsDown, fsWrap;
 const DEFAULT_FS = 11; // 글자 크기를 따로 지정하지 않은 요소의 기본값(px) — 조절 칸에 보여줄 값
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
 let BOARD_W = DEFAULT_BOARD.w;
@@ -49,8 +49,9 @@ function setShapeContent(el, s) {
     [...el.childNodes].forEach((n) => { if (n.nodeType === 3) n.remove(); }); // 텍스트 노드 제거
     return;
   }
-  if (s.t === 'divider') {
-    // 구분선은 선(CSS ::after)만 보이면 된다 — 글자가 겹쳐 보이지 않게 비워둔다.
+  if (s.t === 'divider' || s.t === 'pager') {
+    // 구분선·페이지 이동은 CSS ::after 로 그려지는 고정 모양만 보이면 된다 —
+    // 글자(NAME 폴백)가 겹쳐 보이지 않게 비워둔다.
     el.replaceChildren();
     return;
   }
@@ -226,11 +227,17 @@ function syncCtx() {
   if (n === 1) {
     const s = find(selIds[0]);
     ctxT.textContent = NAME[s.t];
+    // 컴포넌트 타입마다 실제로 의미 있는 조절칸만 보여준다 — 전부 다 띄우면
+    // 어떤 타입에 뭐가 적용되는지 알기 어렵고 툴바만 복잡해진다.
+    const showText = !!HAS_TEXT[s.t];
+    fL.classList.toggle('hidden', !showText);
+    fsWrap.classList.toggle('hidden', !showText);
     fL.value = s.label;
     fS.value = s.fs || DEFAULT_FS;
     fD.value = s.desc || '';
     fD.classList.toggle('hidden', s.t !== 'button');
     bItems.classList.toggle('hidden', !HAS_ITEMS[s.t]);
+    bReq.classList.toggle('hidden', !HAS_REQ[s.t]);
     bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
   }
   // 그룹으로 묶기/해제는 그룹 도구라 2개 이상일 때만 의미가 있다 — 정렬 노출과 별개로 판단.
@@ -616,6 +623,7 @@ export function initEditor(opts = {}) {
   fS = document.getElementById('fS');
   fsUp = document.getElementById('fsUp');
   fsDown = document.getElementById('fsDown');
+  fsWrap = document.getElementById('fsWrap');
   fD = document.getElementById('fD');
   bItems = document.getElementById('bItems');
   itemsPop = document.getElementById('itemsPop');

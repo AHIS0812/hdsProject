@@ -258,8 +258,12 @@ function shapeToHtml(shape, n) {
     return wrapAbs(shape, `<input type="file" style="flex:1;font-size:10px;min-width:0;` +
       `background:${shape.required ? '#FFFAE6' : 'transparent'}">`);
   }
+  // 구분선·페이지 이동은 label 을 쓰지 않는 순수 장식/고정 위젯 — label 이 없을 때
+  // 아래 공용 분기로 떨어지면 타입 영문 slug("divider"/"pager")가 그대로 찍혀 보였다.
+  if (t === 'divider') return wrapAbs(shape, '', STATIC_STYLE.divider);
+  if (t === 'pager') return wrapAbs(shape, '<span style="letter-spacing:2px">‹ 1 2 3 ›</span>', STATIC_STYLE.pager);
 
-  // title / label / divider / area / pager / 알 수 없는 타입
+  // title / label / area / 알 수 없는 타입
   const extra = STATIC_STYLE[t] || 'border:1px solid #c6c4bf;background:#fff;justify-content:center';
   // 실제 화면의 섹션 제목("▸ 주소" 처럼)을 흉내낸다 — title/area 만 화살표 프리픽스를 단다.
   const prefix = t === 'title' || t === 'area' ? '▸ ' : '';

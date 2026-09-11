@@ -33,6 +33,14 @@ export const NAME = Object.fromEntries(COMPS.map((c) => [c.t, c.n]));
 /** items(쉼표 목록)를 갖는 타입 — 컨텍스트 툴바에 항목 입력칸 표시 */
 export const HAS_ITEMS = { list: 1, select: 1, radio: 1, tab: 1 };
 
+/** label 이 실제 화면에 보이는 문구로 쓰이는 타입 — 컨텍스트 툴바에 문구·글자 크기 입력칸 표시.
+ * select/radio/list/tab 은 label 이 아니라 items 를 쓰고, date/file/pager/divider 는 label 을
+ * 아예 쓰지 않으므로 여기서 뺀다(넣어봐야 결과 화면에 아무 영향이 없어 혼란만 준다). */
+export const HAS_TEXT = { title: 1, label: 1, button: 1, input: 1, text: 1, check: 1, area: 1, image: 1 };
+
+/** required(＊ 표시)가 실제 화면에 반영되는 타입만 컨텍스트 툴바에 "필수" 토글을 보여준다. */
+export const HAS_REQ = { input: 1, select: 1, radio: 1, date: 1, check: 1, text: 1, file: 1 };
+
 export const SNAP = 6;
 
 /** 캔버스 기본 크기 */
