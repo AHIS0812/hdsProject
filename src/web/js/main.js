@@ -594,6 +594,7 @@ function payload() {
   };
   if (workMode === 'new') p.template = currentTpl;
   if (workMode === 'edit' && scr) p.baseScreen = { id: scr.id, name: scr.name };
+  if (editor.hasBoardBackground()) p.background = editor.getBoardBackground();
   return p;
 }
 

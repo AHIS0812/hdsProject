@@ -309,6 +309,10 @@ function buildPreviewHtml(title, payload) {
   const els = readingOrder(payload.shapes)
     .map((s, i) => shapeToHtml(s, i + 1))
     .join('');
+  // 변경화면 캡처 배경(payload.background)이 있으면 컴포넌트 뒤에 깔아, 실제 화면과 겹쳐 비교할 수 있게 한다.
+  const bgStyle = payload.background
+    ? ` style="background-image:url(&quot;${esc(payload.background)}&quot;);background-size:100% 100%"`
+    : '';
   return (
     `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title>` +
     `<style>body{margin:0;font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f5f4f1}` +
@@ -316,7 +320,7 @@ function buildPreviewHtml(title, payload) {
     `.d-cv{position:relative;width:${w}px;height:${h}px;background:#fff;margin:0 auto 16px;` +
     `border:1px solid #ddd;box-shadow:0 1px 4px rgba(0,0,0,.08)}</style></head>` +
     `<body><div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능</div>` +
-    `<div class="d-cv">${els}</div>${INTERACTION_SCRIPT}</body></html>`
+    `<div class="d-cv"${bgStyle}>${els}</div>${INTERACTION_SCRIPT}</body></html>`
   );
 }
 

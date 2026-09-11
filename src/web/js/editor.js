@@ -23,6 +23,7 @@ let clip = null;          // 복사 버퍼 (배열)
 let move = null;
 let rs = null;
 let marq = null;          // 드래그 선택 사각형 상태
+let bgSrc = null;         // 변경화면 캡처 배경 이미지 data URL (트레이싱용, 생성 시 배경으로도 쓰인다)
 let notify = () => {};
 
 const pt = (e) => {
@@ -44,6 +45,11 @@ function setShapeContent(el, s) {
     im.draggable = false;
     if (!im.parentNode) el.prepend(im);
     [...el.childNodes].forEach((n) => { if (n.nodeType === 3) n.remove(); }); // 텍스트 노드 제거
+    return;
+  }
+  if (s.t === 'divider') {
+    // 구분선은 선(CSS ::after)만 보이면 된다 — 글자가 겹쳐 보이지 않게 비워둔다.
+    el.replaceChildren();
     return;
   }
   const cols = String(s.cols || '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -148,7 +154,7 @@ function render() {
     });
     board.appendChild(o);
   });
-  hint.style.display = shapes.length ? 'none' : 'block';
+  hint.style.display = (shapes.length || bgSrc) ? 'none' : 'block';
   bU.disabled = !hist.length;
   bR.disabled = !future.length;
   notify();
@@ -925,15 +931,21 @@ export function addImage({ src, w = 240, h = 160 }) {
 }
 
 /** 변경화면: 소스 연동이 안 되는 화면의 캡처본을 캔버스 배경에 깔아 트레이싱용으로 쓴다.
- * shapes 와 무관한 순수 시각적 참고용 — payload·저장본에 포함되지 않는다. */
+ * shapes 와 무관한 순수 시각적 참고용이지만, "화면 생성" 시엔 payload.background 로 함께
+ * 전달되어 생성 결과에서도 컴포넌트 뒤에 배경으로 표시된다(getBoardBackground 참고). */
 export function setBoardBackground(src) {
+  bgSrc = src;
   board.style.backgroundImage = `url("${src}")`;
   board.style.backgroundSize = '100% 100%';
+  hint.style.display = 'none';
 }
 export function clearBoardBackground() {
+  bgSrc = null;
   board.style.backgroundImage = '';
+  hint.style.display = shapes.length ? 'none' : 'block';
 }
-export const hasBoardBackground = () => !!board.style.backgroundImage;
+export const hasBoardBackground = () => !!bgSrc;
+export const getBoardBackground = () => bgSrc;
 
 export function setShapes(arr) {
   push();
@@ -966,13 +978,13 @@ export function redo() {
 }
 
 export function zoomBy(d) {
-  zm = Math.min(150, Math.max(25, zm + d));
+  zm = Math.min(200, Math.max(25, zm + d));
   board.style.transform = 'scale(' + zm / 100 + ')';
   zv.textContent = zm + '%';
   applyZoomSize();
 }
 
-/** 지금 보이는 캔버스 뷰포트에 맞춰 확대율을 계산한다(5% 단위, 25~150%) — "화면 필드가
+/** 지금 보이는 캔버스 뷰포트에 맞춰 확대율을 계산한다(5% 단위, 25~200%) — "화면 필드가
  * 한눈에 보이는 크기"가 기본값이라는 요구사항. 보드 크기가 바뀔 때(화면 유형·변경화면·비율
  * 전환)와 하단 배율 버튼(리셋) 클릭 시 호출한다. 화면 유형 대부분이 같은 해상도(960×600)를
  * 쓰므로 자연히 같은 배율로 통일되고, 팝업처럼 작은 보드만 더 크게 보인다. */
@@ -980,8 +992,8 @@ export function zoomReset() {
   if (cv && cv.clientWidth && cv.clientHeight) {
     const availW = Math.max(160, cv.clientWidth - 60);
     const availH = Math.max(160, cv.clientHeight - 60);
-    const scale = Math.min(availW / BOARD_W, availH / BOARD_H, 1.5);
-    zm = Math.max(25, Math.min(150, Math.round((scale * 100) / 5) * 5));
+    const scale = Math.min(availW / BOARD_W, availH / BOARD_H, 2);
+    zm = Math.max(25, Math.min(200, Math.round((scale * 100) / 5) * 5));
   } else {
     zm = 100;
   }

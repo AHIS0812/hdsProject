@@ -20,6 +20,10 @@
       }
     },
     "screenName": { "type": "string" },
+    "background": {
+      "type": "string",
+      "description": "변경화면 캡처 이미지 data URL — 생성 결과에서 컴포넌트 뒤 배경으로 표시"
+    },
     "canvas": {
       "type": "object",
       "additionalProperties": false,

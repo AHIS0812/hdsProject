@@ -284,10 +284,10 @@ h4.gap{margin-top:30px;}
 
 /* ── 화면 비율 프리셋(PC/PC·스크롤/모바일) — 하단 툴바 버튼 위로 뜨는 팝오버 ── */
 .ratio-pop{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
-  min-width:190px;background:#fff;border:1px solid var(--line);border-radius:12px;
+  min-width:260px;background:#fff;border:1px solid var(--line);border-radius:12px;
   box-shadow:var(--sh);padding:5px;display:flex;flex-direction:column;gap:1px;}
 .ratio-pop button{display:flex;justify-content:space-between;align-items:center;gap:10px;
-  width:100%;text-align:left;background:none;border:0;font-family:inherit;
+  width:100%;text-align:left;background:none;border:0;font-family:inherit;white-space:nowrap;
   font-size:12.5px;color:var(--ink);padding:8px 10px;border-radius:7px;cursor:pointer;}
 .ratio-pop button span{font-size:10.5px;color:var(--mut);white-space:nowrap;}
 .ratio-pop button:hover,.ratio-pop button:focus-visible{background:var(--or-l);color:var(--or-d);}
