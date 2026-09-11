@@ -15,6 +15,7 @@ let shapes = [];
 let selIds = [];          // 선택된 요소 id 목록 (다중 선택)
 let hist = [];
 let future = [];
+let opSeq = 0;             // push() 호출마다 증가 — "방금 그 다음 호출도 연속된 조작인지" 판별용
 let uid = 1;
 let gid = 1;              // 그룹 id 카운터
 let zm = 100;
@@ -547,6 +548,7 @@ function delSel() {
 }
 
 function push() {
+  opSeq++;
   hist.push(JSON.stringify(shapes));
   future = [];
   if (hist.length > 60) hist.shift();
@@ -706,6 +708,7 @@ export function initEditor(opts = {}) {
     else if (e.key === 'Escape') setSel([]);
     else if (e.key.indexOf('Arrow') === 0 && selIds.length) {
       e.preventDefault();
+      push();
       const ss = selShapes();
       const d = e.shiftKey ? 10 : 1;
       let dx = 0;
@@ -874,31 +877,31 @@ export function getBoardSize() {
   return { w: BOARD_W, h: BOARD_H };
 }
 
-const overlapsAny = (x, y, w, h) =>
-  shapes.some((o) => x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y);
-
-/** 캔버스 정중앙을 기준으로, 이미 요소가 있어 겹치면 대각선으로 조금씩 밀어 자리를 찾는다. */
-function freeCenterSpot(w, h) {
-  const STEP = 18;
-  const baseX = Math.round((BOARD_W - w) / 2);
-  const baseY = Math.round((BOARD_H - h) / 2);
-  for (let k = 0; k < 40; k++) {
-    const x = Math.max(0, Math.min(BOARD_W - w, baseX + STEP * k));
-    const y = Math.max(0, Math.min(BOARD_H - h, baseY + STEP * k));
-    if (!overlapsAny(x, y, w, h)) return { x, y };
-  }
-  return { x: baseX, y: baseY };
-}
+// 신규 컴포넌트를 "연속으로" 추가할 때만 서로 겹치지 않게 조금씩 밀어서 놓는다 — 기존 요소와
+// 겹치는 건 상관없다. 직전 호출도 addComponent 였는지는 push() 의 opSeq 로 판별한다: 그 사이에
+// 다른 조작(이동·삭제 등)이 있었다면 그것도 push() 를 부르므로 연쇄가 자연히 끊긴다.
+const ADD_STEP = 18;
+let addStreakSeq = -1;
+let addStreakSpot = null;
 
 export function addComponent(t) {
   push();
   const [w, h] = DEF[t];
-  const { x, y } = freeCenterSpot(w, h);
+  const baseX = Math.round((BOARD_W - w) / 2);
+  const baseY = Math.round((BOARD_H - h) / 2);
+  let x = baseX;
+  let y = baseY;
+  if (addStreakSeq === opSeq - 1 && addStreakSpot) {
+    x = Math.max(0, Math.min(BOARD_W - w, addStreakSpot.x + ADD_STEP));
+    y = Math.max(0, Math.min(BOARD_H - h, addStreakSpot.y + ADD_STEP));
+  }
   shapes.push({
     id: uid++, t,
     x, y, w, h,
     label: defaultLabel(t), cols: defaultCols(t), req: false,
   });
+  addStreakSeq = opSeq;
+  addStreakSpot = { x, y };
   render();
   setSel([shapes.at(-1).id]);
 }

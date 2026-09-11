@@ -262,6 +262,14 @@ h4.gap{margin-top:30px;}
 .cb.on{background:var(--or);color:#fff;}
 .cb.red:hover{background:#FFF0EC;color:#E5484D;}
 .cdiv{width:1px;height:22px;background:var(--line);margin:0 3px;}
+/* 아이콘만으로는 뜻을 알기 어려워 아이콘+글자 라벨로 보여주는 툴바 버튼 */
+.cb-txt{height:32px;padding:0 9px;border:none;background:#fff;border-radius:8px;cursor:pointer;
+  color:#5A6472;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;
+  font-family:inherit;white-space:nowrap;}
+.cb-txt:hover{background:#F2F4F7;color:var(--ink);}
+.cb-txt.on{background:var(--or);color:#fff;}
+.cb-txt.red{color:#E5484D;}
+.cb-txt.red:hover{background:#FFF0EC;}
 
 .tools{position:absolute;bottom:22px;left:calc(50% + 153px);transform:translateX(-50%);background:var(--nv);
        border-radius:14px;padding:6px;display:flex;gap:3px;box-shadow:0 8px 28px rgba(15,59,124,.36);z-index:22;}
@@ -353,7 +361,6 @@ h4.gap{margin-top:30px;}
 
 /* ── 버튼을 눌러야 뜨는 작은 팝오버 (항목 편집 · 위치) — 고정 툴바 안의 버튼 바로 아래 ── */
 .pop-wrap{position:relative;display:inline-flex;}
-.items-btn{width:auto;padding:0 10px;font-size:12px;font-weight:600;}
 .items-pop{position:absolute;top:calc(100% + 6px);left:0;width:220px;background:#fff;
   border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:8px;z-index:1;}
 .items-list{max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;margin-bottom:7px;}
@@ -369,21 +376,16 @@ h4.gap{margin-top:30px;}
 .items-add{display:flex;gap:5px;}
 .items-add input{flex:1;width:auto;height:30px;font-size:12px;}
 
-.pos-pop{position:absolute;top:calc(100% + 6px);left:0;min-width:130px;background:#fff;
-  border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:5px;z-index:1;
-  display:flex;flex-direction:column;gap:1px;}
-.pos-pop button{display:block;width:100%;text-align:left;background:none;border:0;font-family:inherit;
-  font-size:12.5px;color:var(--ink);padding:8px 10px;border-radius:7px;cursor:pointer;}
-.pos-pop button:hover,.pos-pop button:focus-visible{background:var(--or-l);color:var(--or-d);}
-
-/* ── 정렬 팝오버 — 정렬·분배·맞추기 버튼을 한 곳에 모아 툴바를 단순하게 유지 ── */
-.align-pop{position:absolute;top:calc(100% + 6px);left:0;background:#fff;
-  border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:6px;z-index:1;}
-.align-grid{display:grid;grid-template-columns:repeat(3,32px);gap:1px;}
-.align-grid button{width:32px;height:32px;border:none;background:none;border-radius:8px;
-  cursor:pointer;color:#5A6472;font-size:14px;display:grid;place-items:center;font-family:inherit;}
+/* ── 위치·정렬 팝오버 — 아이콘만으론 뜻을 알기 어려워 아이콘+글자 라벨을 2열로 배치 ── */
+.pos-pop,.align-pop{position:absolute;top:calc(100% + 6px);left:0;min-width:230px;background:#fff;
+  border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:7px;z-index:1;}
+.pop-title{font-size:10.5px;font-weight:700;color:var(--mut);padding:4px 7px 5px;}
+.align-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;}
+.align-grid button{display:flex;align-items:center;gap:7px;width:100%;text-align:left;
+  background:none;border:0;font-family:inherit;font-size:12.5px;color:var(--ink);
+  padding:8px 9px;border-radius:8px;cursor:pointer;}
 .align-grid button:hover,.align-grid button:focus-visible{background:var(--or-l);color:var(--or-d);}
-.align-sep{height:1px;background:var(--line);margin:5px 2px;}
+.align-sep{height:1px;background:var(--line);margin:6px 2px;}
 
 /* ── 온보딩 코치 카드 ─────────────────────────────────── */
 .coach{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);z-index:20;
