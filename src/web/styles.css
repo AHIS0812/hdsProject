@@ -284,13 +284,14 @@ h4.gap{margin-top:30px;}
   -webkit-appearance:none;margin:0;}
 .fs-ctl input:focus{outline:none;background:var(--or-l);}
 
-.tools{position:absolute;bottom:22px;left:calc(50% + 153px);transform:translateX(-50%);background:var(--nv);
-       border-radius:14px;padding:6px;display:flex;gap:3px;box-shadow:0 8px 28px rgba(15,59,124,.36);z-index:22;}
-.tools button{min-width:38px;height:38px;border:none;background:transparent;color:#B9CBE6;border-radius:10px;
+/* 캔버스 위에 뜨는 툴바라 컴포넌트 색(남색 버튼·제목 등)과 안 겹치도록 중립 톤(--ink)을 쓴다 */
+.tools{position:absolute;bottom:22px;left:calc(50% + 153px);transform:translateX(-50%);background:var(--ink);
+       border-radius:14px;padding:6px;display:flex;gap:3px;box-shadow:0 8px 28px rgba(20,26,34,.4);z-index:22;}
+.tools button{min-width:38px;height:38px;border:none;background:transparent;color:#AEB7C4;border-radius:10px;
               cursor:pointer;font-size:15px;display:grid;place-items:center;font-family:inherit;padding:0 8px;}
 .tools button:hover:not(:disabled){background:rgba(255,255,255,.14);color:#fff;}
 .tools button:disabled{opacity:.32;cursor:default;}
-.tools .zz{font-size:12px;font-weight:700;color:#DCE6F3;}
+.tools .zz{font-size:12px;font-weight:700;color:#D9DEE6;}
 .tools .dv{width:1px;background:rgba(255,255,255,.18);margin:6px 4px;}
 .tools .pop-wrap{display:inline-flex;}
 .tools #btnRatio{font-size:12px;font-weight:700;padding:0 10px;min-width:auto;}
@@ -388,6 +389,32 @@ h4.gap{margin-top:30px;}
 .item-btn.del:hover{background:#FFF0EC;color:#E5484D;}
 .items-add{display:flex;gap:5px;}
 .items-add input{flex:1;width:auto;height:30px;font-size:12px;}
+
+/* ── 설명 팝오버 — 모든 타입 공통. 버튼 타입일 때만 아래에 "연결된 요소" 영역이 붙는다 ── */
+.desc-pop{position:absolute;top:calc(100% + 6px);left:0;width:250px;background:#fff;
+  border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:9px;z-index:1;}
+.desc-pop textarea{width:100%;resize:vertical;min-height:56px;border:1px solid var(--line);
+  border-radius:8px;padding:7px 9px;font-family:inherit;font-size:12.5px;color:var(--ink);outline:none;}
+.desc-pop textarea:focus{border-color:var(--or);}
+.desc-hint{font-size:10.5px;color:var(--mut);line-height:1.4;padding:6px 2px 0;}
+.desc-link{margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);}
+.pop-title .opt{font-weight:400;color:var(--mut);}
+.desc-link-btn{display:flex;align-items:center;gap:6px;width:100%;text-align:left;
+  background:none;border:1px dashed var(--line);border-radius:8px;font-family:inherit;
+  font-size:12px;color:var(--sub);padding:7px 9px;cursor:pointer;}
+.desc-link-btn:hover{background:var(--or-l);color:var(--or-d);border-color:var(--or);}
+.desc-link-btn.on{background:var(--or-l);color:var(--or-d);border-color:var(--or);border-style:solid;}
+.desc-link-cur{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  background:var(--or-l);border-radius:8px;padding:6px 6px 6px 10px;margin-top:5px;}
+.desc-link-cur.hidden{display:none;}
+.desc-link-cur span{font-size:12px;color:var(--or-d);font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;}
+.desc-link-cur button{flex:0 0 auto;width:22px;height:22px;border:none;background:none;
+  color:var(--or-d);border-radius:6px;cursor:pointer;font-size:11px;display:grid;place-items:center;}
+.desc-link-cur button:hover{background:rgba(222,110,16,.16);}
+
+/* ── 캔버스 위 연결 화살표(버튼 → 연결한 요소) — 클릭이 요소에 닿도록 포인터 이벤트는 끈다 ── */
+.link-layer{position:absolute;top:0;left:0;pointer-events:none;z-index:50;overflow:visible;}
 
 /* ── 위치·정렬 팝오버 — 아이콘만으론 뜻을 알기 어려워 아이콘+글자 라벨을 2열로 배치 ── */
 .pos-pop,.align-pop{position:absolute;top:calc(100% + 6px);left:0;min-width:230px;background:#fff;

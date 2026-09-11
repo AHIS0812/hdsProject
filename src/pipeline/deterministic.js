@@ -175,8 +175,14 @@ const reqStar = (shape) => (shape.required
   ? '<span style="position:absolute;left:3px;top:50%;transform:translateY(-50%);' +
     'color:#c00000;font-weight:800;font-size:10px;line-height:1;pointer-events:none;z-index:1">＊</span>'
   : '');
+/** 버튼은 자기만의 클릭·설명 처리(hs-btn)가 있으니 중복으로 달지 않는다 — 그 외 타입만
+ * desc 가 있으면 클릭 시 같은 안내 문구 말풍선이 뜨도록 표시해 둔다(annotate). */
+const noteAttr = (shape) => {
+  const d = shape.type !== 'button' && shape.desc && String(shape.desc).trim();
+  return d ? ` class="hs-note" data-note="${esc(shape.desc)}"` : '';
+};
 const wrapAbs = (shape, inner, extra = '') =>
-  `<div style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
+  `<div${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
   `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;gap:3px;${extra}">${inner}</div>`;
 
 /** 필수 입력은 실제 화면처럼 옅은 크림색 배경으로 강조한다(별표 하나만으로는 눈에 잘 안 띔). */
@@ -267,12 +273,13 @@ function shapeToHtml(shape, n) {
   const extra = STATIC_STYLE[t] || 'border:1px solid #c6c4bf;background:#fff;justify-content:center';
   // 실제 화면의 섹션 제목("▸ 주소" 처럼)을 흉내낸다 — title/area 만 화살표 프리픽스를 단다.
   const prefix = t === 'title' || t === 'area' ? '▸ ' : '';
-  return `<div style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
+  return `<div${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
     `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;font-size:11px;color:#333;` +
     `padding:4px 6px;overflow:hidden;white-space:nowrap;${extra}">${esc(prefix + (shape.label || t))}</div>`;
 }
 
-/** 버튼 클릭(설명 문구)·탭 전환을 처리하는 공통 스크립트. data-note 는 이미 HTML-escape 되어 있어 textContent 로만 다룬다. */
+/** 버튼·주석(hs-note) 클릭 시 설명 문구·탭 전환을 처리하는 공통 스크립트. data-note 는 이미
+ * HTML-escape 되어 있어 textContent 로만 다룬다. */
 const INTERACTION_SCRIPT = `
 <script>
 document.addEventListener('click', function (e) {
@@ -285,26 +292,27 @@ document.addEventListener('click', function (e) {
     tab.classList.add('on'); tab.style.background = '#0F3B7C'; tab.style.color = '#fff';
     return;
   }
-  var btn = e.target.closest('.hs-btn');
-  if (btn) {
-    var msg = btn.dataset.note || '실제 동작은 없는 미리보기 버튼입니다.';
-    var bubble = document.getElementById('hsBubble');
-    if (!bubble) {
-      bubble = document.createElement('div');
-      bubble.id = 'hsBubble';
-      bubble.style.cssText = 'position:fixed;z-index:999;max-width:260px;padding:8px 12px;border-radius:8px;' +
-        'background:#141A22;color:#fff;font-size:12px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.28);' +
-        'pointer-events:none;opacity:0;transition:opacity .15s';
-      document.body.appendChild(bubble);
-    }
-    var r = btn.getBoundingClientRect();
-    bubble.textContent = msg;
-    bubble.style.left = Math.max(6, Math.min(window.innerWidth - 268, r.left)) + 'px';
-    bubble.style.top = Math.max(6, r.top - 44) + 'px';
-    bubble.style.opacity = '1';
-    clearTimeout(bubble._t);
-    bubble._t = setTimeout(function () { bubble.style.opacity = '0'; }, 2400);
+  var noted = e.target.closest('.hs-btn, .hs-note');
+  if (!noted) return;
+  var isBtn = noted.classList.contains('hs-btn');
+  var msg = noted.dataset.note || (isBtn ? '실제 동작은 없는 미리보기 버튼입니다.' : '');
+  if (!msg) return;
+  var bubble = document.getElementById('hsBubble');
+  if (!bubble) {
+    bubble = document.createElement('div');
+    bubble.id = 'hsBubble';
+    bubble.style.cssText = 'position:fixed;z-index:999;max-width:260px;padding:8px 12px;border-radius:8px;' +
+      'background:#141A22;color:#fff;font-size:12px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.28);' +
+      'pointer-events:none;opacity:0;transition:opacity .15s';
+    document.body.appendChild(bubble);
   }
+  var r = noted.getBoundingClientRect();
+  bubble.textContent = msg;
+  bubble.style.left = Math.max(6, Math.min(window.innerWidth - 268, r.left)) + 'px';
+  bubble.style.top = Math.max(6, r.top - 44) + 'px';
+  bubble.style.opacity = '1';
+  clearTimeout(bubble._t);
+  bubble._t = setTimeout(function () { bubble.style.opacity = '0'; }, 2400);
 });
 </script>`;
 
@@ -322,7 +330,8 @@ function buildPreviewHtml(title, payload) {
     `<style>body{margin:0;font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f5f4f1}` +
     `.d-note{font-size:11px;color:#8a8a8a;text-align:center;padding:7px}` +
     `.d-cv{position:relative;width:${w}px;height:${h}px;background:#fff;margin:0 auto 16px;` +
-    `border:1px solid #ddd;box-shadow:0 1px 4px rgba(0,0,0,.08)}</style></head>` +
+    `border:1px solid #ddd;box-shadow:0 1px 4px rgba(0,0,0,.08)}` +
+    `.hs-note{cursor:pointer}</style></head>` +
     `<body><div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능</div>` +
     `<div class="d-cv"${bgStyle}>${els}</div>${INTERACTION_SCRIPT}</body></html>`
   );

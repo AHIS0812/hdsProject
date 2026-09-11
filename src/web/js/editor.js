@@ -4,11 +4,13 @@
 
 import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, HAS_TEXT, HAS_REQ, defaultLabel, defaultCols } from './constants.js';
 
-let board, boardWrap, ctx, hint, ctxT, fL, fD, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl, cmenu, bGroup, bUngroup;
+let board, boardWrap, ctx, hint, ctxT, fL, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl, cmenu, bGroup, bUngroup;
 let bItems, itemsPop, itemsList, itemsInput, itemsAddBtn;
 let bPos, posPop;
 let bAlign, alignPop;
 let fS, fsUp, fsDown, fsWrap;
+let bDesc, descPop, descInput, descLinkWrap, descLinkPick, descLinkCur, descLinkName, descLinkClear;
+let linkLayer;
 const DEFAULT_FS = 11; // 글자 크기를 따로 지정하지 않은 요소의 기본값(px) — 조절 칸에 보여줄 값
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
 let BOARD_W = DEFAULT_BOARD.w;
@@ -26,6 +28,7 @@ let move = null;
 let rs = null;
 let marq = null;          // 드래그 선택 사각형 상태
 let bgSrc = null;         // 변경화면 캡처 배경 이미지 data URL (트레이싱용, 생성 시 배경으로도 쓰인다)
+let pickingLinkFor = null; // 연결할 요소를 고르는 중이면 그 출발 shape id (버튼 → 연결 대상)
 let notify = () => {};
 
 const pt = (e) => {
@@ -116,6 +119,18 @@ function render() {
     setShapeContent(d, s);
     d.onmousedown = (ev) => {
       ev.stopPropagation();
+      // "연결할 요소 선택" 모드에서는 클릭이 평소처럼 선택·이동이 아니라 연결 대상 지정으로 쓰인다.
+      if (pickingLinkFor != null) {
+        if (s.id !== pickingLinkFor) {
+          push();
+          const src = find(pickingLinkFor);
+          if (src) src.link = s.id;
+          notify();
+        }
+        cancelPickLink();
+        render();
+        return;
+      }
       if (ev.target.classList.contains('hh')) {
         push();
         const p = pt(ev);
@@ -158,6 +173,7 @@ function render() {
     });
     board.appendChild(o);
   });
+  renderLinks();
   hint.style.display = (shapes.length || bgSrc) ? 'none' : 'block';
   bU.disabled = !hist.length;
   bR.disabled = !future.length;
@@ -167,6 +183,48 @@ function render() {
 function quick(s) {
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) Object.assign(el.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
+  renderLinks(); // 드래그 중에도 화살표가 따라오도록
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** 도형 경계 위, (tx,ty) 방향을 향한 지점을 계산한다 — 화살표가 중심이 아니라 박스 가장자리에서 시작·끝나게 한다. */
+function edgePoint(s, tx, ty) {
+  const cx = s.x + s.w / 2;
+  const cy = s.y + s.h / 2;
+  const dx = tx - cx;
+  const dy = ty - cy;
+  if (!dx && !dy) return { x: cx, y: cy };
+  const hw = s.w / 2;
+  const hh = s.h / 2;
+  const scale = Math.min(dx ? Math.abs(hw / dx) : Infinity, dy ? Math.abs(hh / dy) : Infinity);
+  return { x: cx + dx * scale, y: cy + dy * scale };
+}
+
+/** 버튼 → 연결한 요소로 이어지는 화살표를 그린다. 기본은 화살표가 없고(link 미지정),
+ * 사용자가 "연결할 요소 선택"으로 지정했을 때만 나타난다. */
+function renderLinks() {
+  if (!linkLayer) return;
+  linkLayer.setAttribute('width', BOARD_W);
+  linkLayer.setAttribute('height', BOARD_H);
+  linkLayer.querySelectorAll('line').forEach((el) => el.remove());
+  shapes.forEach((s) => {
+    if (s.link == null) return;
+    const t = find(s.link);
+    if (!t) return;
+    const c1 = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+    const c2 = { x: t.x + t.w / 2, y: t.y + t.h / 2 };
+    const p1 = edgePoint(s, c2.x, c2.y);
+    const p2 = edgePoint(t, c1.x, c1.y);
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+    line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+    line.setAttribute('stroke', '#F5821F');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-dasharray', '5 4');
+    line.setAttribute('marker-end', 'url(#linkArrow)');
+    linkLayer.appendChild(line);
+  });
 }
 
 function paintSel() {
@@ -204,6 +262,7 @@ function line(dir, p) {
 
 // ── 선택 ─────────────────────────────────────────────────
 function setSel(ids) {
+  cancelPickLink(); // 다른 경로(단축키 등)로 선택이 바뀌면 "대상 선택" 모드는 의미가 없어진다
   selIds = withGroups([...new Set(ids)].filter((id) => find(id)));
   render();
   syncCtx();
@@ -219,6 +278,7 @@ function syncCtx() {
   closeItemsPop(false);
   closePosPop(false);
   closeAlignPop(false);
+  closeDescPop(false);
   const n = selIds.length;
   ctx.classList.toggle('on', n > 0);
   ctxSingle.hidden = n !== 1;
@@ -234,8 +294,7 @@ function syncCtx() {
     fsWrap.classList.toggle('hidden', !showText);
     fL.value = s.label;
     fS.value = s.fs || DEFAULT_FS;
-    fD.value = s.desc || '';
-    fD.classList.toggle('hidden', s.t !== 'button');
+    descInput.value = s.desc || '';
     bItems.classList.toggle('hidden', !HAS_ITEMS[s.t]);
     bReq.classList.toggle('hidden', !HAS_REQ[s.t]);
     bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
@@ -266,7 +325,7 @@ function applyDesc() {
   if (selIds.length !== 1) return;
   const s = find(selIds[0]);
   if (!s) return;
-  s.desc = fD.value;
+  s.desc = descInput.value;
   notify();
 }
 
@@ -370,6 +429,61 @@ function closeAlignPop(refocus) {
   if (alignPop.hidden) return;
   setAlignPop(false);
   if (refocus) bAlign.focus();
+}
+
+function setDescPop(open) {
+  descPop.hidden = !open;
+  bDesc.setAttribute('aria-expanded', String(open));
+  if (open) { updateDescLinkUI(); descInput.focus(); }
+  else cancelPickLink();
+}
+function toggleDescPop() { setDescPop(descPop.hidden); }
+function closeDescPop(refocus) {
+  if (descPop.hidden) return;
+  setDescPop(false);
+  if (refocus) bDesc.focus();
+}
+
+/** "연결된 요소" 표시를 최신 상태로 갱신 — 팝오버를 열 때, 연결을 걸거나 끊을 때 호출한다. */
+function updateDescLinkUI() {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  // 버튼 타입에서만 "다른 요소로 연결" 이 의미 있다(예: 조회 버튼 → 결과 그리드).
+  descLinkWrap.hidden = s.t !== 'button';
+  const target = s.link != null ? find(s.link) : null;
+  descLinkCur.classList.toggle('hidden', !target);
+  if (target) descLinkName.textContent = `${NAME[target.t]} · ${target.label || NAME[target.t]}`;
+  const picking = pickingLinkFor === s.id;
+  descLinkPick.textContent = picking ? '요소를 클릭하세요… (Esc 취소)' : '🎯 클릭해서 연결할 요소 선택';
+  descLinkPick.classList.toggle('on', picking);
+}
+
+/** "대상 선택" 모드를 켜고 끈다 — 켜져 있는 동안 캔버스 클릭은 선택 대신 연결 대상 지정으로 쓰인다. */
+function togglePickLink() {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s || s.t !== 'button') return;
+  if (pickingLinkFor === s.id) { cancelPickLink(); return; }
+  pickingLinkFor = s.id;
+  board.style.cursor = 'crosshair';
+  updateDescLinkUI();
+}
+function cancelPickLink() {
+  if (pickingLinkFor == null) return;
+  pickingLinkFor = null;
+  board.style.cursor = '';
+  updateDescLinkUI();
+}
+function clearLink() {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s || s.link == null) return;
+  push();
+  s.link = null;
+  render();
+  notify();
+  updateDescLinkUI();
 }
 
 /** 선택 요소(들)를 한 단계만 앞/뒤로 옮긴다 (dir: +1 앞으로, -1 뒤로). 여러 개 선택 시
@@ -586,6 +700,7 @@ function delSel() {
   if (!selIds.length) return;
   push();
   shapes = shapes.filter((s) => !isSel(s.id));
+  shapes.forEach((s) => { if (s.link != null && !find(s.link)) s.link = null; }); // 연결 대상이 지워졌으면 화살표도 정리
   setSel([]);
 }
 
@@ -608,6 +723,9 @@ function normalize(arr) {
     src: s.src ?? null,
     desc: s.desc ?? '',
     fs: s.fs ?? s.fontSize ?? null,
+    // linkTo 는 payload 상의 's'+순번 형식 — normalize 는 항상 배열 순서대로 1부터 다시 번호를
+    // 매기므로(toPayloadShapes 도 같은 순서로 내보낸다), 접두사만 떼면 내부 id 와 그대로 대응한다.
+    link: s.link ?? (s.linkTo ? parseInt(String(s.linkTo).replace(/^s/, ''), 10) || null : null),
   }));
 }
 
@@ -624,7 +742,15 @@ export function initEditor(opts = {}) {
   fsUp = document.getElementById('fsUp');
   fsDown = document.getElementById('fsDown');
   fsWrap = document.getElementById('fsWrap');
-  fD = document.getElementById('fD');
+  bDesc = document.getElementById('bDesc');
+  descPop = document.getElementById('descPop');
+  descInput = document.getElementById('descInput');
+  descLinkWrap = document.getElementById('descLinkWrap');
+  descLinkPick = document.getElementById('descLinkPick');
+  descLinkCur = document.getElementById('descLinkCur');
+  descLinkName = document.getElementById('descLinkName');
+  descLinkClear = document.getElementById('descLinkClear');
+  linkLayer = document.getElementById('linkLayer');
   bItems = document.getElementById('bItems');
   itemsPop = document.getElementById('itemsPop');
   itemsList = document.getElementById('itemsList');
@@ -662,6 +788,7 @@ export function initEditor(opts = {}) {
 
   board.addEventListener('mousedown', (e) => {
     if (e.target !== board && e.target.id !== 'hint' && e.target !== marqEl) return;
+    if (pickingLinkFor != null) { cancelPickLink(); return; }
     if (!e.shiftKey) setSel([]);
     const p = pt(e);
     marq = { x0: p.x, y0: p.y, add: e.shiftKey, base: [...selIds] };
@@ -738,9 +865,11 @@ export function initEditor(opts = {}) {
 
   document.addEventListener('keydown', (e) => {
     if (!cmenu.hidden && e.key === 'Escape') { e.preventDefault(); hideMenu(); board.focus(); return; }
+    if (pickingLinkFor != null && e.key === 'Escape') { e.preventDefault(); cancelPickLink(); return; }
     if (!itemsPop.hidden && e.key === 'Escape') { e.preventDefault(); closeItemsPop(true); return; }
     if (!posPop.hidden && e.key === 'Escape') { e.preventDefault(); closePosPop(true); return; }
     if (!alignPop.hidden && e.key === 'Escape') { e.preventDefault(); closeAlignPop(true); return; }
+    if (!descPop.hidden && e.key === 'Escape') { e.preventDefault(); closeDescPop(true); return; }
     if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     const c = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
@@ -780,7 +909,10 @@ export function initEditor(opts = {}) {
   fS.addEventListener('input', applyFontSize);
   fsUp.addEventListener('click', () => stepFontSize(1));
   fsDown.addEventListener('click', () => stepFontSize(-1));
-  fD.addEventListener('input', applyDesc);
+  descInput.addEventListener('input', applyDesc);
+  bDesc.addEventListener('click', toggleDescPop);
+  descLinkPick.addEventListener('click', togglePickLink);
+  descLinkClear.addEventListener('click', clearLink);
   bItems.addEventListener('click', toggleItemsPop);
   itemsAddBtn.addEventListener('click', addItemFromInput);
   itemsInput.addEventListener('keydown', (e) => {
@@ -792,6 +924,7 @@ export function initEditor(opts = {}) {
     if (!itemsPop.hidden && !itemsPop.contains(e.target) && !bItems.contains(e.target)) closeItemsPop(false);
     if (!posPop.hidden && !posPop.contains(e.target) && !bPos.contains(e.target)) closePosPop(false);
     if (!alignPop.hidden && !alignPop.contains(e.target) && !bAlign.contains(e.target)) closeAlignPop(false);
+    if (!descPop.hidden && !descPop.contains(e.target) && !bDesc.contains(e.target)) closeDescPop(false);
   });
   const ALIGN = {
     alignL: 'left', alignC: 'hcenter', alignR: 'right',
@@ -1062,5 +1195,6 @@ export function toPayloadShapes() {
     src: s.src || undefined,
     desc: s.desc || undefined,
     fontSize: s.fs || undefined,
+    linkTo: s.link != null ? 's' + s.link : undefined,
   }));
 }
