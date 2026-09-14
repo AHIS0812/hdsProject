@@ -358,7 +358,7 @@ document.addEventListener('click', function (e) {
     bubble = document.createElement('div');
     bubble.id = 'hsBubble';
     bubble.style.cssText = 'position:fixed;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
-      'background:#141A22;color:#fff;font-size:12.5px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.28);' +
+      'background:#F5821F;color:#fff;font-size:12.5px;line-height:1.45;box-shadow:0 6px 20px rgba(245,130,31,.4);' +
       'pointer-events:none;opacity:0;transition:opacity .15s';
     document.body.appendChild(bubble);
   }
@@ -405,7 +405,7 @@ function buildPreviewHtml(title, payload) {
     `outline:2px solid #E5484D;outline-offset:2px;box-shadow:0 0 0 5px rgba(229,72,77,.18)}` +
     // 말풍선 꼬리 — 클릭한 요소 쪽을 가리키도록 위치는 JS 에서 --tail-x 로 맞춘다.
     `#hsBubble::after{content:"";position:absolute;left:var(--tail-x,20px);bottom:-6px;width:0;height:0;` +
-    `border-width:6px 6px 0 6px;border-style:solid;border-color:#141A22 transparent transparent transparent}` +
+    `border-width:6px 6px 0 6px;border-style:solid;border-color:#F5821F transparent transparent transparent}` +
     `</style></head>` +
     `<body>${toggleHtml}<div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
     ` · 설명·연결 있는 요소는 클릭하면 표시</div>` +
