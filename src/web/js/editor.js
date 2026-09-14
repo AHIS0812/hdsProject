@@ -142,7 +142,7 @@ function render() {
         rs = { id: s.id, d: ev.target.dataset.d, ox: s.x, oy: s.y, ow: s.w, oh: s.h, px: p.x, py: p.y };
         return;
       }
-      if (ev.shiftKey) { toggleSel(s.id); return; }
+      if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { toggleSel(s.id); return; }
       if (!isSel(s.id)) setSel([s.id]);
       push();
       const p = pt(ev);
@@ -824,9 +824,10 @@ export function initEditor(opts = {}) {
   board.addEventListener('mousedown', (e) => {
     if (e.target !== board && e.target.id !== 'hint' && e.target !== marqEl) return;
     if (pickingLinkFor != null) { cancelPickLink(); return; }
-    if (!e.shiftKey) setSel([]);
+    const addKey = e.shiftKey || e.ctrlKey || e.metaKey;
+    if (!addKey) setSel([]);
     const p = pt(e);
-    marq = { x0: p.x, y0: p.y, add: e.shiftKey, base: [...selIds] };
+    marq = { x0: p.x, y0: p.y, add: addKey, base: [...selIds] };
   });
 
   document.addEventListener('mousemove', (e) => {
@@ -838,8 +839,10 @@ export function initEditor(opts = {}) {
       const h = Math.abs(p.y - marq.y0);
       Object.assign(marqEl.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
       marqEl.hidden = false;
+      // 드래그 범위 안에 완전히 들어온 요소만 선택한다(일부만 걸치면 선택 안 됨) — PPT·Canva 등과
+      // 같은 방식. 예전엔 살짝만 겹쳐도 선택돼 의도치 않게 묶이는 경우가 많았다.
       const hits = shapes
-        .filter((s) => s.x < x + w && s.x + s.w > x && s.y < y + h && s.y + s.h > y)
+        .filter((s) => s.x >= x && s.y >= y && s.x + s.w <= x + w && s.y + s.h <= y + h)
         .map((s) => s.id);
       selIds = marq.add ? [...new Set([...marq.base, ...hits])] : hits;
       paintSel();

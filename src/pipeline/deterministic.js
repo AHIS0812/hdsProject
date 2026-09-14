@@ -165,7 +165,7 @@ const STATIC_STYLE = {
     'color:#1a2942;font-size:11.5px;font-weight:700',
   divider: 'border:none;background:none;border-top:1px solid #d3d8e0;border-radius:0',
   image: 'border:1px dashed #b9b7b2;background:#fafaf8;color:#9a9a9a;font-size:10px',
-  pager: 'border:none;background:none;color:#9a9a9a;justify-content:flex-end',
+  pager: 'border:none;background:none;color:#9a9a9a;justify-content:center',
 };
 
 // 필수 표시(＊)는 입력 폭을 갉아먹지 않도록 별도 flex 자식이 아니라 컨트롤 위에 얹는 절대배치

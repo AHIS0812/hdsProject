@@ -163,7 +163,11 @@ h4.gap{margin-top:30px;}
 .sh{position:absolute;border:1px solid #A8B1BF;border-radius:3px;background:#fff;
     display:flex;align-items:center;justify-content:center;font-size:10px;color:#5A6472;
     cursor:move;user-select:none;overflow:hidden;padding:0 5px;white-space:nowrap;}
-.sh.sel{border-color:var(--or);border-width:1.5px;}
+/* 타입별 [data-t=X] 규칙들과 명시도가 같아서(둘 다 클래스+속성 1개) 소스 순서상 뒤에 오는 쪽이
+   이기다 보니 title·button·check 등 몇몇 타입은 선택해도 주황 테두리가 안 보였다(border:none 이
+   style 까지 지워버림) — 속성 선택자를 하나 더 붙여 명시도를 확실히 높이고, style/color/width
+   셋 다 명시해서 타입별로 border-style 을 none·dashed 등으로 바꿔둔 규칙을 확실히 이긴다. */
+.sh.sel, .sh.sel[data-t]{border-style:solid;border-color:var(--or);border-width:1.5px;}
 .sh[data-t=area]{border-style:dashed;border-color:#BFC7D3;background:#FAFBFD;
                  align-items:flex-start;justify-content:flex-start;padding:3px 6px;color:#AEB7C4;font-size:9.5px;}
 .sh[data-t=button]{background:var(--nv);border-color:var(--nv);color:#fff;font-weight:700;}
@@ -207,7 +211,7 @@ h4.gap{margin-top:30px;}
 .sh[data-t=image] img{width:100%;height:100%;object-fit:contain;pointer-events:none;display:block;}
 .sh[data-t=image]:has(img){border-style:solid;border-color:#C7CFDA;background:#fff;}
 .sketchscale .sh[data-t=image] img,.d-cv img{pointer-events:none;}
-.sh[data-t=pager]{border:none;background:none;justify-content:flex-end;color:#8E98A6;font-size:10px;letter-spacing:2px;}
+.sh[data-t=pager]{border:none;background:none;justify-content:center;color:#8E98A6;font-size:10px;letter-spacing:2px;}
 .sh[data-t=pager]::after{content:"‹ 1 2 3 ›";}
 .sh[data-t=divider]{border:none;background:none;padding:0;overflow:visible;}
 .sh[data-t=divider]::after{content:"";position:absolute;left:0;right:0;top:50%;height:1.5px;background:#C7CFDA;}
