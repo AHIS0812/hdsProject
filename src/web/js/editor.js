@@ -239,25 +239,65 @@ function paintSel() {
   board.querySelectorAll('.sh').forEach((el) => el.classList.toggle('sel', isSel(+el.dataset.id)));
 }
 
+/** 이동 중 스냅 가이드 — 다른 요소와의 정렬(좌/가운데/우, 위/가운데/아래, 서로 맞닿는 변 포함)이
+ * 캔버스 중앙 격자보다 우선한다. 여러 후보가 동시에 허용 오차 안에 들어오면 "가장 가까운 것"을
+ * 골라 붙인다(예전엔 배열에서 먼저 나온 후보로 붙어서, 캔버스 중앙이 늘 이겨버리는 경우가 많았다).
+ * 캔버스 중앙은 후보 목록 맨 뒤에 둬서, 거리가 완전히 같을 때만(동률) 다른 요소 정렬에 밀린다. */
 function guides(s) {
   board.querySelectorAll('.gd').forEach((e) => e.remove());
   const others = shapes.filter((o) => o.id !== s.id);
-  const vT = [BOARD_W / 2];
-  const hT = [BOARD_H / 2];
+  const vT = [];
+  const hT = [];
   others.forEach((o) => {
     vT.push(o.x, o.x + o.w / 2, o.x + o.w);
     hT.push(o.y, o.y + o.h / 2, o.y + o.h);
   });
-  let bx = null;
-  let by = null;
-  [[s.x, 0], [s.x + s.w / 2, s.w / 2], [s.x + s.w, s.w]].forEach(([v, off]) =>
-    vT.forEach((t) => { if (bx === null && Math.abs(v - t) <= SNAP) bx = { t, off }; }),
-  );
-  [[s.y, 0], [s.y + s.h / 2, s.h / 2], [s.y + s.h, s.h]].forEach(([v, off]) =>
-    hT.forEach((t) => { if (by === null && Math.abs(v - t) <= SNAP) by = { t, off }; }),
-  );
+  vT.push(BOARD_W / 2);
+  hT.push(BOARD_H / 2);
+  const nearest = (candidates, targets) => {
+    let best = null;
+    candidates.forEach(([v, off]) => {
+      targets.forEach((t) => {
+        const d = Math.abs(v - t);
+        if (d <= SNAP && (!best || d < best.d)) best = { t, off, d };
+      });
+    });
+    return best;
+  };
+  const bx = nearest([[s.x, 0], [s.x + s.w / 2, s.w / 2], [s.x + s.w, s.w]], vT);
+  const by = nearest([[s.y, 0], [s.y + s.h / 2, s.h / 2], [s.y + s.h, s.h]], hT);
   if (bx) { s.x = Math.round(bx.t - bx.off); line('v', bx.t); }
   if (by) { s.y = Math.round(by.t - by.off); line('h', by.t); }
+}
+
+/** 리사이즈 중 폭·높이가 다른 요소와 비슷해지면 정확히 같은 크기로 붙는다(옆에 있는 요소와
+ * 높이 맞추기 등) — 위치 정렬만으론 "같은 크기로 나란히" 배치가 잘 안 맞는다는 요청으로 추가.
+ * dir 은 리사이즈 핸들 방향('n'/'s'/'e'/'w' 조합), rs 는 리사이즈 시작 시점 상태(고정된 반대쪽
+ * 가장자리를 계산하는 데 쓴다). */
+function snapSize(s, dir, rs) {
+  const others = shapes.filter((o) => o.id !== s.id);
+  if (dir.includes('e') || dir.includes('w')) {
+    let best = null;
+    others.forEach((o) => {
+      const d = Math.abs(s.w - o.w);
+      if (d <= SNAP && (!best || d < best.d)) best = { w: o.w, d };
+    });
+    if (best) {
+      s.w = best.w;
+      if (dir.includes('w')) s.x = rs.ox + rs.ow - best.w; // 오른쪽 가장자리는 그대로 고정
+    }
+  }
+  if (dir.includes('s') || dir.includes('n')) {
+    let best = null;
+    others.forEach((o) => {
+      const d = Math.abs(s.h - o.h);
+      if (d <= SNAP && (!best || d < best.d)) best = { h: o.h, d };
+    });
+    if (best) {
+      s.h = best.h;
+      if (dir.includes('n')) s.y = rs.oy + rs.oh - best.h; // 아래쪽 가장자리는 그대로 고정
+    }
+  }
 }
 
 function line(dir, p) {
@@ -882,6 +922,7 @@ export function initEditor(opts = {}) {
       if (d.includes('s')) s.h = Math.max(20, Math.round(rs.oh + dy));
       if (d.includes('w')) { const w = Math.max(24, Math.round(rs.ow - dx)); s.x = rs.ox + rs.ow - w; s.w = w; }
       if (d.includes('n')) { const h = Math.max(20, Math.round(rs.oh - dy)); s.y = rs.oy + rs.oh - h; s.h = h; }
+      snapSize(s, d, rs);
       guides(s); quick(s);
     }
   });
