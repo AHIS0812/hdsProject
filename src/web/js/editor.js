@@ -9,7 +9,7 @@ let bItems, itemsPop, itemsList, itemsInput, itemsAddBtn;
 let bPos, posPop;
 let bAlign, alignPop;
 let fS, fsUp, fsDown, fsWrap;
-let bDesc, descPop, descInput, descLinkWrap, descLinkPick, descLinkCur, descLinkName, descLinkClear;
+let bDesc, descPop, descInput, descLinkWrap, descLinkPick, descLinkList;
 let linkLayer;
 const DEFAULT_FS = 11; // 글자 크기를 따로 지정하지 않은 요소의 기본값(px) — 조절 칸에 보여줄 값
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
@@ -120,14 +120,19 @@ function render() {
     d.onmousedown = (ev) => {
       ev.stopPropagation();
       // "연결할 요소 선택" 모드에서는 클릭이 평소처럼 선택·이동이 아니라 연결 대상 지정으로 쓰인다.
+      // 대상을 하나 고른 뒤에도 모드가 유지되어 연속으로 여러 개를 추가·해제할 수 있다(자기 자신을
+      // 다시 클릭하면 모드 종료). 이미 연결된 대상을 다시 클릭하면 연결이 풀린다(토글).
       if (pickingLinkFor != null) {
-        if (s.id !== pickingLinkFor) {
-          push();
-          const src = find(pickingLinkFor);
-          if (src) src.link = s.id;
+        if (s.id === pickingLinkFor) { cancelPickLink(); return; }
+        push();
+        const src = find(pickingLinkFor);
+        if (src) {
+          src.links = src.links || [];
+          const idx = src.links.indexOf(s.id);
+          if (idx === -1) src.links.push(s.id); else src.links.splice(idx, 1);
           notify();
         }
-        cancelPickLink();
+        updateDescLinkUI();
         render();
         return;
       }
@@ -201,9 +206,9 @@ function edgePoint(s, tx, ty) {
   return { x: cx + dx * scale, y: cy + dy * scale };
 }
 
-/** 버튼 → 연결한 요소로 이어지는 화살표를 그린다. 기본은 화살표가 없고(link 미지정),
+/** 어떤 요소든 연결한 요소(들)로 이어지는 화살표를 그린다. 기본은 화살표가 없고(links 미지정),
  * 그것도 상시로 보이는 게 아니라 "설명" 팝오버를 열어 그 요소를 확인하는 동안만 나타난다
- * — 늘 그려두면 캔버스가 복잡해진다. */
+ * — 늘 그려두면 캔버스가 복잡해진다. 대상은 여러 개일 수 있다. */
 function renderLinks() {
   if (!linkLayer) return;
   linkLayer.setAttribute('width', BOARD_W);
@@ -211,21 +216,23 @@ function renderLinks() {
   linkLayer.querySelectorAll('line').forEach((el) => el.remove());
   if (!descPop || descPop.hidden || selIds.length !== 1) return;
   const s = find(selIds[0]);
-  if (!s || s.link == null) return;
-  const t = find(s.link);
-  if (!t) return;
-  const c1 = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
-  const c2 = { x: t.x + t.w / 2, y: t.y + t.h / 2 };
-  const p1 = edgePoint(s, c2.x, c2.y);
-  const p2 = edgePoint(t, c1.x, c1.y);
-  const line = document.createElementNS(SVG_NS, 'line');
-  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
-  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
-  line.setAttribute('stroke', '#F5821F');
-  line.setAttribute('stroke-width', '2');
-  line.setAttribute('stroke-dasharray', '5 4');
-  line.setAttribute('marker-end', 'url(#linkArrow)');
-  linkLayer.appendChild(line);
+  if (!s || !Array.isArray(s.links) || !s.links.length) return;
+  s.links.forEach((linkId) => {
+    const t = find(linkId);
+    if (!t) return;
+    const c1 = { x: s.x + s.w / 2, y: s.y + s.h / 2 };
+    const c2 = { x: t.x + t.w / 2, y: t.y + t.h / 2 };
+    const p1 = edgePoint(s, c2.x, c2.y);
+    const p2 = edgePoint(t, c1.x, c1.y);
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+    line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+    line.setAttribute('stroke', '#F5821F');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-dasharray', '5 4');
+    line.setAttribute('marker-end', 'url(#linkArrow)');
+    linkLayer.appendChild(line);
+  });
 }
 
 function paintSel() {
@@ -446,26 +453,40 @@ function closeDescPop(refocus) {
   if (refocus) bDesc.focus();
 }
 
-/** "연결된 요소" 표시를 최신 상태로 갱신 — 팝오버를 열 때, 연결을 걸거나 끊을 때 호출한다. */
+/** "연결된 요소" 목록을 최신 상태로 갱신 — 팝오버를 열 때, 연결을 걸거나 끊을 때 호출한다.
+ * 이제 모든 타입에서 쓸 수 있고, 대상도 여러 개를 걸 수 있다(예: 조회 버튼 → 그리드 + 상태 라벨). */
 function updateDescLinkUI() {
   if (selIds.length !== 1) return;
   const s = find(selIds[0]);
   if (!s) return;
-  // 버튼 타입에서만 "다른 요소로 연결" 이 의미 있다(예: 조회 버튼 → 결과 그리드).
-  descLinkWrap.hidden = s.t !== 'button';
-  const target = s.link != null ? find(s.link) : null;
-  descLinkCur.classList.toggle('hidden', !target);
-  if (target) descLinkName.textContent = `${NAME[target.t]} · ${target.label || NAME[target.t]}`;
+  const links = Array.isArray(s.links) ? s.links : [];
+  descLinkList.replaceChildren(...links.map((tid) => {
+    const t = find(tid);
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    const text = document.createElement('span');
+    text.className = 'item-text';
+    text.textContent = t ? `${NAME[t.t]} · ${t.label || NAME[t.t]}` : '(지워진 요소)';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'item-btn del';
+    del.textContent = '×';
+    del.title = '연결 해제';
+    del.addEventListener('click', () => removeLink(tid));
+    row.append(text, del);
+    return row;
+  }));
   const picking = pickingLinkFor === s.id;
-  descLinkPick.textContent = picking ? '요소를 클릭하세요… (Esc 취소)' : '🎯 클릭해서 연결할 요소 선택';
+  descLinkPick.textContent = picking ? '요소를 클릭하세요… (다시 누르면 종료)' : '🎯 클릭해서 연결할 요소 추가';
   descLinkPick.classList.toggle('on', picking);
 }
 
-/** "대상 선택" 모드를 켜고 끈다 — 켜져 있는 동안 캔버스 클릭은 선택 대신 연결 대상 지정으로 쓰인다. */
+/** "대상 선택" 모드를 켜고 끈다 — 켜져 있는 동안 캔버스 클릭은 선택 대신 연결 대상 지정으로 쓰인다.
+ * 대상을 하나 고른 뒤에도 모드가 유지되어 여러 개를 연달아 추가할 수 있다. */
 function togglePickLink() {
   if (selIds.length !== 1) return;
   const s = find(selIds[0]);
-  if (!s || s.t !== 'button') return;
+  if (!s) return;
   if (pickingLinkFor === s.id) { cancelPickLink(); return; }
   pickingLinkFor = s.id;
   board.style.cursor = 'crosshair';
@@ -477,12 +498,14 @@ function cancelPickLink() {
   board.style.cursor = '';
   updateDescLinkUI();
 }
-function clearLink() {
+function removeLink(targetId) {
   if (selIds.length !== 1) return;
   const s = find(selIds[0]);
-  if (!s || s.link == null) return;
+  if (!s || !Array.isArray(s.links)) return;
+  const idx = s.links.indexOf(targetId);
+  if (idx === -1) return;
   push();
-  s.link = null;
+  s.links.splice(idx, 1);
   render();
   notify();
   updateDescLinkUI();
@@ -702,7 +725,10 @@ function delSel() {
   if (!selIds.length) return;
   push();
   shapes = shapes.filter((s) => !isSel(s.id));
-  shapes.forEach((s) => { if (s.link != null && !find(s.link)) s.link = null; }); // 연결 대상이 지워졌으면 화살표도 정리
+  // 연결 대상 중 지워진 것이 있으면 목록에서 걷어낸다(화살표도 자연히 사라진다).
+  shapes.forEach((s) => {
+    if (Array.isArray(s.links) && s.links.length) s.links = s.links.filter((id) => find(id));
+  });
   setSel([]);
 }
 
@@ -725,10 +751,19 @@ function normalize(arr) {
     src: s.src ?? null,
     desc: s.desc ?? '',
     fs: s.fs ?? s.fontSize ?? null,
-    // linkTo 는 payload 상의 's'+순번 형식 — normalize 는 항상 배열 순서대로 1부터 다시 번호를
-    // 매기므로(toPayloadShapes 도 같은 순서로 내보낸다), 접두사만 떼면 내부 id 와 그대로 대응한다.
-    link: s.link ?? (s.linkTo ? parseInt(String(s.linkTo).replace(/^s/, ''), 10) || null : null),
+    // linksTo 는 payload 상의 's'+순번 형식 배열 — normalize 는 항상 배열 순서대로 1부터 다시
+    // 번호를 매기므로(toPayloadShapes 도 같은 순서로 내보낸다), 접두사만 떼면 내부 id 와 그대로
+    // 대응한다. link/linkTo(단일값)는 이전 버전 데이터 호환용.
+    links: normalizeLinks(s),
   }));
+}
+
+function normalizeLinks(s) {
+  const toInt = (v) => parseInt(String(v).replace(/^s/, ''), 10) || null;
+  if (Array.isArray(s.links)) return s.links.filter((v) => v != null);
+  if (Array.isArray(s.linksTo)) return s.linksTo.map(toInt).filter((v) => v != null);
+  const legacy = s.link ?? (s.linkTo ? toInt(s.linkTo) : null);
+  return legacy != null ? [legacy] : [];
 }
 
 // ── 공개 API ──────────────────────────────────────────────
@@ -749,9 +784,7 @@ export function initEditor(opts = {}) {
   descInput = document.getElementById('descInput');
   descLinkWrap = document.getElementById('descLinkWrap');
   descLinkPick = document.getElementById('descLinkPick');
-  descLinkCur = document.getElementById('descLinkCur');
-  descLinkName = document.getElementById('descLinkName');
-  descLinkClear = document.getElementById('descLinkClear');
+  descLinkList = document.getElementById('descLinkList');
   linkLayer = document.getElementById('linkLayer');
   bItems = document.getElementById('bItems');
   itemsPop = document.getElementById('itemsPop');
@@ -914,7 +947,6 @@ export function initEditor(opts = {}) {
   descInput.addEventListener('input', applyDesc);
   bDesc.addEventListener('click', toggleDescPop);
   descLinkPick.addEventListener('click', togglePickLink);
-  descLinkClear.addEventListener('click', clearLink);
   bItems.addEventListener('click', toggleItemsPop);
   itemsAddBtn.addEventListener('click', addItemFromInput);
   itemsInput.addEventListener('keydown', (e) => {
@@ -1197,6 +1229,6 @@ export function toPayloadShapes() {
     src: s.src || undefined,
     desc: s.desc || undefined,
     fontSize: s.fs || undefined,
-    linkTo: s.link != null ? 's' + s.link : undefined,
+    linksTo: Array.isArray(s.links) && s.links.length ? s.links.map((id) => 's' + id) : undefined,
   }));
 }

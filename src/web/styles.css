@@ -390,7 +390,7 @@ h4.gap{margin-top:30px;}
 .items-add{display:flex;gap:5px;}
 .items-add input{flex:1;width:auto;height:30px;font-size:12px;}
 
-/* ── 설명 팝오버 — 모든 타입 공통. 버튼 타입일 때만 아래에 "연결된 요소" 영역이 붙는다 ── */
+/* ── 설명 팝오버 — 모든 타입 공통. 연결(화살표) 대상은 여러 개를 걸 수 있다 ── */
 .desc-pop{position:absolute;top:calc(100% + 6px);left:0;width:250px;background:#fff;
   border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:9px;z-index:1;}
 .desc-pop textarea{width:100%;resize:vertical;min-height:56px;border:1px solid var(--line);
@@ -399,19 +399,14 @@ h4.gap{margin-top:30px;}
 .desc-hint{font-size:10.5px;color:var(--mut);line-height:1.4;padding:6px 2px 0;}
 .desc-link{margin-top:8px;padding-top:8px;border-top:1px solid var(--line2);}
 .pop-title .opt{font-weight:400;color:var(--mut);}
+.desc-link-list{display:flex;flex-direction:column;gap:3px;margin-bottom:5px;}
+.desc-link-list .item-row{background:var(--or-l);border-radius:8px;padding:4px 4px 4px 8px;}
+.desc-link-list .item-text{color:var(--or-d);font-weight:600;}
 .desc-link-btn{display:flex;align-items:center;gap:6px;width:100%;text-align:left;
   background:none;border:1px dashed var(--line);border-radius:8px;font-family:inherit;
   font-size:12px;color:var(--sub);padding:7px 9px;cursor:pointer;}
 .desc-link-btn:hover{background:var(--or-l);color:var(--or-d);border-color:var(--or);}
 .desc-link-btn.on{background:var(--or-l);color:var(--or-d);border-color:var(--or);border-style:solid;}
-.desc-link-cur{display:flex;align-items:center;justify-content:space-between;gap:6px;
-  background:var(--or-l);border-radius:8px;padding:6px 6px 6px 10px;margin-top:5px;}
-.desc-link-cur.hidden{display:none;}
-.desc-link-cur span{font-size:12px;color:var(--or-d);font-weight:600;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap;}
-.desc-link-cur button{flex:0 0 auto;width:22px;height:22px;border:none;background:none;
-  color:var(--or-d);border-radius:6px;cursor:pointer;font-size:11px;display:grid;place-items:center;}
-.desc-link-cur button:hover{background:rgba(222,110,16,.16);}
 
 /* ── 캔버스 위 연결 화살표(버튼 → 연결한 요소) — 클릭이 요소에 닿도록 포인터 이벤트는 끈다 ── */
 .link-layer{position:absolute;top:0;left:0;pointer-events:none;z-index:50;overflow:visible;}

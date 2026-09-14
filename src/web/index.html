@@ -194,13 +194,10 @@
           <div class="pop-title">이 요소의 역할 설명</div>
           <textarea id="descInput" rows="3" placeholder="설명을 추가하세요" aria-label="요소 설명"></textarea>
           <p class="desc-hint">생성된 화면 미리보기에서 이 요소를 클릭하면 이 설명이 안내 문구로 표시됩니다.</p>
-          <div class="desc-link" id="descLinkWrap" hidden>
-            <div class="pop-title">연결된 요소 <span class="opt">(선택 — 화살표로 표시)</span></div>
-            <button type="button" class="desc-link-btn" id="descLinkPick">🎯 클릭해서 연결할 요소 선택</button>
-            <div class="desc-link-cur hidden" id="descLinkCur">
-              <span id="descLinkName"></span>
-              <button type="button" id="descLinkClear" aria-label="연결 해제">✕</button>
-            </div>
+          <div class="desc-link" id="descLinkWrap">
+            <div class="pop-title">연결된 요소 <span class="opt">(여러 개 가능 — 화살표로 표시)</span></div>
+            <div class="desc-link-list" id="descLinkList"></div>
+            <button type="button" class="desc-link-btn" id="descLinkPick">🎯 클릭해서 연결할 요소 추가</button>
           </div>
         </div>
       </span>

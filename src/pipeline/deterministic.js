@@ -175,16 +175,24 @@ const reqStar = (shape) => (shape.required
   ? '<span style="position:absolute;left:3px;top:50%;transform:translateY(-50%);' +
     'color:#c00000;font-weight:800;font-size:10px;line-height:1;pointer-events:none;z-index:1">＊</span>'
   : '');
-/** 버튼은 자기만의 클릭·설명 처리(hs-btn)가 있으니 중복으로 달지 않는다 — 그 외 타입만
- * desc 가 있으면 클릭 시 같은 안내 문구 말풍선이 뜨도록 표시해 둔다(annotate). */
-const noteAttr = (shape) => {
-  const d = shape.type !== 'button' && shape.desc && String(shape.desc).trim();
-  return d ? ` class="hs-note" data-note="${esc(shape.desc)}"` : '';
+/** shape.linksTo(여러 개 가능)를 클릭 시 화살표를 그릴 data-link-targets 속성으로 바꾼다.
+ * 화살표 연결의 대상을 런타임에 찾을 수 있도록, payload 의 shape.id 를 그대로 DOM id 로 쓴다. */
+const linkTargetsAttr = (shape) => {
+  const links = Array.isArray(shape.linksTo) ? shape.linksTo.filter(Boolean) : [];
+  return links.length ? ` data-link-targets="${links.map((id) => `hs-${esc(id)}`).join(' ')}"` : '';
 };
-/** 화살표 연결(linkTo)의 대상을 런타임에 찾을 수 있도록, payload 의 shape.id 를 그대로 DOM id 로 쓴다. */
+/** 버튼은 자기만의 클릭 처리(hs-btn)가 있으니 중복으로 달지 않는다 — 그 외 타입은
+ * desc·linksTo 가 있으면 클릭 시 안내 문구 말풍선·연결 화살표가 뜨도록 표시해 둔다(annotate). */
+const annoAttrs = (shape) => {
+  if (shape.type === 'button') return '';
+  const d = shape.desc && String(shape.desc).trim();
+  const linkAttr = linkTargetsAttr(shape);
+  if (!d && !linkAttr) return '';
+  return ` class="hs-note"${d ? ` data-note="${esc(shape.desc)}"` : ''}${linkAttr}`;
+};
 const elId = (shape) => (shape.id ? ` id="hs-${esc(shape.id)}"` : '');
 const wrapAbs = (shape, inner, extra = '') =>
-  `<div${elId(shape)}${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
+  `<div${elId(shape)}${annoAttrs(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
   `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;gap:3px;${extra}">${inner}</div>`;
 
 /** 필수 입력은 실제 화면처럼 옅은 크림색 배경으로 강조한다(별표 하나만으로는 눈에 잘 안 띔). */
@@ -251,11 +259,10 @@ function shapeToHtml(shape, n) {
       solid: 'background:#0F3B7C;border-color:#0F3B7C;color:#fff',
       default: 'background:#fff;border-color:#9fb3d1;color:#0F3B7C',
     }[role];
-    // linkTo(스케치에서 "연결할 요소"로 지정한 대상)가 있으면 클릭 시 그 요소로 화살표를 그린다.
-    const linkAttr = shape.linkTo ? ` data-link-target="hs-${esc(shape.linkTo)}"` : '';
+    // linksTo(스케치에서 "연결할 요소"로 지정한 대상들)가 있으면 클릭 시 그 요소들로 화살표를 그린다.
     return wrapAbs(
       shape,
-      `<button type="button" class="hs-btn" data-note="${esc(shape.desc || '')}"${linkAttr} style="${control({ required: false })};` +
+      `<button type="button" class="hs-btn" data-note="${esc(shape.desc || '')}"${linkTargetsAttr(shape)} style="${control({ required: false })};` +
         `${roleStyle};font-weight:700;cursor:pointer">${esc(shape.label || '버튼')}</button>`,
     );
   }
@@ -277,13 +284,13 @@ function shapeToHtml(shape, n) {
   const extra = STATIC_STYLE[t] || 'border:1px solid #c6c4bf;background:#fff;justify-content:center';
   // 실제 화면의 섹션 제목("▸ 주소" 처럼)을 흉내낸다 — title/area 만 화살표 프리픽스를 단다.
   const prefix = t === 'title' || t === 'area' ? '▸ ' : '';
-  return `<div${elId(shape)}${noteAttr(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
+  return `<div${elId(shape)}${annoAttrs(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
     `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;font-size:11px;color:#333;` +
     `padding:4px 6px;overflow:hidden;white-space:nowrap;${extra}">${esc(prefix + (shape.label || t))}</div>`;
 }
 
-/** 버튼·주석(hs-note) 클릭 시 설명 문구·탭 전환·(버튼이면) 연결 화살표를 처리하는 공통 스크립트.
- * data-note/data-link-target 은 이미 HTML-escape 되어 있어 textContent/id 조회로만 다룬다. */
+/** 버튼·주석(hs-note) 클릭 시 설명 문구·탭 전환·연결 화살표(여러 개 가능)를 처리하는 공통 스크립트.
+ * data-note/data-link-targets 는 이미 HTML-escape 되어 있어 textContent/id 조회로만 다룬다. */
 const INTERACTION_SCRIPT = `
 <script>
 function hsEdgePoint(r, cx, cy, tx, ty) {
@@ -293,17 +300,12 @@ function hsEdgePoint(r, cx, cy, tx, ty) {
   var scale = Math.min(dx ? Math.abs(hw / dx) : Infinity, dy ? Math.abs(hh / dy) : Infinity);
   return { x: cx + dx * scale, y: cy + dy * scale };
 }
-function hsClearArrow() {
+function hsClearArrows() {
   var svg = document.getElementById('hsLinkLayer');
-  var line = svg && svg.querySelector('line');
-  if (line) line.remove();
+  if (!svg) return;
+  [].forEach.call(svg.querySelectorAll('line'), function (l) { l.remove(); });
 }
-function hsDrawArrow(srcEl, tgtEl) {
-  var svg = document.getElementById('hsLinkLayer');
-  var cv = document.querySelector('.d-cv');
-  if (!svg || !cv) return;
-  hsClearArrow();
-  var cvR = cv.getBoundingClientRect();
+function hsDrawArrow(svg, cvR, srcEl, tgtEl) {
   var sr = srcEl.getBoundingClientRect();
   var tr = tgtEl.getBoundingClientRect();
   var sc = { x: sr.left - cvR.left + sr.width / 2, y: sr.top - cvR.top + sr.height / 2 };
@@ -317,6 +319,14 @@ function hsDrawArrow(srcEl, tgtEl) {
   line.setAttribute('stroke-dasharray', '5 4'); line.setAttribute('marker-end', 'url(#hsLinkArrow)');
   svg.appendChild(line);
 }
+function hsDrawArrows(srcEl, targetEls) {
+  var svg = document.getElementById('hsLinkLayer');
+  var cv = document.querySelector('.d-cv');
+  hsClearArrows();
+  if (!svg || !cv || !targetEls.length) return;
+  var cvR = cv.getBoundingClientRect();
+  targetEls.forEach(function (t) { hsDrawArrow(svg, cvR, srcEl, t); });
+}
 document.addEventListener('click', function (e) {
   var tab = e.target.closest('.hs-tab');
   if (tab) {
@@ -328,12 +338,13 @@ document.addEventListener('click', function (e) {
     return;
   }
   var noted = e.target.closest('.hs-btn, .hs-note');
-  if (!noted) { hsClearArrow(); return; }
+  if (!noted) { hsClearArrows(); return; }
   var isBtn = noted.classList.contains('hs-btn');
   var msg = noted.dataset.note || (isBtn ? '실제 동작은 없는 미리보기 버튼입니다.' : '');
 
-  var targetEl = isBtn && noted.dataset.linkTarget ? document.getElementById(noted.dataset.linkTarget) : null;
-  if (targetEl) hsDrawArrow(noted, targetEl); else hsClearArrow();
+  var targetIds = (noted.dataset.linkTargets || '').split(/\\s+/).filter(Boolean);
+  var targetEls = targetIds.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  hsDrawArrows(noted, targetEls);
 
   if (!msg) return;
   var bubble = document.getElementById('hsBubble');
@@ -351,7 +362,7 @@ document.addEventListener('click', function (e) {
   bubble.style.top = Math.max(6, r.top - 44) + 'px';
   bubble.style.opacity = '1';
   clearTimeout(bubble._t);
-  bubble._t = setTimeout(function () { bubble.style.opacity = '0'; hsClearArrow(); }, 2400);
+  bubble._t = setTimeout(function () { bubble.style.opacity = '0'; hsClearArrows(); }, 2400);
 });
 </script>`;
 
