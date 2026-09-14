@@ -27,17 +27,27 @@ npm run dev
 
 ## 동작
 
-- **캔버스 에디터** (`/`) — 요소 16종 배치/이동/8방향 리사이즈/스냅/undo·redo(60)/줌/컨텍스트 툴바/단축키,
-  다중 선택(Shift+클릭·마퀴) + 정렬·균등 분배 + 그룹화(Ctrl+G) + 우클릭 메뉴, 단축키 도움말(?)·첫 방문 온보딩,
-  반응형(좁으면 패널 상단 스택)·접근성(랜드마크·ARIA·키보드·포커스 트랩·`prefers-reduced-motion`),
-  신규·변경 모드, 시스템·화면 검색 콤보박스, 유형별 캔버스 크기,
+- **캔버스 에디터** (`/`) — 요소 16종 배치/이동/8방향 리사이즈/undo·redo(60)/줌(25~200%, 화면 배율 프리셋
+  PC·PC스크롤·모바일 + 폭 직접 입력)/컨텍스트 툴바/단축키,
+  스냅 가이드(다른 요소와의 정렬이 캔버스 중앙보다 우선, 리사이즈 시 다른 요소와 크기 일치 스냅),
+  다중 선택(Shift+클릭·Ctrl/⌘+클릭·드래그 — 드래그는 범위 안에 **완전히 들어온 요소만**) +
+  정렬(1개 선택 시 페이지 기준, 2개+ 선택 시 서로 기준)·균등 분배·폭/높이 맞추기 + 그룹화(Ctrl+G) + 우클릭 메뉴,
+  단축키 도움말(?)·첫 방문 온보딩, 반응형(좁으면 패널 상단 스택)·접근성(랜드마크·ARIA·키보드·포커스 트랩·`prefers-reduced-motion`),
+  신규·변경 모드(레이아웃 전환 시 즉시 적용 + "되돌리기" 토스트, blocking 확인창 없음),
+  시스템·화면 검색 콤보박스, 유형별 캔버스 크기(팝업만 560×420, 나머지 960×600),
+  **컴포넌트 타입별로 다른 컨텍스트 툴바**(문구·글자 크기는 텍스트 표시 타입만, 항목은 select/radio/list/tab만,
+  필수 토글은 실제 필수 표시가 반영되는 타입만) + **설명**(모든 타입, 생성 결과에서 클릭 시 안내 문구로 표시) +
+  **연결 화살표**(여러 요소로 연결 가능, 설명 팝오버가 열려 있을 때만 캔버스에 표시 — 예: 조회 버튼 → 결과 그리드),
+  변경화면 캡처 이미지를 캔버스 배경으로 깔아 트레이싱(소스 연동 안 되는 화면용, 생성 결과에도 배경으로 반영),
   "화면 생성" → 결과 모달 2탭 (화면 = 결과/동시 보기(내 스케치↔결과)·이미지 복사 / WebSquare XML = 구문 강조·복사),
   코드 내려받기(파일 2개↑ zip, `fflate`),
   이미지 추가(드래그·선택·붙여넣기 → 캔버스 image 요소, data URL, 리사이즈),
   **이름 붙인 저장본**(localStorage 슬롯) · `.hds.json` 파일 내보내기·불러오기. (새로고침 시 캔버스는 시작 상태로 초기화 — 남기려면 저장본/파일)
 - **규칙 기반 변환기** (`src/pipeline/deterministic.js`) — payload 를 읽기순으로 정렬 →
   `catalog/websquare/mapping.json` 기반 WebSquare XML(select/radio/list/tab 항목 펼침, `area` 자식 중첩,
-  필수(＊) 라벨 → 인접 필드 전파) + 좌표 그대로의 Preview HTML.
+  필수(＊) 라벨 → 인접 필드 전파) + 좌표 그대로의 Preview HTML(버튼 클릭·선택·체크 상호작용,
+  설명·연결 있는 요소는 클릭하면 안내 문구·화살표 표시, **"설명 붙은 요소 보기" 토글**로 전체 훑어보기,
+  변경화면 캡처 배경 반영).
 - 메타 API: `GET /api/systems`, `GET /api/screens?system=&q=`, `GET /api/screens/:id` — `fixtures/` 데이터
 - 생성 API: `POST /api/generate` — 스키마 검증 + 규칙 기반 변환
 - 이미지 첨부: 서버 없음. 클라이언트가 축소 → data URL → 캔버스 `image` shape (`src`)
@@ -53,8 +63,8 @@ src/
   web/       캔버스 에디터 (index.html, styles.css, js/*)
 schemas/     screen-draft(입력) / generation-result(출력) — 프론트↔백엔드 계약
 fixtures/    systems, screens, payloads (데이터 소스)
-catalog/     사내 UI 표준 (components, tokens, layout-guide, websquare 매핑)
-config/      settings.json
+catalog/     사내 UI 표준 (websquare 매핑 — 실사용. components/tokens/layout-guide 는 §9 T-4 참고용 초안)
+config/      settings.json, policy.json(버튼 색 역할 힌트 — 변환기가 사용)
 runs/        평가 실행 산출물 (gitignore)
 ```
 
