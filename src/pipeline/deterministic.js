@@ -328,6 +328,13 @@ function hsDrawArrows(srcEl, targetEls) {
   targetEls.forEach(function (t) { hsDrawArrow(svg, cvR, srcEl, t); });
 }
 document.addEventListener('click', function (e) {
+  var toggle = e.target.closest('#hsToggle');
+  if (toggle) {
+    var on = document.body.classList.toggle('hs-hl');
+    toggle.classList.toggle('on', on);
+    toggle.textContent = on ? '✕ 설명 표시 끄기' : '📍 설명 붙은 요소 보기';
+    return;
+  }
   var tab = e.target.closest('.hs-tab');
   if (tab) {
     var bar = tab.parentElement;
@@ -339,8 +346,7 @@ document.addEventListener('click', function (e) {
   }
   var noted = e.target.closest('.hs-btn, .hs-note');
   if (!noted) { hsClearArrows(); return; }
-  var isBtn = noted.classList.contains('hs-btn');
-  var msg = noted.dataset.note || (isBtn ? '실제 동작은 없는 미리보기 버튼입니다.' : '');
+  var msg = noted.dataset.note || '';
 
   var targetIds = (noted.dataset.linkTargets || '').split(/\\s+/).filter(Boolean);
   var targetEls = targetIds.map(function (id) { return document.getElementById(id); }).filter(Boolean);
@@ -351,15 +357,17 @@ document.addEventListener('click', function (e) {
   if (!bubble) {
     bubble = document.createElement('div');
     bubble.id = 'hsBubble';
-    bubble.style.cssText = 'position:fixed;z-index:999;max-width:260px;padding:8px 12px;border-radius:8px;' +
-      'background:#141A22;color:#fff;font-size:12px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.28);' +
+    bubble.style.cssText = 'position:fixed;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
+      'background:#141A22;color:#fff;font-size:12.5px;line-height:1.45;box-shadow:0 6px 20px rgba(0,0,0,.28);' +
       'pointer-events:none;opacity:0;transition:opacity .15s';
     document.body.appendChild(bubble);
   }
   var r = noted.getBoundingClientRect();
+  var bubbleLeft = Math.max(6, Math.min(window.innerWidth - 268, r.left));
   bubble.textContent = msg;
-  bubble.style.left = Math.max(6, Math.min(window.innerWidth - 268, r.left)) + 'px';
-  bubble.style.top = Math.max(6, r.top - 44) + 'px';
+  bubble.style.left = bubbleLeft + 'px';
+  bubble.style.top = Math.max(6, r.top - 46) + 'px';
+  bubble.style.setProperty('--tail-x', Math.max(12, Math.min(240, r.left + r.width / 2 - bubbleLeft)) + 'px');
   bubble.style.opacity = '1';
   clearTimeout(bubble._t);
   bubble._t = setTimeout(function () { bubble.style.opacity = '0'; hsClearArrows(); }, 2400);
@@ -375,6 +383,11 @@ function buildPreviewHtml(title, payload) {
   const bgStyle = payload.background
     ? ` style="background-image:url(&quot;${esc(payload.background)}&quot;);background-size:100% 100%"`
     : '';
+  // 설명·연결이 하나라도 있어야 "설명 붙은 요소 보기" 토글을 보여준다(없으면 눌러도 아무 의미 없음).
+  const hasAnno = (payload.shapes || []).some(
+    (s) => (s.desc && String(s.desc).trim()) || (Array.isArray(s.linksTo) && s.linksTo.length),
+  );
+  const toggleHtml = hasAnno ? `<button type="button" id="hsToggle" class="hs-toggle">📍 설명 붙은 요소 보기</button>` : '';
   return (
     `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title>` +
     `<style>body{margin:0;font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f5f4f1}` +
@@ -382,9 +395,20 @@ function buildPreviewHtml(title, payload) {
     `.d-cv{position:relative;width:${w}px;height:${h}px;background:#fff;margin:0 auto 16px;` +
     `border:1px solid #ddd;box-shadow:0 1px 4px rgba(0,0,0,.08)}` +
     `.hs-note{cursor:pointer}` +
-    `#hsLinkLayer{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}</style></head>` +
-    `<body><div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
-    ` · 연결된 버튼을 누르면 화살표로 표시</div>` +
+    `#hsLinkLayer{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}` +
+    // "설명 붙은 요소 보기"를 켜면 desc·연결이 달린 요소(버튼 포함)에 빨간 테두리로 표시한다.
+    `.hs-toggle{position:fixed;right:14px;top:14px;z-index:998;padding:7px 13px;border-radius:999px;` +
+    `border:1px solid #d8dee6;background:#fff;color:#333;font-size:12px;font-weight:700;cursor:pointer;` +
+    `box-shadow:0 2px 10px rgba(0,0,0,.14);font-family:inherit}` +
+    `.hs-toggle.on{background:#E5484D;border-color:#E5484D;color:#fff}` +
+    `.hs-hl .hs-note,.hs-hl .hs-btn[data-note]:not([data-note=""]),.hs-hl .hs-btn[data-link-targets]{` +
+    `outline:2px solid #E5484D;outline-offset:2px;box-shadow:0 0 0 5px rgba(229,72,77,.18)}` +
+    // 말풍선 꼬리 — 클릭한 요소 쪽을 가리키도록 위치는 JS 에서 --tail-x 로 맞춘다.
+    `#hsBubble::after{content:"";position:absolute;left:var(--tail-x,20px);bottom:-6px;width:0;height:0;` +
+    `border-width:6px 6px 0 6px;border-style:solid;border-color:#141A22 transparent transparent transparent}` +
+    `</style></head>` +
+    `<body>${toggleHtml}<div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
+    ` · 설명·연결 있는 요소는 클릭하면 표시</div>` +
     `<div class="d-cv"${bgStyle}>${els}` +
     `<svg id="hsLinkLayer" width="${w}" height="${h}"><defs>` +
     `<marker id="hsLinkArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
