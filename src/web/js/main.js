@@ -610,7 +610,7 @@ function snapshotSketch() {
 function build() {
   if (!editor.count()) { toast('먼저 화면 요소를 배치해주세요'); return; }
   if (!sysCombo.get()) { toast('시스템을 선택해주세요'); return; }
-  if (workMode === 'edit' && !scrCombo.get()) { toast('변경할 화면을 선택해주세요'); return; }
+  if (workMode === 'edit' && !scrCombo.get() && !editor.hasBoardBackground()) { toast('변경할 화면을 선택하거나 캡처 이미지를 배경으로 깔아주세요'); return; }
   runBuild(payload(), scrNm.value || '생성 결과', snapshotSketch());
 }
 

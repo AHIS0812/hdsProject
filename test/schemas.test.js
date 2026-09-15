@@ -60,12 +60,21 @@ test('systemId 없는 payload 는 오류 목록을 돌려준다', () => {
   assert.ok(Array.isArray(errs) && errs.length > 0);
 });
 
-test('mode=edit 인데 baseScreen 없으면 실패한다', () => {
+test('mode=edit 인데 baseScreen·background 둘 다 없으면 실패한다', () => {
   const errs = validateScreenDraft({
     systemId: 'portal', mode: 'edit',
     canvas: { w: 960, h: 600 }, shapes: [],
   });
   assert.ok(Array.isArray(errs) && errs.length > 0);
+});
+
+test('mode=edit 인데 baseScreen 없어도 캡처 배경(background)이 있으면 통과한다', () => {
+  const errs = validateScreenDraft({
+    systemId: 'portal', mode: 'edit',
+    background: 'data:image/png;base64,iVBORw0KGgo=',
+    canvas: { w: 960, h: 600 }, shapes: [],
+  });
+  assert.equal(errs, null);
 });
 
 // ── 픽스처 검증 ───────────────────────────────────────────

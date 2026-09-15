@@ -45,7 +45,12 @@
     },
     {
       "if": { "properties": { "mode": { "const": "edit" } } },
-      "then": { "required": ["baseScreen"] }
+      "then": {
+        "anyOf": [
+          { "required": ["baseScreen"] },
+          { "required": ["background"] }
+        ]
+      }
     }
   ],
   "$defs": {
