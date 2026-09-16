@@ -22,8 +22,11 @@ let canvasDirty = false;
 // "PC" 비율 프리셋이 돌아갈 기준 크기 — 신규는 화면 유형 기본값, 변경화면은 그 화면의 canvas
 let baseBoardSize = DEFAULT_BOARD;
 
-// 캔버스 편집 내용은 새로고침 시 유지하지 않는다(항상 시작 화면으로).
-// 명시적으로 남기려면 상단 "저장본" 슬롯 또는 .hds.json 내보내기를 쓴다.
+// 캔버스 편집 내용은 새로고침해도 유지된다 — PPT·캔바처럼 "지금 작업 중인 화면" 하나를
+// 자동 저장(localStorage, 디바운스)해 뒀다가 부팅 시 이어서 불러온다(§AUTOSAVE_KEY 아래).
+// 다른 화면으로 새로 시작하려면 상단 신규/변경 화면 전환이나 화면 유형 타일을 쓴다 — 그 자체가
+// "새로 시작하기" 진입점이고, 그 순간부터 그게 새로운 자동 저장 대상이 된다.
+// 이름 붙여 따로 보관하려면 "저장본" 슬롯(다른 이름으로 저장 = 사본) 또는 .hds.json 내보내기를 쓴다.
 
 /**
  * 캔버스를 새 shapes 로 교체 (프로그램 로드 — dirty 아님)
@@ -75,6 +78,51 @@ function restoreSnapshot(snap) {
   toast('이전 화면으로 되돌렸습니다');
 }
 
+// ── 자동 저장(현재 작업 중인 화면 1개, localStorage) ────────
+// "저장본" 슬롯(이름 붙여 여러 개 보관)과는 별개로, PPT·캔바처럼 지금 캔버스에 있는 내용 그대로를
+// 디바운스해서 계속 최신 상태로 남겨 두고, 새로고침·재접속 시 그 상태를 이어서 연다.
+const AUTOSAVE_KEY = 'hds:autosave';
+let autosaveTimer = null;
+
+/** snapshotForUndo() 와 같은 필드 + 복원에 필요한 시스템 선택·캡처 배경까지 포함한 전체 스냅샷 */
+function autosaveSnapshot() {
+  return {
+    ...snapshotForUndo(),
+    systemId: sysCombo.get()?.id || null,
+    background: editor.hasBoardBackground() ? editor.getBoardBackground() : null,
+  };
+}
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(autosaveSnapshot())); } catch { /* 저장 공간 부족 등 — 조용히 무시 */ }
+  }, 500);
+}
+function readAutosave() {
+  try {
+    const doc = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null');
+    return doc && Array.isArray(doc.shapes) ? doc : null;
+  } catch { return null; }
+}
+/** autosaveSnapshot() 으로 저장해 둔 상태를 부팅 시 그대로 복원한다(시스템/화면 선택은 boot() 이 이어서 처리) */
+function restoreAutosave(snap) {
+  workMode = snap.workMode === 'edit' ? 'edit' : 'new';
+  markMode(workMode);
+  applyMode();
+  currentTpl = document.querySelector(`.tpl[data-tpl="${snap.currentTpl}"]`) ? snap.currentTpl : 'list';
+  highlightTpl(currentTpl);
+  loadedScreenId = snap.loadedScreenId || null;
+  baseBoardSize = snap.baseBoardSize || DEFAULT_BOARD;
+  editor.clearBoardBackground();
+  editor.setBoardSize(snap.canvas?.w || DEFAULT_BOARD.w, snap.canvas?.h || DEFAULT_BOARD.h);
+  editor.setShapes(snap.shapes);
+  if (snap.background) editor.setBoardBackground(snap.background);
+  syncBgButtons();
+  scrNm.value = snap.scrName || '';
+  syncAbL();
+  canvasDirty = snap.shapes.length > 0; // 이어서 작업 중이던 내용이므로, 비어있지 않으면 dirty 유지
+}
+
 /**
  * 캔버스를 교체하는 동작(템플릿/모드/화면 전환, 배경 이미지 업로드 등)을 감싼다.
  * 사용자가 실제로 손댄 내용(canvasDirty)이 있을 때만 — 프로그램으로 막 불러온 직후처럼
@@ -101,6 +149,7 @@ function syncAbL() {
   const span = document.createElement('span');
   span.textContent = `${w} × ${h}`;
   abL.append(span);
+  scheduleAutosave();
 }
 scrNm.addEventListener('input', syncAbL);
 
@@ -252,6 +301,7 @@ const sysCombo = makeCombo($('sysBox'), {
     scrCombo.setItems([]);
     loadedScreenId = null;
     scrCombo.setPlaceholder(sys ? '불러오는 중…' : '먼저 시스템을 선택하세요');
+    scheduleAutosave();
     if (!sys) return;
     try {
       const screens = await api.getScreens(sys.id);
@@ -383,6 +433,7 @@ $('bgFile').addEventListener('change', async () => {
 $('btnBgClear').addEventListener('click', () => {
   editor.clearBoardBackground();
   syncBgButtons();
+  scheduleAutosave();
 });
 
 drop.addEventListener('click', () => fileInput.click());
@@ -648,24 +699,48 @@ function initHelp() {
 
 // ── 부팅 ─────────────────────────────────────────────────
 async function boot() {
-  // 예전 버전의 자동 저장 초안이 남아 있으면 정리 (더 이상 복원하지 않음)
+  // 예전 버전의 자동 저장 초안이 남아 있으면 정리 (형식이 달라 더 이상 복원 못 함)
   try { localStorage.removeItem('aiScreenDraft:v1'); } catch { /* 무시 */ }
 
-  editor.initEditor({ onChange: () => { canvasDirty = true; } });
+  editor.initEditor({ onChange: () => { canvasDirty = true; scheduleAutosave(); } });
   initResultModal();
   initHelp();
 
   applyMode();
-  // 항상 시작 화면으로: 선택된 유형(목록조회)의 프리셋을 올려 타일 ↔ 캔버스 상태를 맞춘다
-  loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
-  syncAbL();
-  canvasDirty = false; // 부팅 시점의 로드는 사용자 수정이 아님
+  const draft = readAutosave();
+  if (draft) {
+    restoreAutosave(draft);
+    toast('작업 중이던 화면을 이어서 불러왔습니다');
+  } else {
+    // 자동 저장된 내용이 없으면(첫 방문 등) 선택된 유형(목록조회)의 프리셋을 올려 시작 상태로
+    loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
+    syncAbL();
+    canvasDirty = false; // 부팅 시점의 로드는 사용자 수정이 아님
+  }
 
   try {
     const systems = await api.getSystems();
     sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name, sub: s.sub })));
-    const want = systems.find((s) => s.id === 'salesportal') ? 'salesportal' : systems[0]?.id;
-    if (want) sysCombo.choose(want);
+    const draftSys = draft?.systemId && systems.some((s) => s.id === draft.systemId) ? draft.systemId : null;
+    if (draftSys) {
+      // 자동 저장된 시스템 선택을 조용히 재현(onPick 을 타면 loadedScreenId 가 초기화돼 버린다) —
+      // 화면 목록도 같이 불러와 변경화면 선택까지 이어 붙인다.
+      sysCombo.choose(draftSys, true);
+      try {
+        const screens = await api.getScreens(draftSys);
+        scrCombo.setItems(screens.map((s) => ({ id: s.id, name: s.name, sub: s.template })));
+        scrCombo.setPlaceholder(screens.length ? '화면 선택' : '등록된 화면이 없습니다');
+        if (draft.loadedScreenId && screens.some((s) => s.id === draft.loadedScreenId)) {
+          scrCombo.choose(draft.loadedScreenId, true);
+        }
+      } catch (e) {
+        toast('화면 목록을 불러오지 못했습니다');
+        console.error(e);
+      }
+    } else {
+      const want = systems.find((s) => s.id === 'salesportal') ? 'salesportal' : systems[0]?.id;
+      if (want) sysCombo.choose(want);
+    }
   } catch (e) {
     toast('API 서버에 연결하지 못했습니다 — npm run dev 로 실행했는지 확인하세요');
     console.error(e);
