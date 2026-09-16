@@ -327,6 +327,12 @@ function hsDrawArrows(srcEl, targetEls) {
   var cvR = cv.getBoundingClientRect();
   targetEls.forEach(function (t) { hsDrawArrow(svg, cvR, srcEl, t); });
 }
+function hsHideBubble() {
+  var bubble = document.getElementById('hsBubble');
+  if (bubble) bubble.style.opacity = '0';
+}
+// 현재 말풍선·화살표가 켜져 있는 요소(다시 클릭하면 끈다). 이미지 캡처는 이 상태를 그대로 담는다.
+var hsActiveNoted = null;
 document.addEventListener('click', function (e) {
   var toggle = e.target.closest('#hsToggle');
   if (toggle) {
@@ -345,36 +351,48 @@ document.addEventListener('click', function (e) {
     return;
   }
   var noted = e.target.closest('.hs-btn, .hs-note');
-  if (!noted) { hsClearArrows(); return; }
-  var msg = noted.dataset.note || '';
+  if (!noted || noted === hsActiveNoted) {
+    // 빈 곳을 클릭했거나, 이미 켜져 있는 요소를 다시 클릭 — 끈다.
+    hsClearArrows();
+    hsHideBubble();
+    hsActiveNoted = null;
+    return;
+  }
+  hsActiveNoted = noted;
 
   var targetIds = (noted.dataset.linkTargets || '').split(/\\s+/).filter(Boolean);
   var targetEls = targetIds.map(function (id) { return document.getElementById(id); }).filter(Boolean);
   hsDrawArrows(noted, targetEls);
 
-  if (!msg) return;
+  var msg = noted.dataset.note || '';
+  if (!msg) { hsHideBubble(); return; }
+  var cv = document.querySelector('.d-cv');
+  if (!cv) return;
   var bubble = document.getElementById('hsBubble');
   if (!bubble) {
     bubble = document.createElement('div');
     bubble.id = 'hsBubble';
-    bubble.style.cssText = 'position:fixed;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
+    bubble.style.cssText = 'position:absolute;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
       'background:#fff;color:#222;border:1.5px solid #F5821F;font-size:12.5px;line-height:1.45;' +
       'box-shadow:0 6px 20px rgba(0,0,0,.16);pointer-events:none;opacity:0;transition:opacity .15s';
-    document.body.appendChild(bubble);
+    cv.appendChild(bubble);
   }
+  // 말풍선은 이제 뷰포트가 아니라 .d-cv(캔버스) 기준 좌표로 배치한다 — 캡처 대상이 .d-cv 하나뿐이라
+  // 말풍선·화살표가 그 안에 같이 들어있어야 이미지 복사·저장에 함께 찍힌다.
+  var cvR = cv.getBoundingClientRect();
   var r = noted.getBoundingClientRect();
+  var localLeft = r.left - cvR.left;
+  var localTop = r.top - cvR.top;
   // 텍스트를 먼저 넣어 실제 렌더 폭을 잰 뒤(말풍선 폭은 내용에 따라 260px 보다 좁을 수 있다),
   // 그 폭을 기준으로 꼬리 위치를 잡아야 꼬리가 말풍선 밖으로 벗어나지 않는다.
   bubble.textContent = msg;
   var bw = bubble.getBoundingClientRect().width || 260;
-  var bubbleLeft = Math.max(6, Math.min(window.innerWidth - 6 - bw, r.left));
+  var bubbleLeft = Math.max(6, Math.min(cvR.width - 6 - bw, localLeft));
   bubble.style.left = bubbleLeft + 'px';
-  bubble.style.top = Math.max(6, r.top - 46) + 'px';
-  var tailX = r.left + r.width / 2 - bubbleLeft;
+  bubble.style.top = Math.max(6, localTop - 46) + 'px';
+  var tailX = localLeft + r.width / 2 - bubbleLeft;
   bubble.style.setProperty('--tail-x', Math.max(12, Math.min(bw - 12, tailX)) + 'px');
   bubble.style.opacity = '1';
-  clearTimeout(bubble._t);
-  bubble._t = setTimeout(function () { bubble.style.opacity = '0'; hsClearArrows(); }, 2400);
 });
 </script>`;
 
@@ -417,7 +435,7 @@ function buildPreviewHtml(title, payload) {
     `border-width:7px 6.5px 0 6.5px;border-style:solid;border-color:#fff transparent transparent transparent}` +
     `</style></head>` +
     `<body>${toggleHtml}<div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
-    ` · 설명·연결 있는 요소는 클릭하면 표시</div>` +
+    ` · 설명·연결 있는 요소는 클릭하면 표시, 다시 클릭하면 숨김</div>` +
     `<div class="d-cv"${bgStyle}>${els}` +
     `<svg id="hsLinkLayer" width="${w}" height="${h}"><defs>` +
     `<marker id="hsLinkArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +

@@ -203,6 +203,7 @@ function setTab(p) {
   const canCopy = p === 'v' ? hasPreview : !!textForTab(p);
   $('mCopy').hidden = !canCopy;
   $('mCopy').textContent = p === 'v' ? '이미지 복사' : '복사';
+  $('mSaveImg').hidden = !(p === 'v' && hasPreview);
   const code = last.result?.code;
   $('mDownload').hidden = !(code?.websquareXml || code?.files?.length);
 }
@@ -259,6 +260,9 @@ async function copyText(text) {
  * 생성 결과 preview HTML → PNG Blob.
  * 화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 있고(동시 보기에서는 준비 전일 수도 있음),
  * 전용 iframe 에 preview HTML 을 다시 렌더해 콘텐츠 전체 크기로 캡처한다(잘림 방지).
+ * 캡처 대상은 body 전체가 아니라 실제 화면 영역(.d-cv)만 — "설명 붙은 요소 보기" 토글 버튼,
+ * 안내 문구 같은 미리보기 전용 UI는 빠지고, 사용자가 켜 둔 설명 말풍선·연결 화살표는 .d-cv
+ * 안에 같이 그려지므로(deterministic.js 의 INTERACTION_SCRIPT 참고) 그대로 함께 찍힌다.
  */
 async function renderScreenBlob() {
   const html = last.result?.preview?.html;
@@ -282,7 +286,8 @@ async function renderScreenBlob() {
     const doc = cap.contentDocument;
     const el = doc?.documentElement;
     const body = doc?.body;
-    if (!body) throw new Error('미리보기 렌더 실패');
+    const cv = doc?.querySelector('.d-cv');
+    if (!body || !cv) throw new Error('미리보기 렌더 실패');
 
     const fullW = Math.max(el.scrollWidth, body.scrollWidth, el.offsetWidth, body.offsetWidth, 320);
     const fullH = Math.max(el.scrollHeight, body.scrollHeight, el.offsetHeight, body.offsetHeight, 240);
@@ -290,12 +295,13 @@ async function renderScreenBlob() {
     cap.style.height = fullH + 'px';
     await new Promise((r) => setTimeout(r, 80));
 
-    const render = window.html2canvas(body, {
+    const cvRect = cv.getBoundingClientRect();
+    const render = window.html2canvas(cv, {
       backgroundColor: '#ffffff',
       scale: 2,
       logging: false,
-      width: fullW,
-      height: fullH,
+      width: Math.ceil(cvRect.width),
+      height: Math.ceil(cvRect.height),
       windowWidth: fullW,
       windowHeight: fullH,
       scrollX: 0,
@@ -329,18 +335,31 @@ async function copyScreenImage() {
   } catch {
     // 클립보드 이미지 복사 불가(브라우저 미지원·권한 등) → PNG 파일로 저장
     try {
-      const blob = await blobPromise;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${(last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_')}.png`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      saveBlob(await blobPromise, screenImageName());
       toast('클립보드 대신 이미지 파일(.png)로 저장했습니다');
       flashCopied('↓ 저장됨');
     } catch (e) {
       toast('이미지를 만들지 못했습니다: ' + e.message);
       btn.textContent = '이미지 복사';
     }
+  } finally {
+    btn.disabled = false;
+  }
+}
+const screenImageName = () => `${(last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_')}.png`;
+async function saveScreenImage() {
+  const btn = $('mSaveImg');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const restore = btn.textContent;
+  btn.textContent = '이미지 만드는 중…';
+  try {
+    saveBlob(await renderScreenBlob(), screenImageName());
+    btn.textContent = '↓ 저장됨';
+    setTimeout(() => { btn.textContent = restore; }, 1400);
+  } catch (e) {
+    toast('이미지를 만들지 못했습니다: ' + e.message);
+    btn.textContent = restore;
   } finally {
     btn.disabled = false;
   }
@@ -412,6 +431,7 @@ export async function runBuild(payload, title, sketch = null) {
   mfoot().hidden = true;
   $('mView').hidden = true;
   $('mCopy').hidden = true;
+  $('mSaveImg').hidden = true;
   $('mDownload').hidden = true;
   setActiveTab('v');
   const stop = showProgress();
@@ -429,6 +449,7 @@ export async function runBuild(payload, title, sketch = null) {
     pre.textContent = e.message;
     mbody().replaceChildren(pre);
     $('mCopy').hidden = true;
+    $('mSaveImg').hidden = true;
     $('mDownload').hidden = true;
   }
 }
@@ -437,6 +458,7 @@ export function initResultModal() {
   $('mClose').addEventListener('click', closeModal);
   $('mDownload').addEventListener('click', download);
   $('mCopy').addEventListener('click', copyCurrent);
+  $('mSaveImg').addEventListener('click', saveScreenImage);
   document.querySelectorAll('.mtab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.p)));
   $('mSeg').addEventListener('click', (e) => {
     const v = e.target.closest('button')?.dataset.v;
