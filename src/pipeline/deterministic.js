@@ -331,8 +331,79 @@ function hsHideBubble() {
   var bubble = document.getElementById('hsBubble');
   if (bubble) bubble.style.opacity = '0';
 }
-// 현재 말풍선·화살표가 켜져 있는 요소(다시 클릭하면 끈다). 이미지 캡처는 이 상태를 그대로 담는다.
+/** noted 요소(.hs-btn 또는 .hs-note)를 담은 hs-{shape.id} wrapper 의 id.
+ * 버튼은 wrapper(바깥 div)에 id 가 있고 정작 클릭 대상인 .hs-btn 자신에는 없어서,
+ * "지금 켜져 있는 요소가 무엇인지"를 안정적으로 식별하려면 이 id 를 써야 한다
+ * (result-modal.js 가 이미지 캡처 시 같은 요소를 다시 찾아 켜는 데 쓴다). */
+function hsStableId(el) {
+  var w = el.closest('[id]');
+  return w ? w.id : '';
+}
+/** hsStableId 로 저장해 둔 id → 클릭 가능한 노드(.hs-btn 또는 .hs-note)를 되찾는다. */
+function hsFindNotedById(id) {
+  var w = id && document.getElementById(id);
+  if (!w) return null;
+  return w.matches('.hs-btn,.hs-note') ? w : w.querySelector('.hs-btn,.hs-note');
+}
+// 현재 말풍선·화살표가 켜져 있는 요소(다시 클릭하면 끈다).
+// hsActiveId 는 result-modal.js 가 이미지 캡처 시 이 상태를 그대로 재현하는 데 읽어간다
+// (이 iframe 은 캡처용으로 새로 렌더될 때마다 새 문서라 hsActiveNoted 참조 자체는 못 넘기고,
+// 전역 var 로 선언돼 window 프로퍼티가 되는 id 문자열만 넘긴다).
 var hsActiveNoted = null;
+var hsActiveId = null;
+function hsActivate(noted) {
+  hsActiveNoted = noted;
+  hsActiveId = hsStableId(noted);
+
+  var targetIds = (noted.dataset.linkTargets || '').split(/\\s+/).filter(Boolean);
+  var targetEls = targetIds.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  hsDrawArrows(noted, targetEls);
+
+  var msg = noted.dataset.note || '';
+  if (!msg) { hsHideBubble(); return; }
+  var cv = document.querySelector('.d-cv');
+  if (!cv) return;
+  var bubble = document.getElementById('hsBubble');
+  if (!bubble) {
+    bubble = document.createElement('div');
+    bubble.id = 'hsBubble';
+    bubble.style.cssText = 'position:absolute;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
+      'background:#fff;color:#222;border:1.5px solid #F5821F;font-size:12.5px;line-height:1.45;' +
+      'box-shadow:0 6px 20px rgba(0,0,0,.16);pointer-events:none;opacity:0;transition:opacity .15s';
+    cv.appendChild(bubble);
+  }
+  // 말풍선은 뷰포트가 아니라 .d-cv(캔버스) 기준 좌표로 배치한다 — 캡처 대상이 .d-cv 하나뿐이라
+  // 말풍선·화살표가 그 안에 같이 들어있어야 이미지 복사·저장에 함께 찍힌다.
+  var cvR = cv.getBoundingClientRect();
+  var r = noted.getBoundingClientRect();
+  var localLeft = r.left - cvR.left;
+  var localTop = r.top - cvR.top;
+  // 텍스트를 먼저 넣어 실제 렌더 폭·높이를 잰 뒤(내용에 따라 260px 보다 좁을 수 있다),
+  // 그 크기를 기준으로 꼬리·위치를 잡아야 캔버스 밖으로 벗어나지 않는다.
+  bubble.textContent = msg;
+  bubble.classList.remove('below');
+  var bw = bubble.getBoundingClientRect().width || 260;
+  var bh = bubble.getBoundingClientRect().height || 38;
+  var GAP = 10; // 요소와 꼬리 끝 사이 여백
+  var TAIL = 9; // 꼬리 삼각형 높이
+  // 요소가 캔버스 위쪽 끝 가까이 있어 위에 놓을 자리가 없으면 아래로 뒤집는다
+  // (버튼이 화면 맨 위 줄에 있는 경우 등 — 말풍선이 캔버스 밖으로 잘리거나 겹쳐 안 보이던 문제).
+  var fitsAbove = localTop - (bh + GAP + TAIL) >= 4;
+  var top;
+  if (fitsAbove) {
+    top = localTop - bh - GAP - TAIL;
+  } else {
+    bubble.classList.add('below');
+    top = localTop + r.height + GAP + TAIL;
+  }
+  top = Math.max(4, Math.min(cvR.height - bh - 4, top));
+  var bubbleLeft = Math.max(6, Math.min(cvR.width - 6 - bw, localLeft));
+  bubble.style.left = bubbleLeft + 'px';
+  bubble.style.top = top + 'px';
+  var tailX = localLeft + r.width / 2 - bubbleLeft;
+  bubble.style.setProperty('--tail-x', Math.max(12, Math.min(bw - 12, tailX)) + 'px');
+  bubble.style.opacity = '1';
+}
 document.addEventListener('click', function (e) {
   var toggle = e.target.closest('#hsToggle');
   if (toggle) {
@@ -356,43 +427,10 @@ document.addEventListener('click', function (e) {
     hsClearArrows();
     hsHideBubble();
     hsActiveNoted = null;
+    hsActiveId = null;
     return;
   }
-  hsActiveNoted = noted;
-
-  var targetIds = (noted.dataset.linkTargets || '').split(/\\s+/).filter(Boolean);
-  var targetEls = targetIds.map(function (id) { return document.getElementById(id); }).filter(Boolean);
-  hsDrawArrows(noted, targetEls);
-
-  var msg = noted.dataset.note || '';
-  if (!msg) { hsHideBubble(); return; }
-  var cv = document.querySelector('.d-cv');
-  if (!cv) return;
-  var bubble = document.getElementById('hsBubble');
-  if (!bubble) {
-    bubble = document.createElement('div');
-    bubble.id = 'hsBubble';
-    bubble.style.cssText = 'position:absolute;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
-      'background:#fff;color:#222;border:1.5px solid #F5821F;font-size:12.5px;line-height:1.45;' +
-      'box-shadow:0 6px 20px rgba(0,0,0,.16);pointer-events:none;opacity:0;transition:opacity .15s';
-    cv.appendChild(bubble);
-  }
-  // 말풍선은 이제 뷰포트가 아니라 .d-cv(캔버스) 기준 좌표로 배치한다 — 캡처 대상이 .d-cv 하나뿐이라
-  // 말풍선·화살표가 그 안에 같이 들어있어야 이미지 복사·저장에 함께 찍힌다.
-  var cvR = cv.getBoundingClientRect();
-  var r = noted.getBoundingClientRect();
-  var localLeft = r.left - cvR.left;
-  var localTop = r.top - cvR.top;
-  // 텍스트를 먼저 넣어 실제 렌더 폭을 잰 뒤(말풍선 폭은 내용에 따라 260px 보다 좁을 수 있다),
-  // 그 폭을 기준으로 꼬리 위치를 잡아야 꼬리가 말풍선 밖으로 벗어나지 않는다.
-  bubble.textContent = msg;
-  var bw = bubble.getBoundingClientRect().width || 260;
-  var bubbleLeft = Math.max(6, Math.min(cvR.width - 6 - bw, localLeft));
-  bubble.style.left = bubbleLeft + 'px';
-  bubble.style.top = Math.max(6, localTop - 46) + 'px';
-  var tailX = localLeft + r.width / 2 - bubbleLeft;
-  bubble.style.setProperty('--tail-x', Math.max(12, Math.min(bw - 12, tailX)) + 'px');
-  bubble.style.opacity = '1';
+  hsActivate(noted);
 });
 </script>`;
 
@@ -428,11 +466,17 @@ function buildPreviewHtml(title, payload) {
     // 말풍선 꼬리 — 클릭한 요소 쪽을 가리키도록 수평 위치는 JS 에서 --tail-x 로 맞춘다.
     // 테두리색 삼각형(::before, 크게) 위에 배경색 삼각형(::after, 작게)을 겹쳐 테두리가 있는
     // 꼬리처럼 보이게 한다 — 두 삼각형 모두 같은 --tail-x 를 기준으로 좌우 대칭이라 폭이 달라도
-    // 중심이 어긋나지 않는다.
+    // 중심이 어긋나지 않는다. 기본은 말풍선이 요소 위에 떠서 꼬리가 아래를 가리키는 형태이고,
+    // 요소가 캔버스 위쪽 끝에 가까워 위에 놓을 자리가 없으면 .below 를 붙여 요소 아래로 뒤집는다
+    // (꼬리도 위를 가리키게 반전).
     `#hsBubble::before{content:"";position:absolute;left:var(--tail-x,20px);bottom:-9px;width:0;height:0;` +
     `border-width:9px 8px 0 8px;border-style:solid;border-color:#F5821F transparent transparent transparent}` +
     `#hsBubble::after{content:"";position:absolute;left:var(--tail-x,20px);bottom:-6.5px;width:0;height:0;` +
     `border-width:7px 6.5px 0 6.5px;border-style:solid;border-color:#fff transparent transparent transparent}` +
+    `#hsBubble.below::before{bottom:auto;top:-9px;border-width:0 8px 9px 8px;` +
+    `border-color:transparent transparent #F5821F transparent}` +
+    `#hsBubble.below::after{bottom:auto;top:-6.5px;border-width:0 6.5px 7px 6.5px;` +
+    `border-color:transparent transparent #fff transparent}` +
     `</style></head>` +
     `<body>${toggleHtml}<div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
     ` · 설명·연결 있는 요소는 클릭하면 표시, 다시 클릭하면 숨김</div>` +

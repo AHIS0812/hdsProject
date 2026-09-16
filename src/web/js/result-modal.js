@@ -268,6 +268,13 @@ async function renderScreenBlob() {
   const html = last.result?.preview?.html;
   if (!html || !window.html2canvas) throw new Error('미리보기가 준비되지 않았습니다');
 
+  // 지금 화면에 떠 있는 iframe(사용자가 클릭해 켜 둔 말풍선·화살표·"설명 붙은 요소 보기" 상태를
+  // 들고 있다)에서 그 상태를 읽어 둔다 — 아래에서 새로 만드는 캡처용 iframe 은 preview HTML을
+  // 처음부터 다시 렌더한 별개의 문서라 이 상태를 이어받지 못하므로, 직접 재현해야 한다.
+  const liveWin = mbody().querySelector('iframe')?.contentWindow;
+  const activeId = liveWin?.hsActiveId || null;
+  const hlOn = !!liveWin?.document?.body?.classList.contains('hs-hl');
+
   const cap = document.createElement('iframe');
   cap.setAttribute('aria-hidden', 'true');
   cap.style.cssText =
@@ -294,6 +301,17 @@ async function renderScreenBlob() {
     cap.style.width = fullW + 'px';
     cap.style.height = fullH + 'px';
     await new Promise((r) => setTimeout(r, 80));
+
+    // 읽어 둔 상태를 캡처용 iframe에 그대로 재현한다 — 실제로 같은 클릭 핸들러(hsToggle,
+    // hsFindNotedById→hsActivate)를 타게 해서, 좌표 계산도 이 iframe 의 실제 렌더 크기 기준으로
+    // 다시 이뤄지게 한다(라이브 iframe 의 좌표를 그대로 복사하면 크기가 달라 어긋날 수 있다).
+    // 말풍선은 opacity 트랜지션(.15s)으로 나타나는데, html2canvas 는 그 순간의 computed style 을
+    // 그대로 찍으므로 트랜지션 도중에 캡처하면 흐릿하거나 거의 안 보이게 찍힌다 — 캡처용
+    // iframe 에서는 트랜지션을 꺼서 opacity 가 즉시 반영되게 한다.
+    if (hlOn || activeId) doc.head.insertAdjacentHTML('beforeend', '<style>#hsBubble{transition:none!important}</style>');
+    if (hlOn) cap.contentWindow?.document.getElementById('hsToggle')?.click();
+    if (activeId) cap.contentWindow?.hsFindNotedById?.(activeId)?.click();
+    if (hlOn || activeId) await new Promise((r) => setTimeout(r, 30));
 
     const cvRect = cv.getBoundingClientRect();
     const render = window.html2canvas(cv, {
