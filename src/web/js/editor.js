@@ -10,6 +10,7 @@ let bPos, posPop;
 let bAlign, alignPop;
 let fS, fsUp, fsDown, fsWrap;
 let bDesc, descPop, descInput, descLinkWrap, descLinkPick, descLinkList;
+let pickStatus, pickCount, pickDone;
 let linkLayer;
 const DEFAULT_FS = 11; // 글자 크기를 따로 지정하지 않은 요소의 기본값(px) — 조절 칸에 보여줄 값
 // 캔버스(보드) 크기 — 화면 유형/불러온 화면에 따라 setBoardSize 로 바뀐다
@@ -519,6 +520,11 @@ function updateDescLinkUI() {
   const picking = pickingLinkFor === s.id;
   descLinkPick.textContent = picking ? '요소를 클릭하세요… (다시 누르면 종료)' : '🎯 클릭해서 연결할 요소 추가';
   descLinkPick.classList.toggle('on', picking);
+  // 대상을 클릭하는 동안은 팝오버가 캔버스를 가려 클릭하기 어려우므로 통째로 숨기고,
+  // 대신 이미 얇은 한 줄인 툴바 안에 진행 상황 배지(연결 개수 + 완료)만 남긴다.
+  descPop.classList.toggle('picking-hidden', picking);
+  pickCount.textContent = `${links.length}개 연결됨`;
+  pickStatus.hidden = !picking;
 }
 
 /** "대상 선택" 모드를 켜고 끈다 — 켜져 있는 동안 캔버스 클릭은 선택 대신 연결 대상 지정으로 쓰인다.
@@ -825,6 +831,9 @@ export function initEditor(opts = {}) {
   descLinkWrap = document.getElementById('descLinkWrap');
   descLinkPick = document.getElementById('descLinkPick');
   descLinkList = document.getElementById('descLinkList');
+  pickStatus = document.getElementById('pickStatus');
+  pickCount = document.getElementById('pickCount');
+  pickDone = document.getElementById('pickDone');
   linkLayer = document.getElementById('linkLayer');
   bItems = document.getElementById('bItems');
   itemsPop = document.getElementById('itemsPop');
@@ -991,6 +1000,7 @@ export function initEditor(opts = {}) {
   descInput.addEventListener('input', applyDesc);
   bDesc.addEventListener('click', toggleDescPop);
   descLinkPick.addEventListener('click', togglePickLink);
+  pickDone.addEventListener('click', togglePickLink);
   bItems.addEventListener('click', toggleItemsPop);
   itemsAddBtn.addEventListener('click', addItemFromInput);
   itemsInput.addEventListener('keydown', (e) => {
@@ -1002,7 +1012,9 @@ export function initEditor(opts = {}) {
     if (!itemsPop.hidden && !itemsPop.contains(e.target) && !bItems.contains(e.target)) closeItemsPop(false);
     if (!posPop.hidden && !posPop.contains(e.target) && !bPos.contains(e.target)) closePosPop(false);
     if (!alignPop.hidden && !alignPop.contains(e.target) && !bAlign.contains(e.target)) closeAlignPop(false);
-    if (!descPop.hidden && !descPop.contains(e.target) && !bDesc.contains(e.target)) closeDescPop(false);
+    if (!descPop.hidden && !descPop.contains(e.target) && !bDesc.contains(e.target) && !pickStatus.contains(e.target)) {
+      closeDescPop(false);
+    }
   });
   const ALIGN = {
     alignL: 'left', alignC: 'hcenter', alignR: 'right',

@@ -331,6 +331,43 @@ function hsHideBubble() {
   var bubble = document.getElementById('hsBubble');
   if (bubble) bubble.style.opacity = '0';
 }
+/** 말풍선을 마우스로 직접 끌어서 옮길 수 있게 한다 — 자동 배치가 요소를 가리거나 자리가 마땅치
+ * 않을 때 직접 빼둘 수 있도록. 좌우로 옮기면 꼬리도 계속 원래 요소 쪽을 가리키게 다시 계산하고
+ * (위/아래 방향은 처음 켤 때 정해진 대로 유지), 옮긴 사실은 data-moved 로 표시해 둔다 —
+ * result-modal.js 가 이미지 캡처 시 이 위치를 그대로 복사해 재현한다. */
+function hsInitBubbleDrag(bubble) {
+  var drag = null;
+  bubble.addEventListener('mousedown', function (e) {
+    var cv = document.querySelector('.d-cv');
+    if (!cv) return;
+    var cvR = cv.getBoundingClientRect();
+    var bR = bubble.getBoundingClientRect();
+    drag = {
+      cvR: cvR, w: bR.width, h: bR.height,
+      offX: e.clientX - bR.left, offY: e.clientY - bR.top,
+    };
+    bubble.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!drag) return;
+    var left = Math.max(0, Math.min(drag.cvR.width - drag.w, e.clientX - drag.cvR.left - drag.offX));
+    var top = Math.max(0, Math.min(drag.cvR.height - drag.h, e.clientY - drag.cvR.top - drag.offY));
+    bubble.style.left = left + 'px';
+    bubble.style.top = top + 'px';
+    bubble.dataset.moved = '1';
+    if (hsActiveNoted) {
+      var tr = hsActiveNoted.getBoundingClientRect();
+      var targetCenter = tr.left - drag.cvR.left + tr.width / 2;
+      bubble.style.setProperty('--tail-x', Math.max(12, Math.min(drag.w - 12, targetCenter - left)) + 'px');
+    }
+  });
+  document.addEventListener('mouseup', function () {
+    if (!drag) return;
+    drag = null;
+    bubble.style.cursor = 'grab';
+  });
+}
 /** noted 요소(.hs-btn 또는 .hs-note)를 담은 hs-{shape.id} wrapper 의 id.
  * 버튼은 wrapper(바깥 div)에 id 가 있고 정작 클릭 대상인 .hs-btn 자신에는 없어서,
  * "지금 켜져 있는 요소가 무엇인지"를 안정적으로 식별하려면 이 id 를 써야 한다
@@ -367,10 +404,12 @@ function hsActivate(noted) {
   if (!bubble) {
     bubble = document.createElement('div');
     bubble.id = 'hsBubble';
+    // pointer-events 는 켜져 있다 — 말풍선을 직접 드래그로 옮길 수 있게 하기 위함(hsInitBubbleDrag).
     bubble.style.cssText = 'position:absolute;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
       'background:#fff;color:#222;border:1.5px solid #F5821F;font-size:12.5px;line-height:1.45;' +
-      'box-shadow:0 6px 20px rgba(0,0,0,.16);pointer-events:none;opacity:0;transition:opacity .15s';
+      'box-shadow:0 6px 20px rgba(0,0,0,.16);cursor:grab;opacity:0;transition:opacity .15s';
     cv.appendChild(bubble);
+    hsInitBubbleDrag(bubble);
   }
   // 말풍선은 뷰포트가 아니라 .d-cv(캔버스) 기준 좌표로 배치한다 — 캡처 대상이 .d-cv 하나뿐이라
   // 말풍선·화살표가 그 안에 같이 들어있어야 이미지 복사·저장에 함께 찍힌다.
@@ -382,6 +421,7 @@ function hsActivate(noted) {
   // 그 크기를 기준으로 꼬리·위치를 잡아야 캔버스 밖으로 벗어나지 않는다.
   bubble.textContent = msg;
   bubble.classList.remove('below');
+  delete bubble.dataset.moved; // 새로 켜는 요소이므로 이전에 사용자가 직접 옮겨둔 위치는 잊는다
   var bw = bubble.getBoundingClientRect().width || 260;
   var bh = bubble.getBoundingClientRect().height || 38;
   var GAP = 10; // 요소와 꼬리 끝 사이 여백
@@ -405,6 +445,9 @@ function hsActivate(noted) {
   bubble.style.opacity = '1';
 }
 document.addEventListener('click', function (e) {
+  // 말풍선을 드래그해서 옮긴 뒤에도(또는 그냥 말풍선 위를 클릭해도) mouseup 에서 click 이 한 번
+  // 더 발생하는데, 이걸 "빈 곳 클릭"으로 처리하면 옮기자마자 꺼져버린다 — 무시한다.
+  if (e.target.closest('#hsBubble')) return;
   var toggle = e.target.closest('#hsToggle');
   if (toggle) {
     var on = document.body.classList.toggle('hs-hl');
@@ -479,7 +522,7 @@ function buildPreviewHtml(title, payload) {
     `border-color:transparent transparent #fff transparent}` +
     `</style></head>` +
     `<body>${toggleHtml}<div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
-    ` · 설명·연결 있는 요소는 클릭하면 표시, 다시 클릭하면 숨김</div>` +
+    ` · 설명·연결 있는 요소는 클릭하면 표시, 다시 클릭하면 숨김 · 말풍선은 드래그로 옮길 수 있음</div>` +
     `<div class="d-cv"${bgStyle}>${els}` +
     `<svg id="hsLinkLayer" width="${w}" height="${h}"><defs>` +
     `<marker id="hsLinkArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +

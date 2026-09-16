@@ -274,6 +274,12 @@ async function renderScreenBlob() {
   const liveWin = mbody().querySelector('iframe')?.contentWindow;
   const activeId = liveWin?.hsActiveId || null;
   const hlOn = !!liveWin?.document?.body?.classList.contains('hs-hl');
+  // 말풍선을 사용자가 직접 드래그해서 옮겨 뒀으면(hsInitBubbleDrag) 그 위치도 그대로 옮겨 찍는다 —
+  // 캡처용 iframe에서 hsActivate 를 다시 태우면 자동 배치 위치로 리셋되므로, 재현 직후 덮어써야 한다.
+  const liveBubble = liveWin?.document?.getElementById('hsBubble');
+  const movedPos = liveBubble?.dataset.moved === '1'
+    ? { left: liveBubble.style.left, top: liveBubble.style.top, tailX: liveBubble.style.getPropertyValue('--tail-x') }
+    : null;
 
   const cap = document.createElement('iframe');
   cap.setAttribute('aria-hidden', 'true');
@@ -312,6 +318,14 @@ async function renderScreenBlob() {
     if (hlOn) cap.contentWindow?.document.getElementById('hsToggle')?.click();
     if (activeId) cap.contentWindow?.hsFindNotedById?.(activeId)?.click();
     if (hlOn || activeId) await new Promise((r) => setTimeout(r, 30));
+    if (movedPos) {
+      const capBubble = doc.getElementById('hsBubble');
+      if (capBubble) {
+        capBubble.style.left = movedPos.left;
+        capBubble.style.top = movedPos.top;
+        if (movedPos.tailX) capBubble.style.setProperty('--tail-x', movedPos.tailX);
+      }
+    }
 
     const cvRect = cv.getBoundingClientRect();
     const render = window.html2canvas(cv, {

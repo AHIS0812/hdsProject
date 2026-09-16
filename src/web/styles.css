@@ -406,6 +406,16 @@ h4.gap{margin-top:30px;}
 .desc-link-btn:hover{background:var(--or-l);color:var(--or-d);border-color:var(--or);}
 .desc-link-btn.on{background:var(--or-l);color:var(--or-d);border-color:var(--or);border-style:solid;}
 
+/* "연결할 요소 추가" 중에는 팝오버 자체를 숨긴다(캔버스가 넓으면 화면 오른쪽으로 옮겨도 여전히
+   가릴 수 있어서) — 대신 툴바 한 줄 안에 들어가는 작은 배지로 진행 상황만 보여준다. 툴바는
+   원래도 얇은 한 줄이라 캔버스를 추가로 가리지 않는다. */
+.desc-pop.picking-hidden{display:none!important;}
+.pick-status{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;
+  color:var(--or-d);background:var(--or-l);border:1px solid var(--or);border-radius:8px;padding:4px 5px 4px 9px;}
+.pick-status button{background:var(--or);color:#fff;border:none;border-radius:6px;font-family:inherit;
+  font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;}
+.pick-status button:hover{background:var(--or-d);}
+
 /* ── 캔버스 위 연결 화살표(버튼 → 연결한 요소) — 클릭이 요소에 닿도록 포인터 이벤트는 끈다 ── */
 .link-layer{position:absolute;top:0;left:0;pointer-events:none;z-index:50;overflow:visible;}
 
