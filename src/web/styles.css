@@ -237,7 +237,9 @@ h4.gap{margin-top:30px;}
 .hh[data-d=w]{top:50%;margin-top:-7px;left:-4px;cursor:ew-resize;border-radius:3px;width:8px;height:14px;}
 .hh[data-d=e]{top:50%;margin-top:-7px;right:-4px;cursor:ew-resize;border-radius:3px;width:8px;height:14px;}
 
-.gd{position:absolute;background:#FF3D7F;pointer-events:none;z-index:9;}
+/* 드래그 선택 사각형·스냅 가이드선은 캔버스 위 도형이 몇 개든(각 도형은 배치 순서대로 z-index
+   1,2,3...) 항상 맨 위에 있어야 조작 중인 게 뭔지 보인다 — 도형 z-index 를 넉넉히 웃도는 값. */
+.gd{position:absolute;background:#FF3D7F;pointer-events:none;z-index:500;}
 .gd.v{width:1.5px;top:0;bottom:0;}.gd.h{height:1.5px;left:0;right:0;}
 
 .grp-outline{position:absolute;border:1.5px dashed var(--nv);border-radius:7px;pointer-events:none;
@@ -385,8 +387,10 @@ h4.gap{margin-top:30px;}
 .toast-act:hover{background:rgba(255,255,255,.28);}
 
 /* ── 다중 선택 · 정렬 툴바 ─────────────────────────────── */
+/* 도형이 많으면(각자 z-index 1,2,3...) 고정된 낮은 z-index 로는 뒤에 있는 입력칸 등에
+   가려질 수 있어서 — 도형 수가 아무리 많아져도 항상 맨 위에 있도록 넉넉히 큰 값을 쓴다. */
 .marq{position:absolute;border:1px solid var(--or);background:rgba(245,130,31,.10);
-      z-index:7;pointer-events:none;border-radius:2px;}
+      z-index:500;pointer-events:none;border-radius:2px;}
 .ctx-grp{display:inline-flex;align-items:center;gap:5px;}
 
 /* ── 버튼을 눌러야 뜨는 작은 팝오버 (항목 편집 · 위치) — 고정 툴바 안의 버튼 바로 아래 ── */
