@@ -206,6 +206,11 @@ function setTab(p) {
   $('mSaveImg').hidden = !(p === 'v' && hasPreview);
   const code = last.result?.code;
   $('mDownload').hidden = !(code?.websquareXml || code?.files?.length);
+  // 실제로 자주 쓰는 동작을 색으로 강조한다 — [화면] 탭에선 이미지 복사·저장, [WebSquare XML]
+  // 탭에선 내려받기. 내려받기는 화면 탭에서는 거의 안 쓰는 부가 기능이라 색을 빼서 덜 튀게 한다.
+  $('mCopy').classList.toggle('nv', p === 'v');
+  $('mSaveImg').classList.toggle('nv', p === 'v');
+  $('mDownload').classList.toggle('nv', p === 'x');
 }
 
 // ── footer 상태줄 (상태 + 소요시간) ──────────────────────
