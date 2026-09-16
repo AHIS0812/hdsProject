@@ -358,16 +358,20 @@ document.addEventListener('click', function (e) {
     bubble = document.createElement('div');
     bubble.id = 'hsBubble';
     bubble.style.cssText = 'position:fixed;z-index:999;max-width:260px;padding:9px 13px;border-radius:10px;' +
-      'background:#F5821F;color:#fff;font-size:12.5px;line-height:1.45;box-shadow:0 6px 20px rgba(245,130,31,.4);' +
-      'pointer-events:none;opacity:0;transition:opacity .15s';
+      'background:#fff;color:#222;border:1.5px solid #F5821F;font-size:12.5px;line-height:1.45;' +
+      'box-shadow:0 6px 20px rgba(0,0,0,.16);pointer-events:none;opacity:0;transition:opacity .15s';
     document.body.appendChild(bubble);
   }
   var r = noted.getBoundingClientRect();
-  var bubbleLeft = Math.max(6, Math.min(window.innerWidth - 268, r.left));
+  // 텍스트를 먼저 넣어 실제 렌더 폭을 잰 뒤(말풍선 폭은 내용에 따라 260px 보다 좁을 수 있다),
+  // 그 폭을 기준으로 꼬리 위치를 잡아야 꼬리가 말풍선 밖으로 벗어나지 않는다.
   bubble.textContent = msg;
+  var bw = bubble.getBoundingClientRect().width || 260;
+  var bubbleLeft = Math.max(6, Math.min(window.innerWidth - 6 - bw, r.left));
   bubble.style.left = bubbleLeft + 'px';
   bubble.style.top = Math.max(6, r.top - 46) + 'px';
-  bubble.style.setProperty('--tail-x', Math.max(12, Math.min(240, r.left + r.width / 2 - bubbleLeft)) + 'px');
+  var tailX = r.left + r.width / 2 - bubbleLeft;
+  bubble.style.setProperty('--tail-x', Math.max(12, Math.min(bw - 12, tailX)) + 'px');
   bubble.style.opacity = '1';
   clearTimeout(bubble._t);
   bubble._t = setTimeout(function () { bubble.style.opacity = '0'; hsClearArrows(); }, 2400);
@@ -403,9 +407,14 @@ function buildPreviewHtml(title, payload) {
     `.hs-toggle.on{background:#E5484D;border-color:#E5484D;color:#fff}` +
     `.hs-hl .hs-note,.hs-hl .hs-btn[data-note]:not([data-note=""]),.hs-hl .hs-btn[data-link-targets]{` +
     `outline:2px solid #E5484D;outline-offset:2px;box-shadow:0 0 0 5px rgba(229,72,77,.18)}` +
-    // 말풍선 꼬리 — 클릭한 요소 쪽을 가리키도록 위치는 JS 에서 --tail-x 로 맞춘다.
-    `#hsBubble::after{content:"";position:absolute;left:var(--tail-x,20px);bottom:-6px;width:0;height:0;` +
-    `border-width:6px 6px 0 6px;border-style:solid;border-color:#F5821F transparent transparent transparent}` +
+    // 말풍선 꼬리 — 클릭한 요소 쪽을 가리키도록 수평 위치는 JS 에서 --tail-x 로 맞춘다.
+    // 테두리색 삼각형(::before, 크게) 위에 배경색 삼각형(::after, 작게)을 겹쳐 테두리가 있는
+    // 꼬리처럼 보이게 한다 — 두 삼각형 모두 같은 --tail-x 를 기준으로 좌우 대칭이라 폭이 달라도
+    // 중심이 어긋나지 않는다.
+    `#hsBubble::before{content:"";position:absolute;left:var(--tail-x,20px);bottom:-9px;width:0;height:0;` +
+    `border-width:9px 8px 0 8px;border-style:solid;border-color:#F5821F transparent transparent transparent}` +
+    `#hsBubble::after{content:"";position:absolute;left:var(--tail-x,20px);bottom:-6.5px;width:0;height:0;` +
+    `border-width:7px 6.5px 0 6.5px;border-style:solid;border-color:#fff transparent transparent transparent}` +
     `</style></head>` +
     `<body>${toggleHtml}<div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
     ` · 설명·연결 있는 요소는 클릭하면 표시</div>` +
