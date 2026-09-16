@@ -98,6 +98,45 @@ function tabPreview(cols) {
   return row;
 }
 
+/** 요소를 더블클릭하면 그 자리에서 바로 문구를 고칠 수 있다 — 상단 툴바의 "문구" 칸까지
+ * 갈 필요 없이 PPT·캔바처럼 바로 타이핑. 문구가 실제로 안 보이는 타입(select/date 등)은
+ * HAS_TEXT 에 없어 아무 일도 하지 않는다. */
+function startInlineEdit(s) {
+  if (!HAS_TEXT[s.t] || pickingLinkFor != null) return;
+  if (selIds.length !== 1 || selIds[0] !== s.id) setSel([s.id]);
+  const el = board.querySelector(`.sh[data-id="${s.id}"]`);
+  if (!el || el.querySelector('.inline-edit')) return;
+  const input = document.createElement('input');
+  input.className = 'inline-edit';
+  input.value = s.label || '';
+  input.setAttribute('aria-label', `${NAME[s.t]} 문구`);
+  input.addEventListener('mousedown', (e) => e.stopPropagation()); // 커서 옮기려는 클릭이 드래그·재선택으로 새지 않게
+  let done = false;
+  const commit = () => {
+    if (done) return;
+    done = true;
+    const next = input.value;
+    input.remove();
+    if (next !== (s.label || '')) {
+      push();
+      s.label = next;
+      setShapeContent(el, s);
+      if (selIds.length === 1 && selIds[0] === s.id) fL.value = s.label;
+      notify();
+    }
+  };
+  const cancel = () => { if (!done) { done = true; input.remove(); } };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // Delete·Ctrl+D 등 캔버스 단축키가 타이핑 중에 끼어들지 않게
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commit(); board.focus({ preventScroll: true }); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancel(); board.focus({ preventScroll: true }); }
+  });
+  input.addEventListener('blur', commit);
+  el.appendChild(input);
+  input.focus();
+  input.select();
+}
+
 /** 선택 id 목록에 같은 그룹의 나머지 요소들을 더한다 (그룹은 한 덩어리로 선택) */
 function withGroups(ids) {
   const gids = new Set(ids.map((id) => find(id)?.g).filter(Boolean));
@@ -154,6 +193,8 @@ function render() {
         selShapes().forEach((o) => { move.orig[o.id] = { x: o.x, y: o.y }; });
       }
     };
+    // 더블클릭하면 상단 툴바까지 갈 필요 없이 그 자리에서 바로 문구를 고칠 수 있다(PPT·캔바 방식).
+    d.ondblclick = (ev) => { ev.stopPropagation(); startInlineEdit(s); };
     if (single === s.id) {
       ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach((dir) => {
         const h = document.createElement('div');
@@ -323,6 +364,13 @@ function toggleSel(id) {
   setSel(has ? selIds.filter((x) => !members.includes(x)) : [...selIds, ...members]);
 }
 
+/** list 안 값들이 전부 같은지 — 다중 선택 편집 시 "같으면 그 값, 다르면 빈 값(=여러 값)" 판단에 쓴다. */
+function commonOf(list, get) {
+  if (!list.length) return undefined;
+  const first = get(list[0]);
+  return list.every((x) => get(x) === first) ? first : undefined;
+}
+
 function syncCtx() {
   closeItemsPop(false);
   closePosPop(false);
@@ -330,23 +378,35 @@ function syncCtx() {
   closeDescPop(false);
   const n = selIds.length;
   ctx.classList.toggle('on', n > 0);
-  ctxSingle.hidden = n !== 1;
+  ctxSingle.hidden = n < 1;
   // 정렬 도구는 1개만 선택해도 쓸 수 있다 — 이때는 캔버스(페이지) 기준으로 정렬된다.
   ctxAlign.hidden = n < 1;
-  if (n === 1) {
-    const s = find(selIds[0]);
-    ctxT.textContent = NAME[s.t];
+  if (n >= 1) {
+    const ss = selShapes();
+    const sameType = ss.every((x) => x.t === ss[0].t);
+    ctxT.textContent = n === 1 ? NAME[ss[0].t] : sameType ? `${NAME[ss[0].t]} ${n}개` : `${n}개 선택됨`;
     // 컴포넌트 타입마다 실제로 의미 있는 조절칸만 보여준다 — 전부 다 띄우면
-    // 어떤 타입에 뭐가 적용되는지 알기 어렵고 툴바만 복잡해진다.
-    const showText = !!HAS_TEXT[s.t];
+    // 어떤 타입에 뭐가 적용되는지 알기 어렵고 툴바만 복잡해진다. 여러 개를 섞어 골랐으면
+    // 그중 하나라도 해당 속성이 있는 타입이면 보여주고, 값을 입력하면 그 속성이 있는 것만 바뀐다.
+    const textShapes = ss.filter((x) => HAS_TEXT[x.t]);
+    const showText = textShapes.length > 0;
     fL.classList.toggle('hidden', !showText);
     fsWrap.classList.toggle('hidden', !showText);
-    fL.value = s.label;
-    fS.value = s.fs || DEFAULT_FS;
-    descInput.value = s.desc || '';
-    bItems.classList.toggle('hidden', !HAS_ITEMS[s.t]);
-    bReq.classList.toggle('hidden', !HAS_REQ[s.t]);
-    bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
+    if (showText) {
+      const commonLabel = commonOf(textShapes, (x) => x.label || '');
+      fL.value = commonLabel ?? '';
+      fL.placeholder = commonLabel === undefined ? '여러 값 — 입력하면 통일' : '문구';
+      const commonFs = commonOf(textShapes, (x) => x.fs || DEFAULT_FS);
+      fS.value = commonFs ?? '';
+    }
+    // 설명(+연결 화살표)·항목은 요소마다 내용이 고유해서 한꺼번에 편집하는 게 의미가 없다 — 1개 선택일 때만.
+    descInput.value = n === 1 ? ss[0].desc || '' : '';
+    bDesc.classList.toggle('hidden', n !== 1);
+    bItems.classList.toggle('hidden', n !== 1 || !HAS_ITEMS[ss[0].t]);
+    const reqShapes = ss.filter((x) => HAS_REQ[x.t]);
+    bReq.classList.toggle('hidden', !reqShapes.length);
+    const allReq = reqShapes.length > 0 && reqShapes.every((x) => x.req);
+    bReq.classList.toggle('on', allReq); bReq.setAttribute('aria-pressed', String(allReq));
   }
   // 그룹으로 묶기/해제는 그룹 도구라 2개 이상일 때만 의미가 있다 — 정렬 노출과 별개로 판단.
   bGroup.hidden = n < 2 || isOneWholeGroup();
@@ -361,12 +421,13 @@ function isOneWholeGroup() {
 }
 
 function applyLabel() {
-  if (selIds.length !== 1) return;
-  const s = find(selIds[0]);
-  if (!s) return;
-  s.label = fL.value;
-  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
-  if (el) setShapeContent(el, s);
+  const ss = selShapes().filter((s) => HAS_TEXT[s.t]);
+  if (!ss.length) return;
+  ss.forEach((s) => {
+    s.label = fL.value;
+    const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+    if (el) setShapeContent(el, s);
+  });
   notify();
 }
 
@@ -382,24 +443,28 @@ function applyDesc() {
 function clampFs(v) { return Math.max(8, Math.min(48, v || DEFAULT_FS)); }
 
 function applyFontSize() {
-  if (selIds.length !== 1) return;
-  const s = find(selIds[0]);
-  if (!s) return;
-  s.fs = clampFs(parseInt(fS.value, 10));
-  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
-  if (el) el.style.fontSize = s.fs + 'px';
+  const ss = selShapes().filter((s) => HAS_TEXT[s.t]);
+  if (!ss.length) return;
+  const v = clampFs(parseInt(fS.value, 10));
+  ss.forEach((s) => {
+    s.fs = v;
+    const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+    if (el) el.style.fontSize = v + 'px';
+  });
   notify();
 }
 
 function stepFontSize(d) {
-  if (selIds.length !== 1) return;
-  const s = find(selIds[0]);
-  if (!s) return;
+  const ss = selShapes().filter((s) => HAS_TEXT[s.t]);
+  if (!ss.length) return;
   push();
-  s.fs = clampFs((s.fs || DEFAULT_FS) + d);
-  fS.value = s.fs;
-  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
-  if (el) el.style.fontSize = s.fs + 'px';
+  // 여러 개 선택했으면 각자 지금 크기 기준으로 한 단계씩 — 서로 다른 크기였다면 그 차이는 유지된다.
+  ss.forEach((s) => {
+    s.fs = clampFs((s.fs || DEFAULT_FS) + d);
+    const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+    if (el) el.style.fontSize = s.fs + 'px';
+  });
+  fS.value = commonOf(ss, (s) => s.fs) ?? '';
   notify();
 }
 
@@ -620,12 +685,15 @@ function delItem(i) {
 }
 
 function toggleReq() {
-  if (selIds.length !== 1) return;
-  const s = find(selIds[0]);
-  if (!s) return;
+  const ss = selShapes().filter((s) => HAS_REQ[s.t]);
+  if (!ss.length) return;
   push();
-  s.req = !s.req;
-  bReq.classList.toggle('on', s.req); bReq.setAttribute('aria-pressed', String(!!s.req));
+  // 여러 개 선택했으면 하나라도 아직 ✕면 전부 ON, 이미 전부 ON이면 전부 OFF — 켜져 있던 것만
+  // 끄이는 식으로 뒤죽박죽되지 않게 "다같이 켜거나 다같이 끄거나" 둘 중 하나로 맞춘다.
+  const allOn = ss.every((s) => s.req);
+  const next = !allOn;
+  ss.forEach((s) => { s.req = next; });
+  bReq.classList.toggle('on', next); bReq.setAttribute('aria-pressed', String(next));
   render();
 }
 
@@ -864,6 +932,9 @@ export function initEditor(opts = {}) {
   // 캔버스를 클릭하면 입력 필드에서 포커스를 뗀다 → Ctrl+A·Del 등 단축키가 바로 먹도록.
   // capture 단계라 요소의 stopPropagation 보다 먼저 실행된다.
   cv.addEventListener('mousedown', (e) => {
+    // 인라인 편집 중인 입력창 안을 클릭한 거면 커서 이동일 뿐이니 그대로 둔다(포커스를 뺏으면
+    // 편집이 바로 끝나버려 커서를 옮길 수가 없다). 다른 곳을 클릭하면 blur 로 commit 된다.
+    if (e.target.closest('.inline-edit')) return;
     const ae = document.activeElement;
     if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && !ae.closest('.ctx')) ae.blur();
     // 캔버스에 키보드 포커스를 준다 → Ctrl+A·Del·방향키가 확실히 먹도록
