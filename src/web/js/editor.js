@@ -171,10 +171,14 @@ function render() {
   const single = selIds.length === 1 ? selIds[0] : null;
   shapes.forEach((s, i) => {
     const d = document.createElement('div');
-    d.className = 'sh' + (isSel(s.id) ? ' sel' : '');
+    const sel = isSel(s.id);
+    d.className = 'sh' + (sel ? ' sel' : '');
     d.dataset.t = s.t;
     d.dataset.id = s.id;
-    Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px', zIndex: String(i + 1) });
+    // 선택된 요소는 원래 쌓임 순서와 상관없이 맨 앞으로 — 선택 테두리·리사이즈 손잡이가 다른
+    // 요소에 가려지지 않게 한다(실제 배치 순서 자체는 안 바꾼다, z-index 만 보이는 동안만 보정).
+    const z = sel ? shapes.length + 1 : i + 1;
+    Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px', zIndex: String(z) });
     if (s.fs) d.style.fontSize = s.fs + 'px';
     setShapeContent(d, s);
     d.onmousedown = (ev) => {
