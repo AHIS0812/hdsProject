@@ -160,11 +160,6 @@ h4.gap{margin-top:30px;}
 .sh{position:absolute;border:1px solid #A8B1BF;border-radius:3px;background:#fff;
     display:flex;align-items:center;justify-content:center;font-size:10px;color:#5A6472;
     cursor:move;user-select:none;overflow:hidden;padding:0 5px;white-space:nowrap;}
-/* 타입별 [data-t=X] 규칙들과 명시도가 같아서(둘 다 클래스+속성 1개) 소스 순서상 뒤에 오는 쪽이
-   이기다 보니 title·button·check 등 몇몇 타입은 선택해도 주황 테두리가 안 보였다(border:none 이
-   style 까지 지워버림) — 속성 선택자를 하나 더 붙여 명시도를 확실히 높이고, style/color/width
-   셋 다 명시해서 타입별로 border-style 을 none·dashed 등으로 바꿔둔 규칙을 확실히 이긴다. */
-.sh.sel, .sh.sel[data-t]{border-style:solid;border-color:var(--or);border-width:1.5px;}
 .sh[data-t=area]{border-style:dashed;border-color:#BFC7D3;background:#FAFBFD;
                  align-items:flex-start;justify-content:flex-start;padding:3px 6px;color:#AEB7C4;font-size:9.5px;}
 /* 문구가 길면 한 줄로 잘려 안 보이는 대신 두 줄(그 이상)로 줄바꿈된다 — fitWrapHeight 가
@@ -230,7 +225,7 @@ h4.gap{margin-top:30px;}
 
 .hh{position:absolute;background:#fff;border:1.5px solid var(--or);border-radius:50%;
     width:9px;height:9px;display:none;z-index:8;}
-.sh.sel .hh{display:block;}
+.sel-outline .hh{display:block;}
 .hh[data-d=nw]{left:-5px;top:-5px;cursor:nwse-resize;}
 .hh[data-d=ne]{right:-5px;top:-5px;cursor:nesw-resize;}
 .hh[data-d=sw]{left:-5px;bottom:-5px;cursor:nesw-resize;}
@@ -247,6 +242,14 @@ h4.gap{margin-top:30px;}
 
 .grp-outline{position:absolute;border:1.5px dashed var(--nv);border-radius:7px;pointer-events:none;
              z-index:4;opacity:.45;}
+
+/* 선택된 요소마다 뜨는 주황 테두리 — 도형 자신에게 직접 그리면 실제 쌓임 순서(z-index)에 묶여
+   겹친 다른 요소에 가려진다. 그래서 도형과 똑같은 위치·크기의 별도 오버레이로 띄워 항상 맨
+   앞에 보이게 한다(도형 자체는 원래 쌓임 순서 그대로). 테두리는 클릭을 막지 않고(밑에 있는
+   도형을 그대로 선택·드래그할 수 있게) 손잡이에만 pointer-events 를 되살린다. */
+.sel-outline{position:absolute;box-sizing:border-box;border:1.5px solid var(--or);border-radius:3px;
+             pointer-events:none;}
+.sel-outline .hh{pointer-events:auto;}
 
 /* 다중 선택 시 전체를 감싸는 바운딩 박스 — 모서리·변 손잡이를 끌면 선택된 도형 전부가 같은
    비율로 커지거나 작아진다. 테두리 자체는 클릭을 막지 않고(밑에 있는 도형을 그대로 선택·드래그

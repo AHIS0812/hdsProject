@@ -653,8 +653,9 @@ function payload() {
 function snapshotSketch() {
   const { w, h } = editor.getBoardSize();
   const clone = $('board').cloneNode(true);
-  clone.querySelectorAll('.hh,.gd,.marq,#hint,.coach').forEach((e) => e.remove());
-  clone.querySelectorAll('.sh.sel').forEach((e) => e.classList.remove('sel'));
+  // 선택 표시(테두리 오버레이·리사이즈 손잡이)·스냅 가이드·드래그 선택 박스 등 편집 중에만
+  // 보이는 UI는 "내 스케치" 비교 화면에는 안 나와야 한다.
+  clone.querySelectorAll('.hh,.gd,.marq,#hint,.coach,.sel-outline,.sel-bbox,.grp-outline').forEach((e) => e.remove());
   return { html: clone.innerHTML, w, h };
 }
 

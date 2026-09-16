@@ -167,18 +167,14 @@ function withGroups(ids) {
 }
 
 function render() {
-  board.querySelectorAll('.sh,.grp-outline,.sel-bbox').forEach((e) => e.remove());
-  const single = selIds.length === 1 ? selIds[0] : null;
+  board.querySelectorAll('.sh,.grp-outline,.sel-bbox,.sel-outline').forEach((e) => e.remove());
   shapes.forEach((s, i) => {
     const d = document.createElement('div');
-    const sel = isSel(s.id);
-    d.className = 'sh' + (sel ? ' sel' : '');
+    d.className = 'sh';
     d.dataset.t = s.t;
     d.dataset.id = s.id;
-    // 선택된 요소는 원래 쌓임 순서와 상관없이 맨 앞으로 — 선택 테두리·리사이즈 손잡이가 다른
-    // 요소에 가려지지 않게 한다(실제 배치 순서 자체는 안 바꾼다, z-index 만 보이는 동안만 보정).
-    const z = sel ? shapes.length + 1 : i + 1;
-    Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px', zIndex: String(z) });
+    // 실제 쌓임(배치) 순서 그대로 — 선택 표시는 별도 오버레이(renderSelOutlines)가 맡는다.
+    Object.assign(d.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px', zIndex: String(i + 1) });
     if (s.fs) d.style.fontSize = s.fs + 'px';
     setShapeContent(d, s);
     d.onmousedown = (ev) => {
@@ -200,12 +196,6 @@ function render() {
         render();
         return;
       }
-      if (ev.target.classList.contains('hh')) {
-        push();
-        const p = pt(ev);
-        rs = { id: s.id, d: ev.target.dataset.d, ox: s.x, oy: s.y, ow: s.w, oh: s.h, px: p.x, py: p.y };
-        return;
-      }
       if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { toggleSel(s.id); return; }
       if (!isSel(s.id)) setSel([s.id]);
       push();
@@ -219,16 +209,9 @@ function render() {
     };
     // 더블클릭하면 상단 툴바까지 갈 필요 없이 그 자리에서 바로 문구를 고칠 수 있다(PPT·캔바 방식).
     d.ondblclick = (ev) => { ev.stopPropagation(); startInlineEdit(s); };
-    if (single === s.id) {
-      ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach((dir) => {
-        const h = document.createElement('div');
-        h.className = 'hh';
-        h.dataset.d = dir;
-        d.appendChild(h);
-      });
-    }
     board.appendChild(d);
   });
+  renderSelOutlines();
   // 선택된 그룹마다 점선 외곽선
   new Set(selShapes().map((s) => s.g).filter(Boolean)).forEach((g) => {
     const gs = shapes.filter((s) => s.g === g);
@@ -289,6 +272,9 @@ function render() {
 function quick(s) {
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) Object.assign(el.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
+  // 이 도형의 선택 테두리 오버레이도 같이 따라오게(이동·리사이즈 도중에도).
+  const o = board.querySelector('.sel-outline[data-id="' + s.id + '"]');
+  if (o) Object.assign(o.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
   renderLinks(); // 드래그 중에도 화살표가 따라오도록
 }
 
@@ -360,8 +346,41 @@ function renderLinks() {
   });
 }
 
+/** 선택된 도형마다 그 위치·크기와 똑같은 오버레이(.sel-outline)를 띄워 주황 테두리를 그린다 —
+ * 도형 자신에게 테두리를 직접 그리면 도형의 실제 쌓임 순서(z-index)에 묶여서 겹친 다른 도형에
+ * 가려질 수 있어서, 항상 맨 앞에 뜨는 별도 레이어로 뺐다. 1개만 선택됐을 때만 리사이즈
+ * 손잡이도 같이 단다(2개 이상이면 전체를 감싸는 바운딩 박스 쪽 손잡이를 쓴다). */
+function renderSelOutlines() {
+  board.querySelectorAll('.sel-outline').forEach((e) => e.remove());
+  const single = selIds.length === 1 ? selIds[0] : null;
+  selShapes().forEach((s) => {
+    const o = document.createElement('div');
+    o.className = 'sel-outline';
+    o.dataset.id = String(s.id);
+    Object.assign(o.style, {
+      left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px',
+      zIndex: String(shapes.length + 4),
+    });
+    if (single === s.id) {
+      ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach((dir) => {
+        const h = document.createElement('div');
+        h.className = 'hh';
+        h.dataset.d = dir;
+        h.onmousedown = (ev) => {
+          ev.stopPropagation();
+          push();
+          const p = pt(ev);
+          rs = { id: s.id, d: dir, ox: s.x, oy: s.y, ow: s.w, oh: s.h, px: p.x, py: p.y };
+        };
+        o.appendChild(h);
+      });
+    }
+    board.appendChild(o);
+  });
+}
+
 function paintSel() {
-  board.querySelectorAll('.sh').forEach((el) => el.classList.toggle('sel', isSel(+el.dataset.id)));
+  renderSelOutlines();
 }
 
 /** 이동 중 스냅 가이드 — 다른 요소와의 정렬(좌/가운데/우, 위/가운데/아래, 서로 맞닿는 변 포함)이
