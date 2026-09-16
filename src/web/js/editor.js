@@ -68,6 +68,9 @@ function setShapeContent(el, s) {
     if (s.t === 'list' && cols.length) content = listPreview(cols);
     else if (s.t === 'tab' && cols.length) content = tabPreview(cols);
     else if (s.t === 'radio' && cols.length) content = radioPreview(cols);
+    // 체크박스는 레이블 없이 단독으로 둘 수 있다(생성 결과와 동일) — 비워 뒀으면 타입 이름
+    // ("체크")으로 대신 채우지 않고 CSS ::before 로 그려지는 네모 아이콘만 보이게 둔다.
+    else if (s.t === 'check') content = document.createTextNode((s.req ? '＊' : '') + (s.label || ''));
     else content = document.createTextNode((s.req ? '＊' : '') + (s.label || NAME[s.t]));
   }
   el.replaceChildren(...(content ? [content] : []), ...handles);
@@ -137,6 +140,7 @@ function startInlineEdit(s) {
       push();
       s.label = next;
       setShapeContent(el, s);
+      if (WRAP_FIT_TYPES[s.t]) fitWrapHeight(s);
       if (selIds.length === 1 && selIds[0] === s.id) fL.value = s.label;
       notify();
     }
@@ -498,6 +502,7 @@ function applyLabel() {
   s.label = fL.value;
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) setShapeContent(el, s);
+  if (WRAP_FIT_TYPES[s.t]) fitWrapHeight(s);
   notify();
 }
 
@@ -547,16 +552,19 @@ const setItemsOf = (s, arr) => { s.cols = arr.join(','); };
 function refreshShapeEl(s) {
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) setShapeContent(el, s);
-  if (s.t === 'radio') fitRadioHeight(s);
+  if (WRAP_FIT_TYPES[s.t]) fitWrapHeight(s);
 }
 
-/** 라디오는 항목이 가로로 다 안 들어가면 줄바꿈되는데(생성 결과와 동일, flex-wrap), 도형
- * 높이가 그대로면 선택 테두리보다 아래로 넘쳐서 잘려 보인다 — 지금 폭 기준으로 실제 필요한
- * 높이를 재서, 부족하면 그만큼 늘린다(이미 그보다 크게 잡아 뒀으면 줄이지 않는다). */
-function fitRadioHeight(s) {
+/** 줄바꿈될 수 있는 타입 — 라디오는 항목이(생성 결과와 동일, flex-wrap), 버튼은 문구가 길면
+ * 두 줄로 넘어간다(CSS white-space:normal). 둘 다 도형 높이가 그대로면 선택 테두리 아래로
+ * 넘쳐서 잘려 보이므로 fitWrapHeight 로 필요한 만큼 높이를 늘려준다. */
+const WRAP_FIT_TYPES = { radio: 1, button: 1 };
+/** 지금 폭 기준으로 내용이 실제로 필요로 하는 높이를 재서, 지금 높이가 모자라면 그만큼 늘린다
+ * (이미 그보다 크게 잡아 뒀으면 줄이지 않는다 — 세로 방향으로 직접 조절한 값은 존중). */
+function fitWrapHeight(s) {
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
-  const wrap = el && el.querySelector('.sh-radios');
-  if (!wrap) return;
+  if (!el) return;
+  const wrap = el.querySelector('.sh-radios') || el;
   const needed = Math.ceil(wrap.scrollHeight);
   const h = Math.max(s.h, Math.min(BOARD_H - s.y, needed));
   if (h !== s.h) {
@@ -1101,9 +1109,9 @@ export function initEditor(opts = {}) {
       if (d.includes('n')) { const h = Math.max(20, Math.round(rs.oh - dy)); s.y = rs.oy + rs.oh - h; s.h = h; }
       snapSize(s, d, rs);
       guides(s); quick(s);
-      // 라디오는 폭이 좁아져 항목이 줄바꿈되면 선택 테두리(=도형 높이)도 같이 늘어나야
+      // 라디오·버튼은 폭이 좁아져 줄바꿈되면 선택 테두리(=도형 높이)도 같이 늘어나야
       // 잘리지 않고 다 보인다 — 가로 방향 리사이즈일 때만(세로만 직접 조절할 땐 그대로 둔다).
-      if (s.t === 'radio' && (d.includes('e') || d.includes('w'))) fitRadioHeight(s);
+      if (WRAP_FIT_TYPES[s.t] && (d.includes('e') || d.includes('w'))) fitWrapHeight(s);
     }
     if (mrs) {
       const p = pt(e);
@@ -1151,7 +1159,7 @@ export function initEditor(opts = {}) {
     rs = null;
     if (mrs) {
       // 라디오가 섞여 있었으면 방금 바뀐 폭 기준으로 줄바꿈 여부를 다시 재서 높이를 맞춘다.
-      mrs.ids.forEach((id) => { const sh = find(id); if (sh && sh.t === 'radio') fitRadioHeight(sh); });
+      mrs.ids.forEach((id) => { const sh = find(id); if (sh && WRAP_FIT_TYPES[sh.t]) fitWrapHeight(sh); });
       mrs = null;
       notify();
       render(); // 바운딩 박스·손잡이를 최종 크기에 맞게 다시 그린다

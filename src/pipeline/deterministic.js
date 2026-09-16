@@ -264,10 +264,12 @@ function shapeToHtml(shape, n) {
       default: 'background:#fff;border-color:#9fb3d1;color:#0F3B7C',
     }[role];
     // linksTo(스케치에서 "연결할 요소"로 지정한 대상들)가 있으면 클릭 시 그 요소들로 화살표를 그린다.
+    // 문구가 길면 한 줄로 잘리는 대신 줄바꿈된다 — 스케치 쪽에서 이미 그만큼 shape.h 를
+    // 늘려서 보내주므로(editor.js fitWrapHeight) 박스 높이는 따로 계산할 필요가 없다.
     return wrapAbs(
       shape,
       `<button type="button" class="hs-btn" data-note="${esc(shape.desc || '')}"${linkTargetsAttr(shape)} style="${control({ required: false })};` +
-        `${roleStyle};font-weight:700;cursor:pointer">${esc(shape.label || '버튼')}</button>`,
+        `${roleStyle};font-weight:700;cursor:pointer;white-space:normal;line-height:1.25;word-break:keep-all">${esc(shape.label || '버튼')}</button>`,
     );
   }
   if (t === 'date') return wrapAbs(shape, `${reqStar(shape)}<input type="date" style="${control(shape)}">`);

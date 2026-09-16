@@ -167,7 +167,10 @@ h4.gap{margin-top:30px;}
 .sh.sel, .sh.sel[data-t]{border-style:solid;border-color:var(--or);border-width:1.5px;}
 .sh[data-t=area]{border-style:dashed;border-color:#BFC7D3;background:#FAFBFD;
                  align-items:flex-start;justify-content:flex-start;padding:3px 6px;color:#AEB7C4;font-size:9.5px;}
-.sh[data-t=button]{background:var(--nv);border-color:var(--nv);color:#fff;font-weight:700;}
+/* 문구가 길면 한 줄로 잘려 안 보이는 대신 두 줄(그 이상)로 줄바꿈된다 — fitWrapHeight 가
+   그만큼 도형 높이도 같이 늘려서 잘리지 않게 한다(editor.js). */
+.sh[data-t=button]{background:var(--nv);border-color:var(--nv);color:#fff;font-weight:700;
+  white-space:normal;text-align:center;line-height:1.25;word-break:keep-all;}
 .sh[data-t=input]{justify-content:flex-start;color:#B4BCC8;}
 .sh[data-t=select]{justify-content:space-between;}
 .sh[data-t=select]::after{content:"▾";color:#8E98A6;font-size:10px;}
