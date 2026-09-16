@@ -289,10 +289,13 @@ function shapeToHtml(shape, n) {
   // title / label / area / 알 수 없는 타입
   const extra = STATIC_STYLE[t] || 'border:1px solid #c6c4bf;background:#fff;justify-content:center';
   // 실제 화면의 섹션 제목("▸ 주소" 처럼)을 흉내낸다 — title/area 만 화살표 프리픽스를 단다.
+  // 문구가 비어 있으면 "label"·"title" 같은 타입 슬러그가 그대로 찍히던 버그가 있었다 —
+  // 화살표 프리픽스도 문구가 있을 때만 붙인다(빈 것에 "▸ "만 남는 걸 피함).
   const prefix = t === 'title' || t === 'area' ? '▸ ' : '';
+  const text = shape.label ? prefix + shape.label : '';
   return `<div${elId(shape)}${annoAttrs(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
     `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;font-size:11px;color:#333;` +
-    `padding:4px 6px;overflow:hidden;white-space:nowrap;${extra}">${esc(prefix + (shape.label || t))}</div>`;
+    `padding:4px 6px;overflow:hidden;white-space:nowrap;${extra}">${esc(text)}</div>`;
 }
 
 /** 버튼·주석(hs-note) 클릭 시 설명 문구·탭 전환·연결 화살표(여러 개 가능)를 처리하는 공통 스크립트.
