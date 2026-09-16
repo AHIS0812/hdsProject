@@ -53,22 +53,23 @@ function setShapeContent(el, s) {
     [...el.childNodes].forEach((n) => { if (n.nodeType === 3) n.remove(); }); // 텍스트 노드 제거
     return;
   }
+  // 리사이즈 손잡이(.hh)는 선택된 도형에만 붙어 있는 별도 자식이라, 아래 replaceChildren 이
+  // 내용을 통째로 갈아끼우면 같이 날아간다 — 항목 추가·삭제(refreshShapeEl) 처럼 선택을 유지한
+  // 채 내용만 새로고침할 때 손잡이가 사라지지 않도록 미리 떼어 뒀다가 다시 붙인다.
+  const handles = [...el.children].filter((c) => c.classList.contains('hh'));
+  let content = null;
   if (s.t === 'divider' || s.t === 'pager') {
     // 구분선·페이지 이동은 CSS ::after 로 그려지는 고정 모양만 보이면 된다 —
     // 글자(NAME 폴백)가 겹쳐 보이지 않게 비워둔다.
-    el.replaceChildren();
-    return;
+    content = null;
+  } else {
+    const cols = String(s.cols || '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (s.t === 'list' && cols.length) content = listPreview(cols);
+    else if (s.t === 'tab' && cols.length) content = tabPreview(cols);
+    else if (s.t === 'radio' && cols.length) content = radioPreview(cols);
+    else content = document.createTextNode((s.req ? '＊' : '') + (s.label || NAME[s.t]));
   }
-  const cols = String(s.cols || '').split(',').map((x) => x.trim()).filter(Boolean);
-  if (s.t === 'list' && cols.length) {
-    el.replaceChildren(listPreview(cols));
-    return;
-  }
-  if (s.t === 'tab' && cols.length) {
-    el.replaceChildren(tabPreview(cols));
-    return;
-  }
-  el.replaceChildren(document.createTextNode((s.req ? '＊' : '') + (s.label || NAME[s.t])));
+  el.replaceChildren(...(content ? [content] : []), ...handles);
 }
 
 /** 표(list) 미리보기 헤더 — 항목이 추가되면 그 컬럼명이 실제로 보이고, 글자 수에 비례해 폭도 달라진다 */
@@ -94,6 +95,20 @@ function tabPreview(cols) {
     chip.className = 'sh-chip' + (i === 0 ? ' on' : '');
     chip.textContent = c;
     row.appendChild(chip);
+  });
+  return row;
+}
+
+/** 라디오 미리보기 — 항목이 추가되면 그 선택지들이 실제로 보인다. 가로 폭이 부족하면
+ * 자동으로 줄바꿈되어 세로로 쌓인다(생성 결과와 동일하게 flex-wrap — 스크롤바 대신 줄바꿈). */
+function radioPreview(cols) {
+  const row = document.createElement('div');
+  row.className = 'sh-radios';
+  cols.forEach((c) => {
+    const item = document.createElement('span');
+    item.className = 'sh-radio';
+    item.textContent = c;
+    row.appendChild(item);
   });
   return row;
 }
@@ -466,6 +481,13 @@ function stepFontSize(d) {
 // ── 항목(select/radio/list/tab) 하나씩 입력 ─────────────────
 const itemsArray = (s) => String(s.cols || '').split(',').map((x) => x.trim()).filter(Boolean);
 const setItemsOf = (s, arr) => { s.cols = arr.join(','); };
+/** 항목 추가·이동·삭제는 팝오버 안의 목록만 새로 그리고 캔버스의 실제 도형은 안 건드려서,
+ * 다른 걸 클릭해 전체 render() 가 한 번 더 일어나기 전까진 방금 추가한 항목이 캔버스에 안
+ * 보이는 문제가 있었다(list/tab/radio 공통) — 항목이 바뀔 때마다 그 도형만 바로 다시 그린다. */
+function refreshShapeEl(s) {
+  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+  if (el) setShapeContent(el, s);
+}
 
 function renderItemsList() {
   if (selIds.length !== 1) return;
@@ -649,6 +671,7 @@ function addItemFromInput() {
   setItemsOf(s, [...itemsArray(s), v]);
   itemsInput.value = '';
   renderItemsList();
+  refreshShapeEl(s);
   notify();
   itemsInput.focus();
 }
@@ -664,6 +687,7 @@ function moveItem(i, dir) {
   [arr[i], arr[j]] = [arr[j], arr[i]];
   setItemsOf(s, arr);
   renderItemsList();
+  refreshShapeEl(s);
   notify();
 }
 
@@ -676,6 +700,7 @@ function delItem(i) {
   arr.splice(i, 1);
   setItemsOf(s, arr);
   renderItemsList();
+  refreshShapeEl(s);
   notify();
 }
 

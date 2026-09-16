@@ -224,13 +224,17 @@ function shapeToHtml(shape, n) {
       ? items.map((o, i) => `<label style="display:flex;align-items:center;gap:2px;font-size:11px;white-space:nowrap">` +
           `<input type="radio" name="${name}"${i === 0 ? ' checked' : ''}> ${esc(o)}</label>`).join('')
       : '<span style="color:#9a9a9a;font-size:10px">(항목 없음)</span>';
-    return wrapAbs(shape, `${reqStar(shape)}${inner}`, `overflow:auto;gap:8px${shape.required ? ';padding-left:11px' : ''}`);
+    // 폭이 좁아 한 줄에 다 안 들어가면 스크롤바 대신 줄바꿈(세로로 쌓임) — 실제 라디오 버튼도
+    // 자리가 부족하면 세로로 배치하지, 가로 스크롤을 달지는 않는다.
+    return wrapAbs(shape, `${reqStar(shape)}${inner}`, `flex-wrap:wrap;gap:4px 10px${shape.required ? ';padding-left:11px' : ''}`);
   }
   if (t === 'check') {
+    // 레이블 없이 체크박스 하나만 두고 싶을 수 있다 — 비워 두면 강제로 "선택 항목"을 채우지 않는다.
+    const labelText = String(shape.label ?? '').trim();
+    const inner = labelText ? `<input type="checkbox"> ${esc(labelText)}` : `<input type="checkbox">`;
     return wrapAbs(
       shape,
-      `${reqStar(shape)}<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#333;white-space:nowrap">` +
-        `<input type="checkbox"> ${esc(shape.label || '선택 항목')}</label>`,
+      `${reqStar(shape)}<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#333;white-space:nowrap">${inner}</label>`,
       shape.required ? 'padding-left:11px' : '',
     );
   }
