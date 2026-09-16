@@ -386,19 +386,15 @@ function syncCtx() {
     const sameType = ss.every((x) => x.t === ss[0].t);
     ctxT.textContent = n === 1 ? NAME[ss[0].t] : sameType ? `${NAME[ss[0].t]} ${n}개` : `${n}개 선택됨`;
     // 컴포넌트 타입마다 실제로 의미 있는 조절칸만 보여준다 — 전부 다 띄우면
-    // 어떤 타입에 뭐가 적용되는지 알기 어렵고 툴바만 복잡해진다. 여러 개를 섞어 골랐으면
-    // 그중 하나라도 해당 속성이 있는 타입이면 보여주고, 값을 입력하면 그 속성이 있는 것만 바뀐다.
+    // 어떤 타입에 뭐가 적용되는지 알기 어렵고 툴바만 복잡해진다.
+    // 문구는 요소마다 원래 내용이 서로 다른 게 자연스러워서(여러 개를 한 문구로 덮어쓰면
+    // 오히려 실수하기 쉽다) 1개를 골랐을 때만 보여준다 — 더블클릭 인라인 편집도 마찬가지.
+    // 글자크기·필수 표시는 여러 개를 섞어 골라도 그중 해당 타입만 한꺼번에 바뀐다.
+    fL.classList.toggle('hidden', n !== 1 || !HAS_TEXT[ss[0].t]);
+    if (n === 1) fL.value = ss[0].label || '';
     const textShapes = ss.filter((x) => HAS_TEXT[x.t]);
-    const showText = textShapes.length > 0;
-    fL.classList.toggle('hidden', !showText);
-    fsWrap.classList.toggle('hidden', !showText);
-    if (showText) {
-      const commonLabel = commonOf(textShapes, (x) => x.label || '');
-      fL.value = commonLabel ?? '';
-      fL.placeholder = commonLabel === undefined ? '여러 값 — 입력하면 통일' : '문구';
-      const commonFs = commonOf(textShapes, (x) => x.fs || DEFAULT_FS);
-      fS.value = commonFs ?? '';
-    }
+    fsWrap.classList.toggle('hidden', !textShapes.length);
+    if (textShapes.length) fS.value = commonOf(textShapes, (x) => x.fs || DEFAULT_FS) ?? '';
     // 설명(+연결 화살표)·항목은 요소마다 내용이 고유해서 한꺼번에 편집하는 게 의미가 없다 — 1개 선택일 때만.
     descInput.value = n === 1 ? ss[0].desc || '' : '';
     bDesc.classList.toggle('hidden', n !== 1);
@@ -421,13 +417,12 @@ function isOneWholeGroup() {
 }
 
 function applyLabel() {
-  const ss = selShapes().filter((s) => HAS_TEXT[s.t]);
-  if (!ss.length) return;
-  ss.forEach((s) => {
-    s.label = fL.value;
-    const el = board.querySelector('.sh[data-id="' + s.id + '"]');
-    if (el) setShapeContent(el, s);
-  });
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s) return;
+  s.label = fL.value;
+  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+  if (el) setShapeContent(el, s);
   notify();
 }
 
