@@ -163,7 +163,7 @@ function withGroups(ids) {
 }
 
 function render() {
-  board.querySelectorAll('.sh,.grp-outline').forEach((e) => e.remove());
+  board.querySelectorAll('.sh,.grp-outline,.sel-bbox').forEach((e) => e.remove());
   const single = selIds.length === 1 ? selIds[0] : null;
   shapes.forEach((s, i) => {
     const d = document.createElement('div');
