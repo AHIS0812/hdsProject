@@ -230,6 +230,7 @@ function render() {
     const b2 = Math.max(...gs.map((s) => s.y + s.h));
     const o = document.createElement('div');
     o.className = 'grp-outline';
+    o.dataset.g = g; // 드래그 중 updateOverlays() 가 이 그룹만 다시 찾아 위치를 갱신하는 데 쓴다
     Object.assign(o.style, {
       left: x - 4 + 'px', top: y - 4 + 'px', width: r - x + 8 + 'px', height: b2 - y + 8 + 'px',
       zIndex: String(shapes.length + 2),
@@ -281,6 +282,30 @@ function quick(s) {
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) Object.assign(el.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
   renderLinks(); // 드래그 중에도 화살표가 따라오도록
+}
+
+/** 다중 선택 바운딩 박스(.sel-bbox)·그룹 점선 외곽선(.grp-outline)은 render() 때만 위치를 잡아서,
+ * 드래그로 도형만 움직이면(quick 은 도형 자기 자신만 갱신) 그대로 남겨져 도형과 따로 논다 —
+ * 이동·크기 조절 중에도 매 프레임 다시 계산해 같이 따라오게 한다. */
+function updateOverlays() {
+  const box = board.querySelector('.sel-bbox');
+  if (box && selIds.length >= 2) {
+    const ss = selShapes();
+    const bx = Math.min(...ss.map((s) => s.x));
+    const by = Math.min(...ss.map((s) => s.y));
+    const br = Math.max(...ss.map((s) => s.x + s.w));
+    const bb = Math.max(...ss.map((s) => s.y + s.h));
+    Object.assign(box.style, { left: bx + 'px', top: by + 'px', width: br - bx + 'px', height: bb - by + 'px' });
+  }
+  board.querySelectorAll('.grp-outline').forEach((o) => {
+    const gs = shapes.filter((s) => s.g === o.dataset.g);
+    if (!gs.length) return;
+    const x = Math.min(...gs.map((s) => s.x));
+    const y = Math.min(...gs.map((s) => s.y));
+    const r = Math.max(...gs.map((s) => s.x + s.w));
+    const b = Math.max(...gs.map((s) => s.y + s.h));
+    Object.assign(o.style, { left: x - 4 + 'px', top: y - 4 + 'px', width: r - x + 8 + 'px', height: b - y + 8 + 'px' });
+  });
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -1061,6 +1086,7 @@ export function initEditor(opts = {}) {
           s.y = Math.round(move.orig[s.id].y + dy);
           quick(s);
         });
+        updateOverlays(); // 다중 선택 박스·그룹 외곽선이 이동한 도형들을 따라오게
       }
     }
     if (rs) {
@@ -1106,8 +1132,7 @@ export function initEditor(opts = {}) {
         sh.h = Math.max(20, Math.round(o.h * scaleY));
         quick(sh);
       });
-      const box = board.querySelector('.sel-bbox');
-      if (box) Object.assign(box.style, { left: nx + 'px', top: ny + 'px', width: nw + 'px', height: nh + 'px' });
+      updateOverlays(); // 다중 선택 박스뿐 아니라, 그룹이 섞여 있으면 그 점선 외곽선도 같이 갱신
     }
   });
 
@@ -1170,6 +1195,7 @@ export function initEditor(opts = {}) {
       dx = Math.max(-minX, Math.min(BOARD_W - maxR, dx));
       dy = Math.max(-minY, Math.min(BOARD_H - maxB, dy));
       ss.forEach((s) => { s.x += dx; s.y += dy; quick(s); });
+      updateOverlays();
       notify();
     }
   });
