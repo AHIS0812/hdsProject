@@ -243,6 +243,12 @@ h4.gap{margin-top:30px;}
 .grp-outline{position:absolute;border:1.5px dashed var(--nv);border-radius:7px;pointer-events:none;
              z-index:4;opacity:.45;}
 
+/* 다중 선택 시 전체를 감싸는 바운딩 박스 — 모서리·변 손잡이를 끌면 선택된 도형 전부가 같은
+   비율로 커지거나 작아진다. 테두리 자체는 클릭을 막지 않고(밑에 있는 도형을 그대로 선택·드래그
+   할 수 있게) 손잡이에만 pointer-events 를 되살린다. */
+.sel-bbox{position:absolute;border:1.5px dashed var(--or);border-radius:4px;pointer-events:none;z-index:6;}
+.sel-bbox .hh{display:block;pointer-events:auto;}
+
 /* 우클릭 메뉴 */
 .cmenu{position:fixed;background:#fff;border:1px solid var(--line);border-radius:11px;
        box-shadow:0 10px 34px rgba(16,24,40,.22);padding:5px;z-index:70;min-width:176px;}

@@ -27,6 +27,7 @@ let zm = 100;
 let clip = null;          // 복사 버퍼 (배열)
 let move = null;
 let rs = null;
+let mrs = null;           // 다중 선택 크기 조절 상태(선택 전체를 감싸는 바운딩 박스 기준)
 let marq = null;          // 드래그 선택 사각형 상태
 let bgSrc = null;         // 변경화면 캡처 배경 이미지 data URL (트레이싱용, 생성 시 배경으로도 쓰인다)
 let pickingLinkFor = null; // 연결할 요소를 고르는 중이면 그 출발 shape id (버튼 → 연결 대상)
@@ -235,6 +236,40 @@ function render() {
     });
     board.appendChild(o);
   });
+  // 다중 선택(2개 이상)이면 전체를 감싸는 바운딩 박스 + 모서리·변 손잡이로 한꺼번에 크기를
+  // 늘리고 줄일 수 있다 — 손잡이를 끌면 그 비율만큼 선택된 도형 전부가 같이 커지거나 작아진다.
+  if (selIds.length >= 2) {
+    const ss = selShapes();
+    const bx = Math.min(...ss.map((s) => s.x));
+    const by = Math.min(...ss.map((s) => s.y));
+    const br = Math.max(...ss.map((s) => s.x + s.w));
+    const bb = Math.max(...ss.map((s) => s.y + s.h));
+    const box = document.createElement('div');
+    box.className = 'sel-bbox';
+    Object.assign(box.style, {
+      left: bx + 'px', top: by + 'px', width: br - bx + 'px', height: bb - by + 'px',
+      zIndex: String(shapes.length + 3),
+    });
+    ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach((dir) => {
+      const h = document.createElement('div');
+      h.className = 'hh';
+      h.dataset.d = dir;
+      h.onmousedown = (ev) => {
+        ev.stopPropagation();
+        push();
+        const ids = selIds.slice();
+        const orig = {};
+        ids.forEach((id) => {
+          const sh = find(id);
+          orig[id] = { x: sh.x, y: sh.y, w: sh.w, h: sh.h };
+        });
+        const p = pt(ev);
+        mrs = { ids, orig, ox: bx, oy: by, ow: br - bx, oh: bb - by, d: dir, px: p.x, py: p.y };
+      };
+      box.appendChild(h);
+    });
+    board.appendChild(box);
+  }
   renderLinks();
   hint.style.display = (shapes.length || bgSrc) ? 'none' : 'block';
   bU.disabled = !hist.length;
@@ -487,6 +522,22 @@ const setItemsOf = (s, arr) => { s.cols = arr.join(','); };
 function refreshShapeEl(s) {
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) setShapeContent(el, s);
+  if (s.t === 'radio') fitRadioHeight(s);
+}
+
+/** 라디오는 항목이 가로로 다 안 들어가면 줄바꿈되는데(생성 결과와 동일, flex-wrap), 도형
+ * 높이가 그대로면 선택 테두리보다 아래로 넘쳐서 잘려 보인다 — 지금 폭 기준으로 실제 필요한
+ * 높이를 재서, 부족하면 그만큼 늘린다(이미 그보다 크게 잡아 뒀으면 줄이지 않는다). */
+function fitRadioHeight(s) {
+  const el = board.querySelector('.sh[data-id="' + s.id + '"]');
+  const wrap = el && el.querySelector('.sh-radios');
+  if (!wrap) return;
+  const needed = Math.ceil(wrap.scrollHeight);
+  const h = Math.max(s.h, Math.min(BOARD_H - s.y, needed));
+  if (h !== s.h) {
+    s.h = h;
+    el.style.height = h + 'px';
+  }
 }
 
 function renderItemsList() {
@@ -1024,6 +1075,39 @@ export function initEditor(opts = {}) {
       if (d.includes('n')) { const h = Math.max(20, Math.round(rs.oh - dy)); s.y = rs.oy + rs.oh - h; s.h = h; }
       snapSize(s, d, rs);
       guides(s); quick(s);
+      // 라디오는 폭이 좁아져 항목이 줄바꿈되면 선택 테두리(=도형 높이)도 같이 늘어나야
+      // 잘리지 않고 다 보인다 — 가로 방향 리사이즈일 때만(세로만 직접 조절할 땐 그대로 둔다).
+      if (s.t === 'radio' && (d.includes('e') || d.includes('w'))) fitRadioHeight(s);
+    }
+    if (mrs) {
+      const p = pt(e);
+      const dx = p.x - mrs.px;
+      const dy = p.y - mrs.py;
+      const d = mrs.d;
+      let nx = mrs.ox; let ny = mrs.oy; let nw = mrs.ow; let nh = mrs.oh;
+      if (d.includes('e')) nw = Math.max(24, mrs.ow + dx);
+      if (d.includes('s')) nh = Math.max(20, mrs.oh + dy);
+      if (d.includes('w')) { nw = Math.max(24, mrs.ow - dx); nx = mrs.ox + mrs.ow - nw; }
+      if (d.includes('n')) { nh = Math.max(20, mrs.oh - dy); ny = mrs.oy + mrs.oh - nh; }
+      nx = Math.max(0, nx);
+      ny = Math.max(0, ny);
+      nw = Math.min(nw, BOARD_W - nx);
+      nh = Math.min(nh, BOARD_H - ny);
+      // 바운딩 박스가 커지고 작아진 비율만큼, 그 안의 도형들도 자기 위치·크기에 같은 비율을 적용한다
+      // (개별 스냅은 안 걸고 비율만 유지 — 여럿이 동시에 움직이는 중엔 스냅이 오히려 더 헷갈린다).
+      const scaleX = nw / mrs.ow;
+      const scaleY = nh / mrs.oh;
+      mrs.ids.forEach((id) => {
+        const sh = find(id);
+        const o = mrs.orig[id];
+        sh.x = Math.round(nx + (o.x - mrs.ox) * scaleX);
+        sh.y = Math.round(ny + (o.y - mrs.oy) * scaleY);
+        sh.w = Math.max(24, Math.round(o.w * scaleX));
+        sh.h = Math.max(20, Math.round(o.h * scaleY));
+        quick(sh);
+      });
+      const box = board.querySelector('.sel-bbox');
+      if (box) Object.assign(box.style, { left: nx + 'px', top: ny + 'px', width: nw + 'px', height: nh + 'px' });
     }
   });
 
@@ -1040,6 +1124,13 @@ export function initEditor(opts = {}) {
     }
     move = null;
     rs = null;
+    if (mrs) {
+      // 라디오가 섞여 있었으면 방금 바뀐 폭 기준으로 줄바꿈 여부를 다시 재서 높이를 맞춘다.
+      mrs.ids.forEach((id) => { const sh = find(id); if (sh && sh.t === 'radio') fitRadioHeight(sh); });
+      mrs = null;
+      notify();
+      render(); // 바운딩 박스·손잡이를 최종 크기에 맞게 다시 그린다
+    }
   });
 
   document.addEventListener('keydown', (e) => {
