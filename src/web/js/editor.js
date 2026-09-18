@@ -32,6 +32,12 @@ let marq = null;          // 드래그 선택 사각형 상태
 let bgSrc = null;         // 변경화면 캡처 배경 이미지 data URL (트레이싱용, 생성 시 배경으로도 쓰인다)
 let pickingLinkFor = null; // 연결할 요소를 고르는 중이면 그 출발 shape id (버튼 → 연결 대상)
 let notify = () => {};
+// 문구·설명·글자크기 입력칸은 키 입력마다 push() 하면 되돌리기 한 번에 한 글자씩만 되돌아가서
+// 쓸모가 없다 — 그렇다고 아예 안 부르면(예전 버그) 그 사이 다른 조작이 push() 를 한 번이라도
+// 부르는 순간 이 필드에서 고친 내용이 되돌리기 스택에 체크포인트 없이 같이 씻겨나간다.
+// 그래서 "같은 선택이 유지되는 동안 그 필드에 처음 손댈 때만" 한 번 push() 하고, 이후 같은
+// 선택에서의 입력은 전부 그 체크포인트 하나로 묶는다 — 선택이 바뀌면(setSel) 다시 초기화된다.
+let textEditPushed = { label: false, desc: false, fs: false };
 
 const pt = (e) => {
   const r = board.getBoundingClientRect();
@@ -455,6 +461,7 @@ function line(dir, p) {
 // ── 선택 ─────────────────────────────────────────────────
 function setSel(ids) {
   cancelPickLink(); // 다른 경로(단축키 등)로 선택이 바뀌면 "대상 선택" 모드는 의미가 없어진다
+  textEditPushed = { label: false, desc: false, fs: false }; // 선택이 바뀌면 새 편집 세션 시작
   selIds = withGroups([...new Set(ids)].filter((id) => find(id)));
   render();
   syncCtx();
@@ -522,6 +529,7 @@ function applyLabel() {
   if (selIds.length !== 1) return;
   const s = find(selIds[0]);
   if (!s) return;
+  if (!textEditPushed.label) { push(); textEditPushed.label = true; }
   s.label = fL.value;
   const el = board.querySelector('.sh[data-id="' + s.id + '"]');
   if (el) setShapeContent(el, s);
@@ -533,6 +541,7 @@ function applyDesc() {
   if (selIds.length !== 1) return;
   const s = find(selIds[0]);
   if (!s) return;
+  if (!textEditPushed.desc) { push(); textEditPushed.desc = true; }
   s.desc = descInput.value;
   notify();
 }
@@ -543,6 +552,7 @@ function clampFs(v) { return Math.max(8, Math.min(48, v || DEFAULT_FS)); }
 function applyFontSize() {
   const ss = selShapes().filter((s) => HAS_TEXT[s.t]);
   if (!ss.length) return;
+  if (!textEditPushed.fs) { push(); textEditPushed.fs = true; }
   const v = clampFs(parseInt(fS.value, 10));
   ss.forEach((s) => {
     s.fs = v;
@@ -915,7 +925,10 @@ function ungroupSel() {
 }
 
 // ── 복제 / 순서 / 삭제 ───────────────────────────────────
-/** shapes 를 복제하며 그룹 id 를 새로 매핑 (원본 그룹에 섞이지 않게) */
+/** shapes 를 복제하며 그룹 id 를 새로 매핑 (원본 그룹에 섞이지 않게).
+ * `{ ...s }` 는 얕은 복사라 s.links(배열) 는 원본과 같은 배열 인스턴스를 그대로 참조하게 된다 —
+ * removeLink 등이 그 배열을 splice/push 로 제자리 수정하므로, 복제본에서 연결을 끊거나
+ * 추가하면 원본도 같이 바뀌는 버그가 있었다. links 도 새 배열로 떠서 독립시킨다. */
 function cloneWithNewGroups(list, ox, oy) {
   const gmap = new Map();
   return list.map((s) => {
@@ -925,6 +938,7 @@ function cloneWithNewGroups(list, ox, oy) {
       ...s, id: uid++, g,
       x: Math.min(BOARD_W - s.w, s.x + ox),
       y: Math.min(BOARD_H - s.h, s.y + oy),
+      links: Array.isArray(s.links) ? [...s.links] : s.links,
     };
   });
 }
