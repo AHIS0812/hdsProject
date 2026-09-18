@@ -4,6 +4,7 @@
 import { generate } from './api.js';
 import { toast } from './toast.js';
 import { highlightXml } from './highlight.js';
+import { NAME } from './constants.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -204,6 +205,7 @@ function setTab(p) {
   $('mCopy').hidden = !canCopy;
   $('mCopy').textContent = p === 'v' ? '이미지 복사' : '복사';
   $('mSaveImg').hidden = !(p === 'v' && hasPreview);
+  $('mExportDoc').hidden = !(p === 'v' && hasPreview);
   const code = last.result?.code;
   $('mDownload').hidden = !(code?.websquareXml || code?.files?.length);
   // 실제로 자주 쓰는 동작을 색으로 강조한다 — [화면] 탭에선 이미지 복사·저장, [WebSquare XML]
@@ -262,29 +264,17 @@ async function copyText(text) {
   flashCopied();
 }
 /**
- * 생성 결과 preview HTML → PNG Blob.
- * 화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 있고(동시 보기에서는 준비 전일 수도 있음),
- * 전용 iframe 에 preview HTML 을 다시 렌더해 콘텐츠 전체 크기로 캡처한다(잘림 방지).
- * 캡처 대상은 body 전체가 아니라 실제 화면 영역(.d-cv)만 — "설명 붙은 요소 보기" 토글 버튼,
- * 안내 문구 같은 미리보기 전용 UI는 빠지고, 사용자가 켜 둔 설명 말풍선·연결 화살표는 .d-cv
- * 안에 같이 그려지므로(deterministic.js 의 INTERACTION_SCRIPT 참고) 그대로 함께 찍힌다.
+ * 생성 결과 preview HTML 을 전용 iframe 에 다시 렌더해 실제 화면 영역(.d-cv)만 캔버스로 찍는다
+ * (화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 있고, 동시 보기에서는 준비 전일 수도 있어
+ * 콘텐츠 전체 크기로 새로 렌더한다). "설명 붙은 요소 보기" 토글 버튼·안내 문구 같은 미리보기
+ * 전용 UI는 .d-cv 밖이라 자동으로 빠진다.
+ * @param {(doc: Document, cap: HTMLIFrameElement) => void|Promise<void>} [applyState]
+ *   캡처 직전에 iframe 문서에 재현해 둘 상태(말풍선·화살표 등) — 이미지 복사/저장에서만 쓴다.
+ * @returns {Promise<HTMLCanvasElement>}
  */
-async function renderScreenBlob() {
+async function captureScreenCanvas(applyState) {
   const html = last.result?.preview?.html;
   if (!html || !window.html2canvas) throw new Error('미리보기가 준비되지 않았습니다');
-
-  // 지금 화면에 떠 있는 iframe(사용자가 클릭해 켜 둔 말풍선·화살표·"설명 붙은 요소 보기" 상태를
-  // 들고 있다)에서 그 상태를 읽어 둔다 — 아래에서 새로 만드는 캡처용 iframe 은 preview HTML을
-  // 처음부터 다시 렌더한 별개의 문서라 이 상태를 이어받지 못하므로, 직접 재현해야 한다.
-  const liveWin = mbody().querySelector('iframe')?.contentWindow;
-  const activeId = liveWin?.hsActiveId || null;
-  const hlOn = !!liveWin?.document?.body?.classList.contains('hs-hl');
-  // 말풍선을 사용자가 직접 드래그해서 옮겨 뒀으면(hsInitBubbleDrag) 그 위치도 그대로 옮겨 찍는다 —
-  // 캡처용 iframe에서 hsActivate 를 다시 태우면 자동 배치 위치로 리셋되므로, 재현 직후 덮어써야 한다.
-  const liveBubble = liveWin?.document?.getElementById('hsBubble');
-  const movedPos = liveBubble?.dataset.moved === '1'
-    ? { left: liveBubble.style.left, top: liveBubble.style.top, tailX: liveBubble.style.getPropertyValue('--tail-x') }
-    : null;
 
   const cap = document.createElement('iframe');
   cap.setAttribute('aria-hidden', 'true');
@@ -313,6 +303,46 @@ async function renderScreenBlob() {
     cap.style.height = fullH + 'px';
     await new Promise((r) => setTimeout(r, 80));
 
+    if (applyState) await applyState(doc, cap);
+
+    const cvRect = cv.getBoundingClientRect();
+    const render = window.html2canvas(cv, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      logging: false,
+      width: Math.ceil(cvRect.width),
+      height: Math.ceil(cvRect.height),
+      windowWidth: fullW,
+      windowHeight: fullH,
+      scrollX: 0,
+      scrollY: 0,
+    });
+    const timeout = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error('이미지 생성이 지연됩니다. 창을 활성 상태로 두고 다시 시도해주세요.')), 20000),
+    );
+    return await Promise.race([render, timeout]);
+  } finally {
+    cap.remove();
+  }
+}
+
+/**
+ * 생성 결과 preview HTML → PNG Blob. 지금 화면에 떠 있는 iframe(사용자가 클릭해 켜 둔 말풍선·
+ * 화살표·"설명 붙은 요소 보기" 상태를 들고 있다)에서 그 상태를 읽어, captureScreenCanvas 가 새로
+ * 만드는 캡처용 iframe(별개 문서라 상태를 이어받지 못한다)에 그대로 재현해 함께 찍는다.
+ */
+async function renderScreenBlob() {
+  const liveWin = mbody().querySelector('iframe')?.contentWindow;
+  const activeId = liveWin?.hsActiveId || null;
+  const hlOn = !!liveWin?.document?.body?.classList.contains('hs-hl');
+  // 말풍선을 사용자가 직접 드래그해서 옮겨 뒀으면(hsInitBubbleDrag) 그 위치도 그대로 옮겨 찍는다 —
+  // 캡처용 iframe에서 hsActivate 를 다시 태우면 자동 배치 위치로 리셋되므로, 재현 직후 덮어써야 한다.
+  const liveBubble = liveWin?.document?.getElementById('hsBubble');
+  const movedPos = liveBubble?.dataset.moved === '1'
+    ? { left: liveBubble.style.left, top: liveBubble.style.top, tailX: liveBubble.style.getPropertyValue('--tail-x') }
+    : null;
+
+  const canvas = await captureScreenCanvas(async (doc, cap) => {
     // 읽어 둔 상태를 캡처용 iframe에 그대로 재현한다 — 실제로 같은 클릭 핸들러(hsToggle,
     // hsFindNotedById→hsActivate)를 타게 해서, 좌표 계산도 이 iframe 의 실제 렌더 크기 기준으로
     // 다시 이뤄지게 한다(라이브 iframe 의 좌표를 그대로 복사하면 크기가 달라 어긋날 수 있다).
@@ -331,29 +361,10 @@ async function renderScreenBlob() {
         if (movedPos.tailX) capBubble.style.setProperty('--tail-x', movedPos.tailX);
       }
     }
-
-    const cvRect = cv.getBoundingClientRect();
-    const render = window.html2canvas(cv, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      logging: false,
-      width: Math.ceil(cvRect.width),
-      height: Math.ceil(cvRect.height),
-      windowWidth: fullW,
-      windowHeight: fullH,
-      scrollX: 0,
-      scrollY: 0,
-    });
-    const timeout = new Promise((_, rej) =>
-      setTimeout(() => rej(new Error('이미지 생성이 지연됩니다. 창을 활성 상태로 두고 다시 시도해주세요.')), 20000),
-    );
-    const canvas = await Promise.race([render, timeout]);
-    return await new Promise((res, rej) =>
-      canvas.toBlob((b) => (b ? res(b) : rej(new Error('이미지 변환 실패'))), 'image/png'),
-    );
-  } finally {
-    cap.remove();
-  }
+  });
+  return await new Promise((res, rej) =>
+    canvas.toBlob((b) => (b ? res(b) : rej(new Error('이미지 변환 실패'))), 'image/png'),
+  );
 }
 
 async function copyScreenImage() {
@@ -401,6 +412,127 @@ async function saveScreenImage() {
     btn.disabled = false;
   }
 }
+// ── 산출물 추출 (PPT: 화면 이미지 + 요소 설명) ──────────────
+/** 읽기 순서(위→아래, 같은 줄이면 왼→오른쪽) — deterministic.js 의 readingOrder 와 같은 규칙.
+ * 번호를 화면을 보는 순서와 맞추기 위해 여기서도 같은 규칙으로 다시 정렬한다. */
+function readingOrder(shapes) {
+  return [...shapes].sort((a, b) =>
+    (Math.abs((a.y ?? 0) - (b.y ?? 0)) > 18 ? (a.y ?? 0) - (b.y ?? 0) : (a.x ?? 0) - (b.x ?? 0)));
+}
+
+/** "설명(desc)" 또는 "연결(linksTo)" 이 달린 요소만 — 결과 화면의 "📍 설명 붙은 요소 보기" 와
+ * 같은 기준이다. 이 목록에 번호를 매겨 이미지 위 배지·오른쪽 설명 목록에 그대로 쓴다. */
+function annotatedShapes() {
+  const shapes = last.payload?.shapes || [];
+  return readingOrder(shapes.filter((s) =>
+    (s.desc && String(s.desc).trim()) || (Array.isArray(s.linksTo) && s.linksTo.length)));
+}
+
+const deliverableFileName = () =>
+  `${(last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_')}_화면설명서.pptx`;
+
+/**
+ * 화면 산출물(PPT) 슬라이드 1장을 만들어 바로 내려받는다 — 왼쪽엔 생성된 화면 이미지,
+ * 오른쪽엔 그 위에 매긴 번호에 대응하는 설명 목록("Description"). 새로 입력할 게 없다 —
+ * 캔버스에서 요소에 붙여 둔 "설명"·"연결"이 곧 이 문서의 내용이 된다.
+ */
+async function buildDeliverablePptx() {
+  if (!window.PptxGenJS) throw new Error('PPT 라이브러리를 불러오지 못했습니다');
+  const canvas = await captureScreenCanvas(); // 말풍선·하이라이트 없는 깨끗한 화면 — 번호는 직접 매긴다
+  const imgData = canvas.toDataURL('image/png');
+
+  const shapes = last.payload?.shapes || [];
+  const { w: boardW, h: boardH } = last.payload?.canvas || { w: 960, h: 600 };
+  const items = annotatedShapes();
+  const findShape = (id) => shapes.find((s) => s.id === id);
+
+  const pptx = new window.PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE'; // 13.33 × 7.5in
+  const slide = pptx.addSlide();
+  const FONT = '맑은 고딕';
+
+  const title = last.payload?.screenName || $('mTitle').textContent || '화면';
+  slide.addText(title, { x: 0.4, y: 0.28, w: 12.5, h: 0.5, fontSize: 20, bold: true, color: '1A2942', fontFace: FONT });
+
+  // 왼쪽: 화면 이미지 — 보드 비율을 유지한 채 영역 안에 맞춘다("contain").
+  const areaX = 0.4; const areaY = 1.0; const areaW = 8.2; const areaH = 6.1;
+  const k = Math.min(areaW / boardW, areaH / boardH);
+  const picW = boardW * k; const picH = boardH * k;
+  const picX = areaX + (areaW - picW) / 2;
+  const picY = areaY + (areaH - picH) / 2;
+  slide.addShape('rect', { x: picX, y: picY, w: picW, h: picH, fill: { color: 'FFFFFF' }, line: { color: 'D8DDE5', width: 1 } });
+  slide.addImage({ data: imgData, x: picX, y: picY, w: picW, h: picH });
+
+  // 이미지 위 번호 배지 — 그 요소의 좌상단 모서리에 걸치게 놓는다(사내 화면설계서 관례).
+  const BADGE = 0.26;
+  items.forEach((s, i) => {
+    const bx = picX + (s.x / boardW) * picW;
+    const by = picY + (s.y / boardH) * picH;
+    slide.addText(String(i + 1), {
+      x: bx - BADGE / 2, y: by - BADGE / 2, w: BADGE, h: BADGE,
+      shape: pptx.ShapeType.ellipse, fill: { color: 'F5821F' }, line: { color: 'FFFFFF', width: 1 },
+      color: 'FFFFFF', bold: true, fontSize: 11, align: 'center', valign: 'middle', fontFace: FONT,
+    });
+  });
+
+  // 오른쪽: 설명 패널
+  const panelX = 8.9; const panelY = 1.0; const panelW = 4.03; const panelH = 6.1;
+  slide.addShape('rect', { x: panelX, y: panelY, w: panelW, h: panelH, fill: { color: 'FAFBFD' }, line: { color: 'E3E6EC', width: 1 } });
+  slide.addText('Description (화면 설명)', {
+    x: panelX + 0.15, y: panelY + 0.1, w: panelW - 0.3, h: 0.3,
+    fontSize: 12, bold: true, color: '6E7787', fontFace: FONT,
+  });
+
+  const paras = [];
+  if (!items.length) {
+    paras.push({
+      text: '설명이 달린 요소가 없습니다.\n캔버스에서 요소를 선택해 "설명"을 추가하면 여기에 자동으로 정리됩니다.',
+      options: { fontSize: 11, color: '79828F', italic: true, breakLine: true },
+    });
+  } else {
+    items.forEach((s, i) => {
+      const name = s.label || NAME[s.type] || s.type;
+      paras.push({ text: `${i + 1}  ${name}`, options: { bold: true, fontSize: 12, color: '1A2942', breakLine: true } });
+      const desc = (s.desc && String(s.desc).trim()) || '';
+      if (desc) paras.push({ text: desc, options: { fontSize: 11, color: '333333', breakLine: true } });
+      const targets = (Array.isArray(s.linksTo) ? s.linksTo : [])
+        .map(findShape).filter(Boolean).map((t) => t.label || NAME[t.type] || t.type);
+      if (targets.length) {
+        paras.push({ text: `→ 연결: ${targets.join(', ')}`, options: { fontSize: 10.5, color: '0F3B7C', breakLine: true } });
+      }
+      paras.push({ text: ' ', options: { fontSize: 6, breakLine: true } }); // 항목 사이 여백
+    });
+  }
+  slide.addText(paras, {
+    x: panelX + 0.15, y: panelY + 0.5, w: panelW - 0.3, h: panelH - 0.65,
+    valign: 'top', fontFace: FONT, lineSpacingMultiple: 1.2,
+  });
+
+  slide.addText('하이스케치 — 규칙 기반 자동 생성', {
+    x: 0.4, y: 7.18, w: 6, h: 0.25, fontSize: 8, color: '9AA3B0', fontFace: FONT,
+  });
+
+  await pptx.writeFile({ fileName: deliverableFileName() });
+}
+
+async function exportDeliverable() {
+  const btn = $('mExportDoc');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const restore = btn.textContent;
+  btn.textContent = '만드는 중…';
+  try {
+    await buildDeliverablePptx();
+    btn.textContent = '✓ 생성됨';
+    setTimeout(() => { btn.textContent = restore; }, 1400);
+  } catch (e) {
+    toast('산출물을 만들지 못했습니다: ' + e.message);
+    btn.textContent = restore;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function copyCurrent() {
   if (currentTab === 'v') return copyScreenImage();
   const text = textForTab(currentTab);
@@ -469,6 +601,7 @@ export async function runBuild(payload, title, sketch = null) {
   $('mView').hidden = true;
   $('mCopy').hidden = true;
   $('mSaveImg').hidden = true;
+  $('mExportDoc').hidden = true;
   $('mDownload').hidden = true;
   setActiveTab('v');
   const stop = showProgress();
@@ -487,6 +620,7 @@ export async function runBuild(payload, title, sketch = null) {
     mbody().replaceChildren(pre);
     $('mCopy').hidden = true;
     $('mSaveImg').hidden = true;
+    $('mExportDoc').hidden = true;
     $('mDownload').hidden = true;
   }
 }
@@ -496,6 +630,7 @@ export function initResultModal() {
   $('mDownload').addEventListener('click', download);
   $('mCopy').addEventListener('click', copyCurrent);
   $('mSaveImg').addEventListener('click', saveScreenImage);
+  $('mExportDoc').addEventListener('click', exportDeliverable);
   document.querySelectorAll('.mtab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.p)));
   $('mSeg').addEventListener('click', (e) => {
     const v = e.target.closest('button')?.dataset.v;

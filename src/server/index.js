@@ -26,8 +26,12 @@ const html2canvasPath = useLocalVendor
 const fflatePath = useLocalVendor
   ? path.join(ROOT, 'vendor/fflate.js')
   : path.join(ROOT, 'node_modules/fflate/umd/index.js');
+const pptxgenPath = useLocalVendor
+  ? path.join(ROOT, 'vendor/pptxgen.bundle.js')
+  : path.join(ROOT, 'node_modules/pptxgenjs/dist/pptxgen.bundle.js');
 app.get('/vendor/html2canvas.js', (req, res) => res.sendFile(html2canvasPath));
 app.get('/vendor/fflate.js', (req, res) => res.sendFile(fflatePath));
+app.get('/vendor/pptxgen.js', (req, res) => res.sendFile(pptxgenPath));
 
 // 에디터 정적 파일 (src/web)
 app.use(express.static(path.join(ROOT, 'src/web')));

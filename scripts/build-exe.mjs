@@ -7,7 +7,7 @@
 //     하이스케치.exe        더블클릭하면 서버가 뜨고 브라우저가 자동으로 열린다
 //     src/web/              에디터 정적 파일 (수정 가능)
 //     fixtures/ config/ catalog/ schemas/   데이터·정책·스키마 (수정 가능)
-//     vendor/                html2canvas·fflate (브라우저에서 쓰는 벤더 스크립트)
+//     vendor/                html2canvas·fflate·pptxgenjs (브라우저에서 쓰는 벤더 스크립트)
 //
 // 동작 원리:
 //   1) esbuild 로 src/server/index.js(ESM) + node_modules 의존성을 CJS 파일 하나로 번들
@@ -68,6 +68,7 @@ for (const dir of ['src/web', 'fixtures', 'config', 'catalog', 'schemas']) {
 mkdirSync(path.join(OUT, 'vendor'), { recursive: true });
 copyFileSync(must('node_modules/html2canvas/dist/html2canvas.min.js'), path.join(OUT, 'vendor/html2canvas.min.js'));
 copyFileSync(must('node_modules/fflate/umd/index.js'), path.join(OUT, 'vendor/fflate.js'));
+copyFileSync(must('node_modules/pptxgenjs/dist/pptxgen.bundle.js'), path.join(OUT, 'vendor/pptxgen.bundle.js'));
 
 console.log(`\n완료 → ${OUT}`);
 console.log('release 폴더를 통째로 옮겨서 배포하세요 (하이스케치.exe 더블클릭으로 실행).');
