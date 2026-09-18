@@ -507,6 +507,7 @@ async function buildDeliverablePptx() {
   slide.addText(paras, {
     x: panelX + 0.15, y: panelY + 0.5, w: panelW - 0.3, h: panelH - 0.65,
     valign: 'top', fontFace: FONT, lineSpacingMultiple: 1.2,
+    fit: 'shrink', // 설명 붙은 요소가 많아 목록이 길어지면 패널 밖으로 넘치는 대신 글자를 줄인다
   });
 
   slide.addText('하이스케치 — 규칙 기반 자동 생성', {
