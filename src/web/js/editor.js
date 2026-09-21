@@ -1462,6 +1462,8 @@ export function setBoardBackground(src) {
 export function clearBoardBackground() {
   bgSrc = null;
   board.style.backgroundImage = '';
+  // setBoardBackground 가 인라인으로 준 100% 100% 를 같이 지워야 CSS 의 20px 격자(안내선)가 원래대로 돌아온다
+  board.style.backgroundSize = '';
   hint.style.display = shapes.length ? 'none' : 'block';
 }
 export const hasBoardBackground = () => !!bgSrc;
