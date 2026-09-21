@@ -87,6 +87,8 @@ function showProgress(label) {
 function renderTab(p) {
   const b = mbody();
   const r = last.result || {};
+  previewObservers.forEach((o) => o.disconnect()); // 이전 탭/보기의 미리보기 크기 감시는 정리
+  previewObservers.length = 0;
   if (p === 'x') {
     const xml = r.code?.websquareXml;
     const pre = document.createElement('pre');
@@ -125,9 +127,45 @@ function renderTab(p) {
     b.innerHTML = '<pre>(preview HTML 없음)</pre>';
     return;
   }
+  b.replaceChildren();
+  mountPreviewFrame(b, html);
+}
+
+/**
+ * 생성 결과 미리보기 iframe 을 host 안에 붙인다. iframe 은 화면 원본 크기 그대로 두고 host 크기에 맞춰
+ * 축소(확대는 안 함)해서, 창이 작아도 스크롤바 없이 화면 전체가 한눈에 보이게 한다.
+ * 세로로 아주 긴 화면(PC·스크롤 고려 등)은 글자가 읽히도록 60% 밑으로는 줄이지 않고 스크롤에 맡긴다.
+ */
+const MIN_FIT = 0.6;
+const previewObservers = [];
+function mountPreviewFrame(host, html) {
+  const wrap = document.createElement('div');
+  wrap.className = 'pvwrap';
   const frame = document.createElement('iframe');
   frame.srcdoc = html;
-  b.replaceChildren(frame);
+  wrap.append(frame);
+  host.append(wrap);
+
+  const fit = () => {
+    const cv = frame.contentDocument?.querySelector('.d-cv');
+    if (!cv) return;
+    const natW = cv.offsetWidth + 40;                     // 캔버스 + 좌우 여백
+    const natH = cv.offsetTop + cv.offsetHeight + 16;     // 상단 안내 문구 + 캔버스 + 하단 여백
+    const cs = getComputedStyle(host);
+    const availW = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+    const availH = host.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2;
+    if (availW <= 0 || availH <= 0) return;
+    const k = Math.min(1, availW / natW, Math.max(availH / natH, MIN_FIT));
+    frame.style.width = natW + 'px';
+    frame.style.height = natH + 'px';
+    frame.style.transform = `scale(${k})`;
+    wrap.style.width = Math.ceil(natW * k) + 'px';
+    wrap.style.height = Math.ceil(natH * k) + 'px';
+  };
+  frame.addEventListener('load', fit);
+  const ro = new ResizeObserver(fit);
+  ro.observe(host);
+  previewObservers.push(ro);
 }
 
 /** 스케치 스냅샷을 컨테이너 폭에 맞춰 축소해 붙인다 */
@@ -167,9 +205,7 @@ function buildCompare(html) {
     mk('내 스케치', (pane) => mountSketch(pane)),
     mk('생성 결과', (pane) => {
       if (html) {
-        const fr = document.createElement('iframe');
-        fr.srcdoc = html;
-        pane.append(fr);
+        mountPreviewFrame(pane, html);
       } else {
         pane.innerHTML = '<pre>(preview HTML 없음)</pre>';
       }
