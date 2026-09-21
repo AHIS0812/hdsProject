@@ -474,6 +474,9 @@ function currentDoc() {
     systemId: sysCombo.get()?.id || null,
     mode: workMode,
     template: currentTpl,
+    // 변경 모드에서 어떤 기존 화면을 고치던 중이었는지 — 없으면 불러온 뒤 생성할 때
+    // "변경할 화면을 선택하세요" 로 막힌다.
+    baseScreenId: workMode === 'edit' ? (scrCombo.get()?.id || null) : null,
     canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
     // 변경화면 캡처 배경(트레이싱) — 빠지면 저장본·파일을 다시 열었을 때 배경이 사라진다
@@ -613,7 +616,25 @@ $('savesPop').addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { closeSavesPop(); $('btnSaves').focus(); }
 });
 
-function applyDoc(doc) {
+/**
+ * 시스템·변경화면 콤보를 조용히(onPick 없이) 맞춘다 — onPick 을 타면 loadedScreenId 가 초기화되고
+ * 화면 콤보가 비워져 변경 모드의 "기준 화면" 선택이 사라진다.
+ * @returns {Promise<boolean>} 기준 화면까지 복원했는지
+ */
+async function restoreSystemAndScreen(systemId, screenId) {
+  sysCombo.choose(systemId, true);
+  const screens = await api.getScreens(systemId);
+  scrCombo.setItems(screens.map((s) => ({ id: s.id, name: s.name, sub: s.template })));
+  scrCombo.setPlaceholder(screens.length ? '화면 선택' : '등록된 화면이 없습니다');
+  if (screenId && screens.some((s) => s.id === screenId)) {
+    scrCombo.choose(screenId, true);
+    loadedScreenId = screenId;
+    return true;
+  }
+  return false;
+}
+
+async function applyDoc(doc) {
   if (!doc || !Array.isArray(doc.shapes)) {
     toast('형식이 맞지 않는 파일입니다');
     return;
@@ -634,8 +655,20 @@ function applyDoc(doc) {
     editor.setBoardBackground(doc.background);
     syncBgButtons();
   }
-  if (doc.systemId) sysCombo.choose(doc.systemId);
   toast('불러왔습니다');
+
+  const systemId = doc.systemId;
+  if (!systemId) { scrCombo.reset(); return; }
+  try {
+    const hasBase = await restoreSystemAndScreen(systemId, doc.baseScreenId);
+    scheduleAutosave();
+    if (workMode === 'edit' && !hasBase && !editor.hasBoardBackground()) {
+      toast('변경할 화면을 선택해주세요 (이 저장본에는 기준 화면 정보가 없습니다)');
+    }
+  } catch (e) {
+    toast('화면 목록을 불러오지 못했습니다');
+    console.error(e);
+  }
 }
 
 // ── payload / 생성 ────────────────────────────────────────
@@ -733,14 +766,8 @@ async function boot() {
     if (draftSys) {
       // 자동 저장된 시스템 선택을 조용히 재현(onPick 을 타면 loadedScreenId 가 초기화돼 버린다) —
       // 화면 목록도 같이 불러와 변경화면 선택까지 이어 붙인다.
-      sysCombo.choose(draftSys, true);
       try {
-        const screens = await api.getScreens(draftSys);
-        scrCombo.setItems(screens.map((s) => ({ id: s.id, name: s.name, sub: s.template })));
-        scrCombo.setPlaceholder(screens.length ? '화면 선택' : '등록된 화면이 없습니다');
-        if (draft.loadedScreenId && screens.some((s) => s.id === draft.loadedScreenId)) {
-          scrCombo.choose(draft.loadedScreenId, true);
-        }
+        await restoreSystemAndScreen(draftSys, draft.loadedScreenId);
       } catch (e) {
         toast('화면 목록을 불러오지 못했습니다');
         console.error(e);
