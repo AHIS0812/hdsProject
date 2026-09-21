@@ -504,14 +504,16 @@ function buildPreviewHtml(title, payload) {
     `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title>` +
     `<style>body{margin:0;font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f5f4f1}` +
     `.d-note{font-size:11px;color:#8a8a8a;text-align:center;padding:7px}` +
+    // 토글 버튼이 안내 줄 오른쪽 끝에 들어가므로(캔버스를 가리지 않게) 안내 문구가 그 밑으로 안 들어가게 비운다.
+    `.d-note.tg{padding-right:168px}` +
     `.d-cv{position:relative;width:${w}px;height:${h}px;background:#fff;margin:0 auto 16px;` +
     `border:1px solid #ddd;box-shadow:0 1px 4px rgba(0,0,0,.08)}` +
     `.hs-note{cursor:pointer}` +
     `#hsLinkLayer{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}` +
     // "설명 붙은 요소 보기"를 켜면 desc·연결이 달린 요소(버튼 포함)에 빨간 테두리로 표시한다.
-    `.hs-toggle{position:fixed;right:14px;top:14px;z-index:998;padding:7px 13px;border-radius:999px;` +
-    `border:1px solid #d8dee6;background:#fff;color:#333;font-size:12px;font-weight:700;cursor:pointer;` +
-    `box-shadow:0 2px 10px rgba(0,0,0,.14);font-family:inherit}` +
+    `.hs-toggle{position:fixed;right:8px;top:3px;z-index:998;padding:3px 11px;border-radius:999px;` +
+    `border:1px solid #d8dee6;background:#fff;color:#333;font-size:11.5px;font-weight:700;cursor:pointer;` +
+    `box-shadow:0 1px 5px rgba(0,0,0,.14);font-family:inherit}` +
     `.hs-toggle.on{background:#E5484D;border-color:#E5484D;color:#fff}` +
     `.hs-hl .hs-note,.hs-hl .hs-btn[data-note]:not([data-note=""]),.hs-hl .hs-btn[data-link-targets]{` +
     `outline:2px solid #E5484D;outline-offset:2px;box-shadow:0 0 0 5px rgba(229,72,77,.18)}` +
@@ -530,7 +532,7 @@ function buildPreviewHtml(title, payload) {
     `#hsBubble.below::after{bottom:auto;top:-6.5px;border-width:0 6.5px 7px 6.5px;` +
     `border-color:transparent transparent #fff transparent}` +
     `</style></head>` +
-    `<body>${toggleHtml}<div class="d-note">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
+    `<body>${toggleHtml}<div class="d-note${hasAnno ? ' tg' : ''}">규칙 기반 변환 미리보기 · 버튼 클릭·선택·체크 상호작용 가능` +
     ` · 설명·연결 있는 요소는 클릭하면 표시, 다시 클릭하면 숨김 · 말풍선은 드래그로 옮길 수 있음</div>` +
     `<div class="d-cv"${bgStyle}>${els}` +
     `<svg id="hsLinkLayer" width="${w}" height="${h}"><defs>` +

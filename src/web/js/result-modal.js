@@ -120,6 +120,7 @@ function renderTab(p) {
   const html = r.preview?.html;
 
   if (viewMode === 'split' && last.sketch) {
+    maxModalSize(); // 두 화면을 나란히 놓으려면 넓게
     b.replaceChildren(buildCompare(html));
     return;
   }
@@ -128,7 +129,7 @@ function renderTab(p) {
     return;
   }
   b.replaceChildren();
-  mountPreviewFrame(b, html);
+  mountPreviewFrame(b, html, { snug: true }); // 결과 화면 크기에 창을 딱 맞춘다
 }
 
 /**
@@ -138,7 +139,41 @@ function renderTab(p) {
  */
 const MIN_FIT = 0.6;
 const previewObservers = [];
-function mountPreviewFrame(host, html) {
+const modalEl = () => document.querySelector('#mask .modal');
+
+/** 결과 창 크기를 CSS 기본값(작은 로딩 화면용)으로 되돌린다 */
+function resetModalSize() {
+  const m = modalEl();
+  if (m) { m.style.width = ''; m.style.height = ''; }
+}
+/** 동시 보기처럼 넓게 써야 하는 경우 — 뷰포트가 허용하는 최대 크기 */
+function maxModalSize() {
+  const m = modalEl();
+  if (m) { m.style.width = 'min(1680px,100%)'; m.style.height = 'min(1040px,100%)'; }
+}
+/**
+ * 결과 창을 미리보기 크기에 딱 맞춘다 — 창 프레임(머리글·보기줄·하단바) + 본문 여백 + 화면 크기.
+ * 뷰포트보다 크면 뷰포트까지만 커지고, 그땐 미리보기가 창에 맞춰 축소된다.
+ */
+function sizeModalToContent(host, natW, natH) {
+  const m = modalEl();
+  if (!m) return;
+  const cs = getComputedStyle(host);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const chromeH = m.offsetHeight - host.clientHeight; // 본문 밖(머리글·보기줄·하단바) 높이
+  // 뷰포트가 허용하는 최대 창 크기(마스크 안쪽 여백 제외, CSS 상한 포함)
+  const mask = m.parentElement;
+  const mcs = getComputedStyle(mask);
+  const maxW = Math.min(1680, mask.clientWidth - parseFloat(mcs.paddingLeft) - parseFloat(mcs.paddingRight));
+  const maxH = Math.min(1040, mask.clientHeight - parseFloat(mcs.paddingTop) - parseFloat(mcs.paddingBottom));
+  // 화면이 창보다 크면 mountPreviewFrame 이 줄여서 넣으므로, 그 축소된 크기에 맞춰 창도 함께 줄인다
+  const k = Math.min(1, (maxW - padX - 2) / natW, Math.max((maxH - chromeH - padY - 2) / natH, MIN_FIT));
+  m.style.width = `${Math.min(maxW, Math.ceil(natW * k + padX + 2))}px`;
+  m.style.height = `${Math.min(maxH, Math.ceil(natH * k + chromeH + padY + 2))}px`;
+}
+
+function mountPreviewFrame(host, html, { snug = false } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'pvwrap';
   const frame = document.createElement('iframe');
@@ -149,8 +184,11 @@ function mountPreviewFrame(host, html) {
   const fit = () => {
     const cv = frame.contentDocument?.querySelector('.d-cv');
     if (!cv) return;
-    const natW = cv.offsetWidth + 40;                     // 캔버스 + 좌우 여백
-    const natH = cv.offsetTop + cv.offsetHeight + 16;     // 상단 안내 문구 + 캔버스 + 하단 여백
+    // 화면 크기에 딱 맞춰 넣으므로 iframe 안쪽 스크롤바는 필요 없다(하단 여백을 살짝 잘라내도 스크롤이 안 생기게)
+    frame.contentDocument.documentElement.style.overflow = 'hidden';
+    const natW = cv.offsetWidth + 24;                     // 캔버스 + 좌우 여백
+    const natH = cv.offsetTop + cv.offsetHeight + 6;      // 상단 안내 문구 + 캔버스 + 하단 여백
+    if (snug) sizeModalToContent(host, natW, natH);
     const cs = getComputedStyle(host);
     const availW = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
     const availH = host.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2;
@@ -633,6 +671,7 @@ function download() {
 export async function runBuild(payload, title, sketch = null) {
   $('mTitle').textContent = title;
   viewMode = 'after';
+  resetModalSize(); // 이전 결과 크기에 맞춰졌던 창을 로딩 화면용 기본 크기로
   openModal();
   $('mClose').focus();
   mfoot().hidden = true;
