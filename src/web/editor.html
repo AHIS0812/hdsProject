@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>하이스케치</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/icon.png" type="image/png" sizes="256x256">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/" title="프로젝트 홈으로" aria-label="하이스케치 — 프로젝트 홈으로">
+    <img class="mark" src="/icon.png" alt="" aria-hidden="true"><b class="bn">하이스케치</b>
+  </a>
+  <a class="btn sm back" id="btnBack" href="/" title="내 프로젝트 목록으로 (변경 내용은 자동 저장됩니다)">‹ 내 프로젝트</a>
+  <div class="sep" aria-hidden="true"></div>
+  <input class="fname fproj" id="projNm" placeholder="제목 없는 프로젝트" maxlength="40" autocomplete="off" aria-label="프로젝트 이름" title="프로젝트 이름 (클릭해서 수정)">
+  <span class="saveStat" id="saveStat" role="status" aria-live="polite"></span>
+  <div class="sep" aria-hidden="true"></div>
+  <label class="scrLbl" for="scrNm">화면</label>
+  <input class="fname" id="scrNm" value="새 화면" placeholder="화면 이름" maxlength="60" autocomplete="off" aria-label="화면 이름">
+  <div class="r">
+    <span class="savesbox">
+      <button class="btn sm" id="btnProj" aria-haspopup="true" aria-expanded="false" aria-controls="projPop">프로젝트 ▾</button>
+      <div class="pop" id="projPop" role="dialog" aria-label="프로젝트" hidden>
+        <div class="pop-menu">
+          <button class="pop-cmd" id="pHome" type="button"><span>내 프로젝트 (홈)</span></button>
+          <button class="pop-cmd" id="pNew" type="button"><span>새 프로젝트…</span></button>
+          <button class="pop-cmd" id="pSave" type="button"><span>지금 저장</span><kbd>Ctrl+S</kbd></button>
+          <button class="pop-cmd" id="pDup" type="button"><span>사본 만들기…</span><kbd>Ctrl+Shift+S</kbd></button>
+          <button class="pop-cmd" id="btnExport" type="button"><span>파일로 내보내기 (.hds.json)</span></button>
+        </div>
+        <div class="pop-title">최근 프로젝트</div>
+        <div class="pop-list" id="projList"></div>
+      </div>
+    </span>
+    <button class="btn sm" id="btnClear" title="캔버스 비우기 (되돌리기로 복구 가능)">비우기</button>
+    <div class="sep" aria-hidden="true"></div>
+    <button class="btn pri" id="btnBuild">화면 생성</button>
+  </div>
+</header>
+
+<div class="stage">
+  <aside class="pane" aria-label="화면 설정">
+    <div class="pbd">
+      <h4 id="h-sys">어느 시스템인가요?</h4>
+      <div class="cbox" id="sysBox">
+        <button type="button" class="cbin empty">시스템 선택</button>
+        <div class="cbpop">
+          <input class="cbsearch" placeholder="시스템 검색">
+          <div class="cblist"></div>
+        </div>
+      </div>
+
+      <h4 id="h-mode">어떤 작업인가요?</h4>
+      <div class="seg" id="modeSeg" role="radiogroup" aria-labelledby="h-mode">
+        <button type="button" role="radio" aria-checked="true" data-mode="new">신규 화면</button>
+        <button type="button" role="radio" aria-checked="false" data-mode="edit">변경 화면</button>
+      </div>
+
+      <div id="editBlock" class="hidden">
+        <h4 class="gap">어떤 화면을 변경하나요?</h4>
+        <div class="cbox" id="scrBox">
+          <button type="button" class="cbin empty">먼저 시스템을 선택하세요</button>
+          <div class="cbpop">
+            <input class="cbsearch" placeholder="화면명 검색">
+            <div class="cblist"></div>
+          </div>
+        </div>
+
+        <div class="bgUp">
+          <div class="bgUp-or">또는</div>
+          <button type="button" class="btn sm" id="btnBgUp">화면 캡처 이미지로 시작</button>
+          <input type="file" id="bgFile" accept="image/*" hidden>
+          <button type="button" class="btn sm" id="btnBgClear" hidden>캡처 배경 제거</button>
+          <p class="bgUp-hint">소스가 연동 안 되는 화면은, 캡처본을 캔버스 배경에 깔고 그 위에 요소를 그려서 만드세요.</p>
+        </div>
+      </div>
+
+      <div id="newBlock">
+        <h4 class="gap" id="h-tpl">어떤 화면인가요?</h4>
+        <div class="tpls" id="tpls" role="group" aria-labelledby="h-tpl">
+          <div class="tpl" data-tpl="list" aria-pressed="false" aria-label="목록 조회 화면"><div class="wf" aria-hidden="true"><i class="q"></i><i class="h"></i>
+            <div class="g"><i></i><i></i><i></i></div><div class="g"><i></i><i></i><i></i></div></div>
+            <div class="nm">목록 조회</div></div>
+          <div class="tpl" data-tpl="detail" aria-pressed="false" aria-label="상세 조회 화면"><div class="wf" aria-hidden="true"><i class="h"></i><i class="m"></i><i></i><i class="q"></i></div>
+            <div class="nm">상세 조회</div></div>
+          <div class="tpl" data-tpl="form" aria-pressed="false" aria-label="등록 · 수정 화면"><div class="wf" aria-hidden="true"><i class="h"></i><i class="m"></i><i class="m"></i><i class="q"></i></div>
+            <div class="nm">등록 · 수정</div></div>
+          <div class="tpl" data-tpl="popup" aria-pressed="false" aria-label="팝업 화면"><div class="wf" aria-hidden="true" style="padding:8px 10px"><i class="h"></i><i></i><i class="m"></i></div>
+            <div class="nm">팝업</div></div>
+          <div class="tpl" data-tpl="main" aria-pressed="false" aria-label="메인 화면"><div class="wf" aria-hidden="true"><i class="h"></i>
+            <div class="g"><i></i><i></i></div><div class="g"><i></i><i></i></div></div>
+            <div class="nm">메인</div></div>
+          <div class="tpl on" data-tpl="blank" aria-pressed="true" aria-label="빈 화면"><div class="wf" aria-hidden="true" style="border:2px dashed #D8DDE5;background:#fff"></div>
+            <div class="nm">빈 화면</div></div>
+        </div>
+      </div>
+
+      <h4>요소 추가 <span style="font-weight:400;color:var(--mut);font-size:11px">클릭하면 놓입니다</span></h4>
+      <div class="grid2" id="clist" role="group" aria-label="요소 팔레트"></div>
+    </div>
+
+    <div class="note">
+      <div class="drop" id="drop" role="button" tabindex="0" aria-label="이미지를 캔버스에 추가 (드래그·선택·붙여넣기)">＋ 이미지 추가 (드래그 · 선택 · 붙여넣기)</div>
+    </div>
+  </aside>
+
+  <div class="canvas" id="cv" aria-label="편집 캔버스">
+    <div class="abL" id="abL" aria-live="polite">새 화면 <span>960 × 600</span></div>
+    <div id="boardWrap">
+      <div id="board" tabindex="0" role="group" aria-label="화면 캔버스 (요소 배치 영역)">
+        <div class="hint" id="hint">화면을 자유롭게 그려보세요
+          <b>반듯하지 않아도 괜찮습니다 · 표준 규칙으로 정리합니다</b></div>
+        <svg id="linkLayer" class="link-layer" aria-hidden="true">
+          <defs>
+            <marker id="linkArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0L10,5L0,10z" fill="#F5821F"></path>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    </div>
+
+    <div class="coach" id="coach" hidden>
+      <b>처음이신가요?</b>
+      <ol>
+        <li>왼쪽 <em>요소 추가</em>에서 클릭하면 캔버스에 놓입니다</li>
+        <li>드래그로 옮기고, 모서리 점으로 크기를 바꿉니다</li>
+        <li>여러 개는 <em>Shift+클릭</em> 또는 빈 곳을 <em>드래그</em>해 선택 → 정렬</li>
+        <li><em>화면 생성</em>을 누르면 표준 규칙으로 정리해 WebSquare 코드까지 만듭니다</li>
+      </ol>
+      <button class="btn sm nv" id="coachOk">알겠어요</button>
+    </div>
+  </div>
+
+  <div class="tools" role="toolbar" aria-label="캔버스 도구">
+    <button id="bU" data-act="undo" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶</button>
+    <button id="bR" data-act="redo" title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">↷</button>
+    <div class="dv" aria-hidden="true"></div>
+    <button data-act="zoomOut" title="축소" aria-label="축소">−</button>
+    <button class="zz" id="zv" data-act="zoomReset" aria-label="화면 전체가 보이는 배율로">100%</button>
+    <button data-act="zoomIn" title="확대" aria-label="확대">＋</button>
+    <div class="dv" aria-hidden="true"></div>
+    <span class="pop-wrap">
+      <button id="btnRatio" type="button" title="화면 비율" aria-haspopup="dialog" aria-expanded="false" aria-controls="ratioPop">PC ▾</button>
+      <div class="ratio-pop" id="ratioPop" role="dialog" aria-label="화면 비율" hidden>
+        <button type="button" data-ratio="pc">PC <span>화면 유형 기본 크기</span></button>
+        <button type="button" data-ratio="pcScroll">PC · 스크롤 고려 <span>960 × 1400</span></button>
+        <button type="button" data-ratio="mobile">모바일 <span>390 × 844</span></button>
+        <div class="ratio-custom">
+          <input type="number" id="ratioW" placeholder="폭" min="320" max="3000" aria-label="캔버스 폭(px) 직접 입력">
+          <span aria-hidden="true">×</span>
+          <input type="number" id="ratioH" placeholder="높이" min="240" max="4000" aria-label="캔버스 높이(px) 직접 입력">
+          <button type="button" id="ratioApply">적용</button>
+        </div>
+      </div>
+    </span>
+    <div class="dv" aria-hidden="true"></div>
+    <button id="btnHelp" data-act="help" title="단축키 도움말 (?)" aria-label="단축키 도움말" aria-haspopup="dialog" aria-expanded="false">?</button>
+  </div>
+
+  <div class="help" id="helpPop" role="dialog" aria-label="단축키 · 사용법" hidden>
+    <div class="help-hd"><b>단축키 · 사용법</b><button class="cb" id="helpClose" title="닫기" aria-label="도움말 닫기">✕</button></div>
+    <div class="help-bd">
+      <dl>
+        <dt>프로젝트 저장</dt><dd><kbd>Ctrl</kbd>+<kbd>S</kbd> 지금 프로젝트에 덮어쓰기 · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> 다른 이름으로 저장 (상단 <b>프로젝트 ▾</b>에서 새 프로젝트·열기)</dd>
+        <dt>요소 추가</dt><dd>왼쪽 팔레트에서 클릭</dd>
+        <dt>선택</dt><dd>클릭 · <kbd>Shift</kbd>/<kbd>Ctrl</kbd>+클릭(여러 개) · 빈 곳 드래그(범위 안에 완전히 들어온 것만)</dd>
+        <dt>전체 선택</dt><dd><kbd>Ctrl</kbd>+<kbd>A</kbd></dd>
+        <dt>선택 해제</dt><dd><kbd>Esc</kbd></dd>
+        <dt>이동</dt><dd>드래그 · 방향키 (<kbd>Shift</kbd>=10px)</dd>
+        <dt>크기 변경</dt><dd>선택 후 모서리·변의 점 드래그 (2개 이상 선택하면 전체를 감싸는 점선 박스로 한꺼번에)</dd>
+        <dt>문구 수정</dt><dd>요소를 더블클릭해서 그 자리에서 바로 입력 (<kbd>Enter</kbd> 확정 · <kbd>Esc</kbd> 취소)</dd>
+        <dt>복제</dt><dd><kbd>Ctrl</kbd>+<kbd>D</kbd></dd>
+        <dt>복사 · 붙여넣기</dt><dd><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></dd>
+        <dt>삭제</dt><dd><kbd>Del</kbd></dd>
+        <dt>그룹 · 해제</dt><dd><kbd>Ctrl</kbd>+<kbd>G</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> (2개 이상)</dd>
+        <dt>되돌리기 · 다시</dt><dd><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></dd>
+        <dt>정렬 · 분배</dt><dd>2개 이상 선택 시 상단 툴바 (분배는 3개 이상)</dd>
+        <dt>여러 개 한꺼번에 수정</dt><dd>2개 이상 선택 시 글자크기·필수 표시도 상단 툴바에서 같이 바뀜</dd>
+        <dt>우클릭 메뉴</dt><dd>캔버스·요소에서 오른쪽 클릭</dd>
+        <dt>확대 · 축소</dt><dd>하단 <b>−</b> / <b>＋</b> 버튼</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="ctx" id="ctx" role="toolbar" aria-label="선택 요소 편집">
+    <span class="ctx-grp" id="ctxSingle">
+      <span class="lb" id="ctxT">버튼</span>
+      <input id="fL" placeholder="문구" aria-label="요소 문구">
+      <span class="fs-ctl" id="fsWrap" role="group" aria-label="글자 크기">
+        <button type="button" id="fsDown" aria-label="글자 크기 줄이기">−</button>
+        <input id="fS" type="number" min="8" max="48" step="1" aria-label="글자 크기(px)">
+        <button type="button" id="fsUp" aria-label="글자 크기 늘리기">＋</button>
+      </span>
+      <span class="pop-wrap">
+        <button class="cb-txt" id="bDesc" type="button" title="설명" aria-label="설명"
+          aria-haspopup="dialog" aria-expanded="false" aria-controls="descPop">💬 설명</button>
+        <div class="desc-pop" id="descPop" role="dialog" aria-label="설명" hidden>
+          <div class="pop-title">이 요소의 역할 설명</div>
+          <textarea id="descInput" rows="3" placeholder="설명을 추가하세요" aria-label="요소 설명"></textarea>
+          <p class="desc-hint">생성된 화면 미리보기에서 이 요소를 클릭하면 이 설명이 안내 문구로 표시됩니다.</p>
+          <div class="desc-link" id="descLinkWrap">
+            <div class="pop-title">연결된 요소 <span class="opt">(여러 개 가능 — 화살표로 표시)</span></div>
+            <div class="desc-link-list" id="descLinkList"></div>
+            <button type="button" class="desc-link-btn" id="descLinkPick">🎯 클릭해서 연결할 요소 추가</button>
+          </div>
+        </div>
+      </span>
+      <span class="pick-status" id="pickStatus" hidden>
+        <b id="pickCount">0개 연결됨</b>
+        <button type="button" id="pickDone">완료</button>
+      </span>
+      <span class="pop-wrap">
+        <button class="cb-txt hidden" id="bItems" type="button" title="항목 편집"
+          aria-haspopup="dialog" aria-expanded="false" aria-controls="itemsPop">항목</button>
+        <div class="items-pop" id="itemsPop" role="dialog" aria-label="항목 편집" hidden>
+          <div class="items-list" id="itemsList" role="list"></div>
+          <div class="items-add">
+            <input id="itemsInput" type="text" placeholder="항목 입력 후 Enter" aria-label="새 항목 입력">
+            <button class="cb" id="itemsAddBtn" type="button" aria-label="항목 추가">＋</button>
+          </div>
+        </div>
+      </span>
+      <button class="cb-txt" id="bReq" data-act="req" title="필수 입력 표시" aria-label="필수 입력 표시" aria-pressed="false">＊ 필수</button>
+    </span>
+    <span class="ctx-grp" id="ctxAlign" hidden>
+      <span class="pop-wrap">
+        <button class="cb-txt" id="bAlign" type="button" title="정렬" aria-label="정렬"
+          aria-haspopup="dialog" aria-expanded="false" aria-controls="alignPop">⇔ 정렬</button>
+        <div class="align-pop" id="alignPop" role="dialog" aria-label="정렬" hidden>
+          <div class="pop-title">페이지에 맞춤</div>
+          <div class="align-grid">
+            <button type="button" data-act="alignT" aria-label="맨 위">⤒ 맨 위</button>
+            <button type="button" data-act="alignL" aria-label="왼쪽">⇤ 왼쪽</button>
+            <button type="button" data-act="alignC" aria-label="가로 가운데">⇔ 가운데</button>
+            <button type="button" data-act="alignM" aria-label="세로 가운데">⇕ 가운데</button>
+            <button type="button" data-act="alignB" aria-label="맨 아래">⤓ 맨 아래</button>
+            <button type="button" data-act="alignR" aria-label="오른쪽">⇥ 오른쪽</button>
+          </div>
+          <div class="align-sep" aria-hidden="true"></div>
+          <div class="pop-title">분배 · 크기 맞추기</div>
+          <div class="align-grid">
+            <button type="button" data-act="distH" title="3개 이상 선택" aria-label="가로 균등 분배">⇿ 가로 분배</button>
+            <button type="button" data-act="distV" title="3개 이상 선택" aria-label="세로 균등 분배">↕ 세로 분배</button>
+            <button type="button" data-act="matchW" title="2개 이상 선택" aria-label="폭 맞추기">↔ 폭 맞추기</button>
+            <button type="button" data-act="matchH" title="2개 이상 선택" aria-label="높이 맞추기">↕ 높이 맞추기</button>
+          </div>
+        </div>
+      </span>
+      <button class="cb-txt" id="bGroup" data-act="group" title="그룹으로 묶기 (Ctrl+G)" aria-label="그룹으로 묶기">⊞ 그룹 묶기</button>
+      <button class="cb-txt" id="bUngroup" data-act="ungroup" title="그룹 해제 (Ctrl+Shift+G)" aria-label="그룹 해제" hidden>⊟ 그룹 해제</button>
+      <span class="pop-wrap">
+        <button class="cb-txt" id="bPos" type="button" title="위치" aria-haspopup="dialog" aria-expanded="false" aria-controls="posPop">⇅ 위치</button>
+        <div class="pos-pop" id="posPop" role="dialog" aria-label="위치" hidden>
+          <div class="align-grid">
+            <button type="button" data-act="stepUp" aria-label="앞으로">▲ 앞으로</button>
+            <button type="button" data-act="stepDown" aria-label="뒤로">▼ 뒤로</button>
+            <button type="button" data-act="front" aria-label="맨 앞으로">⏫ 맨 앞으로</button>
+            <button type="button" data-act="back" aria-label="맨 뒤로">⏬ 맨 뒤로</button>
+          </div>
+        </div>
+      </span>
+    </span>
+    <div class="cdiv" aria-hidden="true"></div>
+    <button class="cb-txt" data-act="dup" title="복제 (Ctrl+D)" aria-label="복제">⧉ 복제</button>
+    <button class="cb-txt red" data-act="del" title="삭제 (Del)" aria-label="삭제">🗑 삭제</button>
+  </div>
+</div>
+
+<div class="cmenu" id="cmenu" role="menu" aria-label="캔버스 메뉴" hidden></div>
+
+<div class="mask" id="mask">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="mhd">
+      <b style="font-size:14px" id="mTitle">생성 결과</b>
+      <div class="mtabs" id="mtabs" role="tablist" aria-label="결과 보기">
+        <button class="mtab on" data-p="v" role="tab" aria-selected="true">화면</button>
+        <button class="mtab" data-p="x" role="tab" aria-selected="false">WebSquare XML</button>
+      </div>
+      <div class="r">
+        <button class="btn sm" id="mCopy" title="현재 탭 내용을 클립보드로 복사">복사</button>
+        <button class="btn sm" id="mSaveImg" title="현재 화면 이미지를 PNG 파일로 저장" hidden>이미지 저장</button>
+        <button class="btn sm" id="mExportDoc" title="화면 이미지 + 요소 설명을 PPT 산출물로 만들기" hidden>산출물 추출</button>
+        <button class="btn sm" id="mDownload">내려받기</button>
+        <button class="btn sm" id="mClose">닫기</button>
+      </div>
+    </div>
+    <div class="mview" id="mView" hidden>
+      <span id="mViewLabel">보기</span>
+      <div class="mseg" id="mSeg" role="group" aria-labelledby="mViewLabel">
+        <button class="on" data-v="after" aria-pressed="true">결과</button>
+        <button data-v="split" aria-pressed="false">동시 보기</button>
+      </div>
+    </div>
+    <div class="mbody" id="mbody" role="tabpanel"></div>
+    <div class="mfoot" id="mfoot" hidden>
+      <div class="mstatus" id="mStatus" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script src="/vendor/html2canvas.js"></script>
+<script src="/vendor/fflate.js"></script>
+<script src="/vendor/pptxgen.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

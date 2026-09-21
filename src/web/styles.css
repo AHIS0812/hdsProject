@@ -1,22 +1,5 @@
-:root{
-  --or:#F5821F;--or-d:#DE6E10;--or-l:#FFF3E7;
-  --nv:#0F3B7C;--nv-d:#0A2A5C;--nv-l:#EEF3FB;
-  --bg:#EDEFF3;--line:#E3E6EC;--line2:#F0F2F6;
-  --ink:#141A22;--sub:#616B7C;--mut:#79828F;
-  --sh:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.07);
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-[hidden]{display:none!important;}
-
-/* 키보드 포커스 링 (마우스 클릭 시에는 안 뜸). !important 로 개별 outline:none 을 이긴다 */
-:focus-visible{outline:2px solid var(--or)!important;outline-offset:2px!important;}
 .tools button:focus-visible,.cb:focus-visible,.mtab:focus-visible{outline-color:#fff!important;}
 #board:focus-visible{outline-offset:-2px!important;}
-
-@media (prefers-reduced-motion:reduce){
-  *,::before,::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
-                     transition-duration:.001ms!important;scroll-behavior:auto!important;}
-}
 body{font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-serif;background:var(--bg);
      color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased;overflow:hidden;}
 
@@ -61,15 +44,19 @@ body{font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-ser
 
 /* 프로젝트 이름·저장 상태·메뉴 */
 .fproj{width:190px;flex:0 1 190px;background:#fff;}
-.scrLbl{font-size:11px;font-weight:700;color:var(--mut);margin-right:-6px;}
+.scrLbl{font-size:11px;font-weight:700;color:var(--mut);margin-right:-6px;white-space:nowrap;}
 .saveStat{font-size:11.5px;font-weight:600;color:var(--mut);white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}
 .saveStat::before{content:"";width:7px;height:7px;border-radius:50%;background:#B8C0CC;flex:0 0 auto;}
 .saveStat.saved{color:#1F8A4C;}
 .saveStat.saved::before{background:#2FB463;}
 .saveStat.dirty{color:#C25E0A;}
-.saveStat.dirty::before{background:var(--or);}
-#btnSave.dirty{background:var(--nv);border-color:var(--nv);color:#fff;}
-#btnSave.dirty:hover{background:var(--nv-d);}
+.saveStat.dirty::before{background:var(--or);animation:savePulse 1s ease-in-out infinite;}
+.saveStat.err{color:#CF222E;}
+.saveStat.err::before{background:#E5484D;}
+@keyframes savePulse{50%{opacity:.35;}}
+.top .brand{display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none;border-radius:8px;}
+.top .btn.back{text-decoration:none;color:#3C4655;}
+a.pop-item-main{display:block;text-decoration:none;}
 #projPop{width:340px;}
 .pop-menu{display:flex;flex-direction:column;gap:1px;padding-bottom:6px;border-bottom:1px solid var(--line2);}
 .pop-cmd{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;
@@ -84,30 +71,6 @@ body{font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-ser
 .pop-item-btn{flex:0 0 auto;width:26px;border:none;background:none;color:var(--mut);border-radius:8px;
               cursor:pointer;font-size:12px;font-family:inherit;}
 .pop-item-btn:hover{background:#F0F2F6;color:var(--ink);}
-
-/* 확인·입력 대화상자 */
-.dlg-mask{position:fixed;inset:0;background:rgba(10,18,32,.45);z-index:70;display:flex;align-items:center;
-          justify-content:center;padding:20px;}
-.dlg{background:#fff;border-radius:14px;width:min(400px,94vw);padding:20px 20px 16px;
-     box-shadow:0 24px 70px rgba(10,18,32,.36);display:flex;flex-direction:column;gap:10px;}
-.dlg-title{font-size:14.5px;color:var(--ink);}
-.dlg-msg{font-size:12.5px;line-height:1.55;color:var(--sub);white-space:pre-line;}
-.dlg-label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:700;color:var(--sub);}
-.dlg-input{height:36px;border:1px solid var(--line);border-radius:9px;padding:0 11px;font-family:inherit;
-           font-size:13px;outline:none;width:100%;color:var(--ink);}
-.dlg-input:focus{border-color:var(--or);}
-.dlg-foot{display:flex;justify-content:flex-end;gap:7px;margin-top:6px;}
-.dlg-foot .btn{height:32px;}
-.btn.dng{background:#E5484D;border-color:#E5484D;color:#fff;}
-.btn.dng:hover{background:#CC3A3F;}
-.btn{height:36px;padding:0 15px;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;
-     cursor:pointer;border:1px solid var(--line);background:#fff;color:#3C4655;
-     display:inline-flex;align-items:center;gap:7px;transition:.12s;}
-.btn:hover{background:#F7F8FA;border-color:#D2D7E0;}
-.btn.pri{background:var(--or);border-color:var(--or);color:#fff;box-shadow:0 3px 12px rgba(245,130,31,.34);font-size:13.5px;}
-.btn.pri:hover{background:var(--or-d);}
-.btn.nv{background:var(--nv);border-color:var(--nv);color:#fff;}
-.btn.sm{height:30px;padding:0 11px;font-size:12px;border-radius:8px;}
 
 .stage{position:relative;height:calc(100vh - 56px);overflow:hidden;}
 .pane{position:absolute;top:14px;bottom:14px;left:14px;width:276px;background:#fff;border-radius:16px;
@@ -429,15 +392,6 @@ h4.gap{margin-top:30px;}
 .hidden{display:none;}
 
 .mfoot{flex:0 0 auto;border-top:1px solid var(--line2);padding:12px 18px;background:#fff;}
-
-.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--nv);color:#fff;
-       padding:10px 18px;border-radius:10px;font-size:12.5px;font-weight:600;z-index:80;
-       box-shadow:0 8px 28px rgba(15,59,124,.36);opacity:0;transition:opacity .2s;pointer-events:none;
-       display:flex;align-items:center;gap:12px;max-width:min(80vw,420px);text-align:center;}
-.toast.on{opacity:1;}
-.toast-act{pointer-events:auto;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.44);
-  border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
-.toast-act:hover{background:rgba(255,255,255,.28);}
 
 /* ── 다중 선택 · 정렬 툴바 ─────────────────────────────── */
 /* 도형이 많으면(각자 z-index 1,2,3...) 고정된 낮은 z-index 로는 뒤에 있는 입력칸 등에

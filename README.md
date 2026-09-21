@@ -43,10 +43,11 @@ npm run dev
   켜 둔 설명 말풍선·화살표·하이라이트까지 그대로) / WebSquare XML = 구문 강조·복사),
   코드 내려받기(파일 2개↑ zip, `fflate`),
   이미지 추가(드래그·선택·붙여넣기 → 캔버스 image 요소, data URL, 리사이즈),
-  **자동 저장**(localStorage, 디바운스) — 새로고침·재접속해도 작업 중이던 화면이 그대로 이어짐(신규/변경
-  전환·화면 유형 선택이 "새로 시작하기"), **프로젝트**(PPT·캔바처럼 지금 열린 프로젝트에 `Ctrl+S` 로 덮어쓰기 저장 ·
-  다른 이름으로 저장 · 새 프로젝트 · 목록에서 열기/이름 변경/삭제 · 저장 안 한 변경은 상태 표시 + 확인 —
-  localStorage) · `.hds.json` 파일 내보내기·열기로 공유
+  **프로젝트 자동 저장**(localStorage) — 에디터는 항상 프로젝트 하나를 열고 고칠 때마다 자동 저장(저장 중… → 저장됨,
+  `Ctrl+S` 지금 저장 · `Ctrl+Shift+S` 사본 만들기, 다른 탭과 충돌하면 덮어쓰기/사본 선택), 새로고침해도 이어짐
+- **프로젝트 홈**(`/` — 캔바·미리캔버스의 "내 작업") — 프로젝트 카드(썸네일)·검색·필터(신규/변경·시스템별)·정렬·
+  카드/목록 보기·즐겨찾기·다중 선택(일괄 내보내기 zip/삭제)·휴지통(30일)·새 프로젝트 마법사·빠른 시작 타일·
+  `.hds.json`/zip 가져오기(끌어놓기)·저장 공간 표시
 - **규칙 기반 변환기** (`src/pipeline/deterministic.js`) — payload 를 읽기순으로 정렬 →
   `catalog/websquare/mapping.json` 기반 WebSquare XML(select/radio/list/tab 항목 펼침, `area` 자식 중첩,
   필수(＊) 라벨 → 인접 필드 전파) + 좌표 그대로의 Preview HTML(버튼 클릭·선택·체크 상호작용,
@@ -64,7 +65,7 @@ src/
   server/    Express, 라우트 (/generate, /systems·/screens, /health)
   pipeline/  deterministic.js — 규칙 기반 변환기
   shared/    스키마 검증, 상수, 경로 유틸
-  web/       캔버스 에디터 (index.html, styles.css, js/*)
+  web/       프로젝트 홈(index.html) · 캔버스 에디터(editor.html) · common.css/home.css/styles.css · js/*
 schemas/     screen-draft(입력) / generation-result(출력) — 프론트↔백엔드 계약
 fixtures/    systems, screens, payloads (데이터 소스)
 catalog/     사내 UI 표준 (websquare 매핑 — 실사용. components/tokens/layout-guide 는 §9 T-4 참고용 초안)
