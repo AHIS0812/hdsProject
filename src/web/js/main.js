@@ -14,7 +14,7 @@ const scrNm = $('scrNm');
 const abL = $('abL');
 
 let workMode = 'new';
-let currentTpl = 'list';
+let currentTpl = 'blank'; // 처음 열면 빈 화면에서 시작
 let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드된 화면 id
 // 사용자가 캔버스를 직접 수정했는지. 템플릿/화면/샘플을 "프로그램으로" 로드한 직후엔 false.
 // true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
@@ -109,7 +109,7 @@ function restoreAutosave(snap) {
   workMode = snap.workMode === 'edit' ? 'edit' : 'new';
   markMode(workMode);
   applyMode();
-  currentTpl = document.querySelector(`.tpl[data-tpl="${snap.currentTpl}"]`) ? snap.currentTpl : 'list';
+  currentTpl = document.querySelector(`.tpl[data-tpl="${snap.currentTpl}"]`) ? snap.currentTpl : 'blank';
   highlightTpl(currentTpl);
   loadedScreenId = snap.loadedScreenId || null;
   baseBoardSize = snap.baseBoardSize || DEFAULT_BOARD;
@@ -713,7 +713,7 @@ async function boot() {
     restoreAutosave(draft);
     toast('작업 중이던 화면을 이어서 불러왔습니다');
   } else {
-    // 자동 저장된 내용이 없으면(첫 방문 등) 선택된 유형(목록조회)의 프리셋을 올려 시작 상태로
+    // 자동 저장된 내용이 없으면(첫 방문 등) 선택된 유형(빈 화면)의 프리셋을 올려 시작 상태로
     loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
     syncAbL();
     canvasDirty = false; // 부팅 시점의 로드는 사용자 수정이 아님
