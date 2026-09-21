@@ -44,8 +44,9 @@ npm run dev
   코드 내려받기(파일 2개↑ zip, `fflate`),
   이미지 추가(드래그·선택·붙여넣기 → 캔버스 image 요소, data URL, 리사이즈),
   **자동 저장**(localStorage, 디바운스) — 새로고침·재접속해도 작업 중이던 화면이 그대로 이어짐(신규/변경
-  전환·화면 유형 선택이 "새로 시작하기"), **이름 붙인 저장본**(localStorage 슬롯) · `.hds.json` 파일
-  내보내기·불러오기로 별도 버전을 남기거나 공유
+  전환·화면 유형 선택이 "새로 시작하기"), **프로젝트**(PPT·캔바처럼 지금 열린 프로젝트에 `Ctrl+S` 로 덮어쓰기 저장 ·
+  다른 이름으로 저장 · 새 프로젝트 · 목록에서 열기/이름 변경/삭제 · 저장 안 한 변경은 상태 표시 + 확인 —
+  localStorage) · `.hds.json` 파일 내보내기·열기로 공유
 - **규칙 기반 변환기** (`src/pipeline/deterministic.js`) — payload 를 읽기순으로 정렬 →
   `catalog/websquare/mapping.json` 기반 WebSquare XML(select/radio/list/tab 항목 펼침, `area` 자식 중첩,
   필수(＊) 라벨 → 인접 필드 전파) + 좌표 그대로의 Preview HTML(버튼 클릭·선택·체크 상호작용,

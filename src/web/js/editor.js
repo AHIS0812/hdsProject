@@ -1478,6 +1478,14 @@ export function setShapes(arr) {
   setSel([]);
 }
 
+/** 되돌리기·다시 기록을 비운다 — 다른 프로젝트를 열거나 새로 시작할 때 이전 내용으로 되돌아가지 않게 */
+export function resetHistory() {
+  hist = [];
+  future = [];
+  if (bU) bU.disabled = true;
+  if (bR) bR.disabled = true;
+}
+
 export function clearShapes() {
   if (!shapes.length) return;
   push();
