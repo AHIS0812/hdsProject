@@ -621,14 +621,19 @@ $('savesPop').addEventListener('keydown', (e) => {
  * 화면 콤보가 비워져 변경 모드의 "기준 화면" 선택이 사라진다.
  * @returns {Promise<boolean>} 기준 화면까지 복원했는지
  */
-async function restoreSystemAndScreen(systemId, screenId) {
+async function restoreSystemAndScreen(systemId, screenId, fallbackName) {
   sysCombo.choose(systemId, true);
   const screens = await api.getScreens(systemId);
   scrCombo.setItems(screens.map((s) => ({ id: s.id, name: s.name, sub: s.template })));
   scrCombo.setPlaceholder(screens.length ? '화면 선택' : '등록된 화면이 없습니다');
-  if (screenId && screens.some((s) => s.id === screenId)) {
-    scrCombo.choose(screenId, true);
-    loadedScreenId = screenId;
+  // baseScreenId 가 없는 예전 저장본 — 변경 모드는 화면 이름이 기준 화면 이름으로 고정되므로
+  // 그 이름으로 기준 화면을 찾는다(캡처 배경만 깐 저장본은 기준 화면이 없어도 되니 건너뜀).
+  const target = screens.find((s) => s.id === screenId)
+    || (workMode === 'edit' && fallbackName && !editor.hasBoardBackground()
+      ? screens.find((s) => s.name === fallbackName) : null);
+  if (target) {
+    scrCombo.choose(target.id, true);
+    loadedScreenId = target.id;
     return true;
   }
   return false;
@@ -660,7 +665,7 @@ async function applyDoc(doc) {
   const systemId = doc.systemId;
   if (!systemId) { scrCombo.reset(); return; }
   try {
-    const hasBase = await restoreSystemAndScreen(systemId, doc.baseScreenId);
+    const hasBase = await restoreSystemAndScreen(systemId, doc.baseScreenId, doc.screenName);
     scheduleAutosave();
     if (workMode === 'edit' && !hasBase && !editor.hasBoardBackground()) {
       toast('변경할 화면을 선택해주세요 (이 저장본에는 기준 화면 정보가 없습니다)');
