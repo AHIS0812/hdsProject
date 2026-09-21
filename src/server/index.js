@@ -6,6 +6,10 @@ import { ROOT, readJson } from '../shared/paths.js';
 import metaRoutes from './routes/meta.js';
 import generateRoutes from './routes/generate.js';
 
+// .env 가 있으면 읽는다(PORT 만 쓴다). README·안내문구가 .env 의 PORT 를 안내하는데 실제로는 아무도
+// 읽지 않던 문제 — Node 20.12+ 의 process.loadEnvFile 을 쓰고, 없거나 파일이 없으면 조용히 넘어간다.
+try { process.loadEnvFile?.(path.join(ROOT, '.env')); } catch { /* .env 없음 */ }
+
 const settings = readJson('config/settings.json', { port: 3000 });
 const port = process.env.PORT || settings.port || 3000;
 
@@ -39,7 +43,9 @@ app.use(express.static(path.join(ROOT, 'src/web')));
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ status: 'error', error: { message: String(err?.message || err) } });
+  // body-parser 의 잘못된 JSON(400)·용량 초과(413)도 500 으로 뭉개지 않고 원래 상태코드를 유지한다
+  const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  res.status(status).json({ status: 'error', error: { message: String(err?.message || err) } });
 });
 
 app.listen(port, () => {

@@ -476,6 +476,8 @@ function currentDoc() {
     template: currentTpl,
     canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
+    // 변경화면 캡처 배경(트레이싱) — 빠지면 저장본·파일을 다시 열었을 때 배경이 사라진다
+    ...(editor.hasBoardBackground() ? { background: editor.getBoardBackground() } : {}),
   };
 }
 
@@ -627,6 +629,11 @@ function applyDoc(doc) {
 
   loadCanvas(doc.shapes, doc.screenName || '새 화면', doc.canvas || DEFAULT_BOARD);
   loadedScreenId = null;
+  // loadCanvas 가 배경을 지우므로 그 뒤에 복원(이미지 data URL 만 허용)
+  if (typeof doc.background === 'string' && doc.background.startsWith('data:image/')) {
+    editor.setBoardBackground(doc.background);
+    syncBgButtons();
+  }
   if (doc.systemId) sysCombo.choose(doc.systemId);
   toast('불러왔습니다');
 }
