@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   COMPS, DEF, NAME, HAS_ITEMS,
   DEFAULT_BOARD, BOARD_SIZES, boardSizeFor,
-  defaultLabel, defaultCols,
+  defaultLabel, defaultCols, cleanItemName, renameItemAt,
 } from '../src/web/js/constants.js';
 import { TEMPLATE_KEYS } from '../src/web/js/templates.js';
 
@@ -56,4 +56,33 @@ test('defaultLabel / defaultCols 는 모든 타입에서 문자열을 돌려준�
     assert.equal(typeof defaultCols(t), 'string');
   }
   assert.ok(defaultCols('list').includes(','));
+});
+
+test('cleanItemName — 쉼표는 공백으로, 앞뒤·연속 공백 정리', () => {
+  assert.equal(cleanItemName('  동의  '), '동의');
+  assert.equal(cleanItemName('가,나，다'), '가 나 다');
+  assert.equal(cleanItemName('a   b'), 'a b');
+  assert.equal(cleanItemName(null), '');
+});
+
+test('renameItemAt — 해당 항목 이름만 바꾼다', () => {
+  assert.equal(renameItemAt('순번,항목1,항목2', 1, '고객명'), '순번,고객명,항목2');
+  assert.equal(renameItemAt('선택1,선택2', 0, '동의'), '동의,선택2');
+  assert.equal(renameItemAt('a,b,c', 2, ' 새 이름 '), 'a,b,새 이름');
+});
+
+test('renameItemAt — 쉼표가 들어가도 항목이 늘어나지 않는다', () => {
+  assert.equal(renameItemAt('a,b', 0, '가,나'), '가 나,b');
+});
+
+test('renameItemAt — 빈 이름·그대로·범위 밖은 변경 없음(null)', () => {
+  assert.equal(renameItemAt('a,b', 0, '   '), null);
+  assert.equal(renameItemAt('a,b', 0, 'a'), null);
+  assert.equal(renameItemAt('a,b', 5, 'x'), null);
+  assert.equal(renameItemAt('a,b', -1, 'x'), null);
+  assert.equal(renameItemAt('', 0, 'x'), null);
+});
+
+test('renameItemAt — 빈 항목이 섞인 문자열은 캔버스 표시와 같은 기준(빈 항목 제외)으로 센다', () => {
+  assert.equal(renameItemAt('a,,b', 1, 'x'), 'a,x');
 });

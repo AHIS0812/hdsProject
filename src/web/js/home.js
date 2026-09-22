@@ -4,7 +4,7 @@
 
 import * as api from './api.js';
 import { createProjectStore, browserStorage, cleanName, UNTITLED, NAME_MAX } from './projects.js';
-import { thumbnailSvg, svgDataUrl } from './thumbnail.js';
+import { thumbnailSvg, svgDataUrl, makeBgThumb } from './thumbnail.js';
 import {
   filterProjects, sortProjects, countViews, countSystems, relTime, daysLeft, metaLine, fmtSize, safeFileName, SORTS,
 } from './home-logic.js';
@@ -172,7 +172,9 @@ function buildCard(m, missing) {
   el.setAttribute('role', 'group');
   el.setAttribute('aria-label', `${m.name}${trashed ? ' (휴지통)' : ''}`);
   const svg = store.thumb(m.id);
-  if (!svg) missing.push(m.id);
+  // 썸네일이 없거나, 캡처 배경이 있는 프로젝트인데 썸네일에 배경이 빠져 있으면(예전 저장분) 다시 만든다.
+  // hasBg 를 아직 모르는 변경 화면 프로젝트는 한 번 열어 보고 채운다.
+  if (!svg || (m.hasBg && !svg.includes('<image')) || (m.hasBg === undefined && m.mode === 'edit')) missing.push(m.id);
   const sysNm = sysName(m.systemId) || m.systemName || '';
   const kind = m.mode === 'edit' ? '변경' : '신규';
   const when = trashed ? `${daysLeft(m.trashedAt)}일 후 영구 삭제` : `${relTime(m.updatedAt)} 수정`;
@@ -232,19 +234,32 @@ function renderBulk() {
     + `<button type="button" class="x" data-bulk="clear" aria-label="선택 해제" title="선택 해제 (Esc)"><span class="ico">${icon('x')}</span></button>`;
 }
 
-/** 썸네일이 없는 예전 프로젝트 — 첫 화면을 그린 뒤 하나씩 채운다 */
+/** 프로젝트 본문으로 썸네일 SVG 를 만든다 — 캡처 배경이 있으면 작게 줄여 함께 넣는다 */
+async function buildThumb(doc) {
+  const bg = typeof doc.background === 'string' && doc.background.startsWith('data:image/') ? await makeBgThumb(doc.background) : null;
+  return thumbnailSvg(doc.shapes, doc.canvas, { background: bg });
+}
+
+/** 썸네일이 없거나 캡처 배경이 빠진 프로젝트 — 첫 화면을 그린 뒤 하나씩 다시 만든다 */
+const thumbQueue = [];
+let thumbRunning = false;
 function fillMissingThumbs(ids) {
-  const queue = [...ids];
-  const step = () => {
-    const id = queue.shift();
-    if (!id) return;
-    const doc = store.get(id);
-    if (doc) {
-      const svg = thumbnailSvg(doc.shapes, doc.canvas);
-      store.setThumb(id, svg);
-      const th = grid.querySelector(`.card[data-id="${CSS.escape(id)}"] .thumb`);
-      if (th) th.innerHTML = `<img alt="" src="${svgDataUrl(svg)}">`;
-    }
+  for (const id of ids) if (!thumbQueue.includes(id)) thumbQueue.push(id);
+  if (thumbRunning) return;
+  thumbRunning = true;
+  const step = async () => {
+    const id = thumbQueue.shift();
+    if (!id) { thumbRunning = false; return; }
+    try {
+      const doc = store.get(id);
+      if (doc) {
+        const svg = await buildThumb(doc);
+        store.setThumb(id, svg);
+        store.setMeta(id, { hasBg: !!doc.background }); // 다음부터는 이 프로젝트를 다시 검사하지 않는다
+        const th = grid.querySelector(`.card[data-id="${CSS.escape(id)}"] .thumb`);
+        if (th) th.innerHTML = `<img alt="" src="${svgDataUrl(svg)}">`;
+      }
+    } catch (e) { console.error(e); }
     setTimeout(step, 20);
   };
   setTimeout(step, 50);

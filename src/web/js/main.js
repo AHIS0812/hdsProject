@@ -9,7 +9,7 @@ import { templateShapes } from './templates.js';
 import { initResultModal, runBuild } from './result-modal.js';
 import { toast } from './toast.js';
 import { createProjectStore, browserStorage, cleanName, UNTITLED } from './projects.js';
-import { thumbnailSvg } from './thumbnail.js';
+import { thumbnailSvg, makeBgThumb } from './thumbnail.js';
 import { sortProjects, relTime, metaLine, safeFileName } from './home-logic.js';
 import { showDialog } from './dialog.js';
 
@@ -511,14 +511,37 @@ function markSaved(ts = null) {
   refreshStatus();
 }
 
+// 변경 화면의 캡처 배경은 홈 카드 썸네일에도 보여야 한다. 원본(수백 KB~MB)을 그대로 넣으면 저장 공간이
+// 아까우니 작게 줄인 이미지를 한 번만 만들어 두고(배경이 바뀔 때만 다시), 저장할 때 썸네일에 얹는다.
+let bgThumb = { key: '', url: null };
+let bgThumbPending = '';
+const bgKey = () => (editor.hasBoardBackground() ? `${editor.getBoardBackground().length}:${editor.getBoardBackground().slice(-48)}` : '');
+const bgThumbUrl = () => { const k = bgKey(); return k && bgThumb.key === k ? bgThumb.url : null; };
+function ensureBgThumb() {
+  const k = bgKey();
+  if (!k || bgThumb.key === k || bgThumbPending === k) return;
+  bgThumbPending = k;
+  makeBgThumb(editor.getBoardBackground()).then((url) => {
+    bgThumb = { key: k, url };
+    bgThumbPending = '';
+    // 줄인 이미지가 준비되면, 방금 저장된 프로젝트의 썸네일만 배경을 넣어 다시 써 둔다
+    if (url && project.id && store.has(project.id) && bgKey() === k) {
+      const doc = currentDoc();
+      store.setThumb(project.id, thumbnailSvg(doc.shapes, doc.canvas, { background: url }));
+    }
+  });
+}
+
 /** 실제로 저장소에 쓴다(동기). 실패하면 false */
 function writeProject(sig, id = project.id, name = null) {
   try {
     const doc = currentDoc();
     const stored = store.meta(id);
     const meta = store.put({
-      id, name: name ?? (stored?.name || project.name), doc, thumb: thumbnailSvg(doc.shapes, doc.canvas),
+      id, name: name ?? (stored?.name || project.name), doc,
+      thumb: thumbnailSvg(doc.shapes, doc.canvas, { background: bgThumbUrl() }),
     });
+    ensureBgThumb();
     setProject(meta.id, meta.name);
     lastRev = meta.updatedAt;
     savedSig = sig;

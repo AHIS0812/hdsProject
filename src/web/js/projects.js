@@ -3,7 +3,7 @@
 //
 // 키는 예전 "저장본" 슬롯과 같다 — 이미 만들어 둔 저장본이 그대로 프로젝트 목록에 나타난다.
 //   hds:saves          목록 메타 [{ id, name, createdAt, updatedAt, lastOpenedAt, favorite, trashedAt,
-//                                  screenName, mode, systemId, systemName, shapes, canvas }]
+//                                  screenName, mode, systemId, systemName, hasBg, shapes, canvas }]
 //   hds:save:<id>      프로젝트 본문(currentDoc 형식)
 //   hds:thumb:<id>     카드용 썸네일(SVG 문자열) — 없어도 프로젝트는 정상 동작
 
@@ -130,6 +130,7 @@ export function createProjectStore(storage) {
         mode: doc.mode === 'edit' ? 'edit' : 'new',
         systemId: doc.systemId || null,
         systemName: doc.systemName || prev?.systemName || null,
+        hasBg: !!doc.background,
         shapes: doc.shapes.length,
         canvas: doc.canvas && doc.canvas.w ? { w: doc.canvas.w, h: doc.canvas.h } : null,
       };
@@ -172,6 +173,10 @@ export function createProjectStore(storage) {
         try { storage.setItem(DOC_PREFIX + id, JSON.stringify({ ...doc, projectName: n })); } catch { /* 이름은 목록에 이미 반영됨 */ }
       }
       return meta;
+    },
+    /** 목록 메타의 일부 필드만 고친다(수정 시각은 그대로) — 홈이 썸네일을 다시 만들며 hasBg 를 채울 때 쓴다 */
+    setMeta(id, partial) {
+      return patch(id, (m) => ({ ...m, ...partial }));
     },
     setFavorite(id, on) {
       return patch(id, (m) => ({ ...m, favorite: !!on }));

@@ -229,6 +229,13 @@ h4.gap{margin-top:30px;}
   border-radius:2px;background:#fff;padding:0 5px;font:inherit;color:var(--ink);outline:none;
   cursor:text;z-index:9;}
 
+/* 항목(라디오 선택지·표 컬럼·탭) 이름을 그 자리에서 고치는 편집칸 — 항목 조각 크기에 맞춘 작은 칸 */
+.sh .inline-edit.item-edit{font-size:11px;font-weight:600;padding:0 6px;box-shadow:0 2px 8px rgba(16,24,40,.25);}
+.sh-radio,.sh-col,.sh-chip{cursor:text;}
+.item-text{cursor:text;}
+.item-rename{flex:1;min-width:0;height:26px;border:1.5px solid var(--or);border-radius:6px;padding:0 7px;
+  font:inherit;font-size:12px;color:var(--ink);outline:none;background:#fff;}
+
 .hh{position:absolute;background:#fff;border:1.5px solid var(--or);border-radius:50%;
     width:9px;height:9px;display:none;z-index:8;}
 .sel-outline .hh{display:block;}

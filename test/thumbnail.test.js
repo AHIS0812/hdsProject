@@ -74,3 +74,31 @@ test('svgDataUrl 은 인코딩된 data URL 이다', () => {
   assert.ok(url.startsWith('data:image/svg+xml;charset=utf-8,'));
   assert.ok(!url.includes('<'));
 });
+
+// ── 변경 화면 캡처 배경 ────────────────────────────────────
+import { makeBgThumb } from '../src/web/js/thumbnail.js';
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+test('background — 캡처 배경 이미지를 캔버스 전체에 늘려 요소 아래에 깐다', () => {
+  const svg = thumbnailSvg([{ t: 'button', x: 10, y: 10, w: 50, h: 20, label: '조회' }], { w: 960, h: 600 }, { background: PNG });
+  wellFormed(svg);
+  assert.match(svg, /<image xlink:href="data:image\/png;base64,[^"]+" x="0" y="0" width="960" height="600" preserveAspectRatio="none"\/>/);
+  assert.ok(svg.indexOf('<image') < svg.indexOf('<text'), '배경이 요소보다 먼저(아래에) 그려진다');
+  assert.ok(svg.includes('xmlns:xlink='));
+});
+
+test('background — 이미지가 아닌 값·없음은 무시한다(주입 방지)', () => {
+  const none = thumbnailSvg([], { w: 100, h: 50 });
+  assert.ok(!none.includes('<image'));
+  assert.ok(!thumbnailSvg([], { w: 100, h: 50 }, { background: 'javascript:alert(1)' }).includes('<image'));
+  assert.ok(!thumbnailSvg([], { w: 100, h: 50 }, { background: 'https://x/y.png' }).includes('<image'));
+  assert.ok(!thumbnailSvg([], { w: 100, h: 50 }, { background: null }).includes('<image'));
+  const evil = thumbnailSvg([], { w: 100, h: 50 }, { background: 'data:image/png;base64,"><script>x</script>' });
+  assert.ok(!evil.includes('<script>'));
+});
+
+test('makeBgThumb — 브라우저가 아니거나 이미지가 아니면 null(Node 에서는 항상 null)', async () => {
+  assert.equal(await makeBgThumb(PNG), null);
+  assert.equal(await makeBgThumb('nope'), null);
+  assert.equal(await makeBgThumb(null), null);
+});

@@ -65,6 +65,22 @@ export const defaultLabel = (t) =>
     file: '파일 선택', list: '표', pager: '', tab: '', image: '이미지', divider: '',
   }[t] ?? NAME[t]);
 
+/** 항목 이름 정리 — 항목은 쉼표로 이어 저장하므로 쉼표는 공백으로 바꾸고, 앞뒤·연속 공백을 정리한다 */
+export const cleanItemName = (s) => String(s ?? '').replace(/[,，]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * 쉼표로 이은 항목 문자열(cols)에서 idx 번째 항목의 이름을 바꾼다.
+ * 이름이 비었거나(지우는 대신 원래 값 유지) 그대로거나 범위를 벗어나면 null(변경 없음).
+ * @returns {string|null} 바뀐 cols 문자열
+ */
+export function renameItemAt(cols, idx, next) {
+  const items = String(cols || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const name = cleanItemName(next);
+  if (!name || idx < 0 || idx >= items.length || items[idx] === name) return null;
+  items[idx] = name;
+  return items.join(',');
+}
+
 export const defaultCols = (t) =>
   ({
     list: '순번,항목1,항목2,항목3',

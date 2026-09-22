@@ -108,14 +108,48 @@ function shapeSvg(s) {
 /**
  * @param {object[]} shapes 에디터 내부 또는 payload 형식 요소 목록
  * @param {{ w:number, h:number }} [canvas] 캔버스 크기(기본 960×600)
+ * @param {{ background?: string|null }} [opts] background — 변경 화면의 캡처 배경(이미지 data URL).
+ *   용량 때문에 makeBgThumb() 으로 줄인 것을 넘긴다. 에디터처럼 캔버스 전체에 늘려 깔고 그 위에 요소를 그린다.
  * @returns {string} 완결된 <svg> 문자열(폭·높이는 부모에 맞춰 늘어나는 viewBox 형식)
  */
-export function thumbnailSvg(shapes, canvas) {
+export function thumbnailSvg(shapes, canvas, opts = {}) {
   const W = Math.max(1, num(canvas?.w, 960));
   const H = Math.max(1, num(canvas?.h, 600));
   const body = (Array.isArray(shapes) ? shapes : []).slice(0, MAX_SHAPES).map(shapeSvg).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`
-    + `<rect width="${W}" height="${H}" fill="#fff"/>${body}</svg>`;
+  const bg = typeof opts.background === 'string' && opts.background.startsWith('data:image/')
+    ? `<image xlink:href="${esc(opts.background)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none"/>`
+    : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`
+    + `<rect width="${W}" height="${H}" fill="#fff"/>${bg}${body}</svg>`;
+}
+
+/**
+ * 캡처 배경 이미지를 썸네일용으로 줄인다(브라우저 전용, 캔버스 사용). 원본은 수백 KB~수 MB 라 그대로 썸네일에
+ * 넣으면 저장 공간을 잡아먹는다 — 가로 maxW px 의 JPEG 로 줄이면 수십 KB. 투명한 PNG 는 흰 바탕에 합성한다.
+ * @returns {Promise<string|null>} data URL, 실패하거나 브라우저가 아니면 null
+ */
+export function makeBgThumb(src, maxW = 360) {
+  if (typeof src !== 'string' || !src.startsWith('data:image/') || typeof Image === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const k = Math.min(1, maxW / (img.naturalWidth || maxW));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round((img.naturalWidth || maxW) * k));
+        c.height = Math.max(1, Math.round((img.naturalHeight || maxW * 0.625) * k));
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff';
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.72));
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
 }
 
 /** <img src> 로 쓸 수 있는 data URL — 스크립트가 실행되지 않는 이미지로만 다룬다 */
