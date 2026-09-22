@@ -2,9 +2,8 @@
 //
 //   node scripts/pack-ico.mjs
 //
-// PNG 원본은 assets/icon-source.png (1254px 브랜드 아이콘) 를 축소한 것.
-// 다시 만들려면 아무 이미지 도구(또는 System.Drawing / 브라우저 canvas)로
-// 16·24·32·48·64·128·256 크기 PNG 를 assets/icon-<size>.png 로 저장한다.
+// PNG 는 src/web/logo.svg 와 같은 도형을 scripts/make-icons.ps1 (System.Drawing) 로 그린 것.
+// 로고를 바꾸면: make-icons.ps1 실행 → 이 스크립트 → assets/icon.ico 를 src/web/favicon.ico 로 복사.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';

@@ -22,9 +22,9 @@ a{color:inherit;}
 /* ── 사이드바 ─────────────────────────────────────────── */
 .side{width:var(--side-w);flex:0 0 var(--side-w);background:#fff;border-right:1px solid var(--line);
       display:flex;flex-direction:column;padding:18px 14px 14px;gap:6px;overflow-y:auto;z-index:20;}
-.brand{display:flex;align-items:center;gap:10px;padding:2px 6px 12px;text-decoration:none;}
-.brand .mark{width:30px;height:30px;border-radius:8px;display:block;}
-.brand b{font-size:16px;font-weight:800;letter-spacing:-.4px;}
+.brand{display:flex;align-items:center;gap:11px;padding:2px 6px 14px;text-decoration:none;}
+.brand .mark{width:36px;height:36px;display:block;filter:drop-shadow(0 3px 6px rgba(239,112,13,.35));}
+.brand b{font-size:18px;font-weight:800;letter-spacing:-.5px;}
 .btn.wide{width:100%;justify-content:center;}
 .btn.pri.wide{height:44px;font-size:14px;border-radius:12px;margin-bottom:10px;}
 .btn .ico{width:16px;height:16px;}
@@ -82,7 +82,16 @@ a{color:inherit;}
 .hero::before,.hero::after{content:"";position:absolute;border-radius:50%;pointer-events:none;}
 .hero::before{width:340px;height:340px;right:-90px;top:-170px;background:radial-gradient(circle,rgba(245,130,31,.55),rgba(245,130,31,0) 68%);}
 .hero::after{width:260px;height:260px;left:34%;bottom:-170px;background:radial-gradient(circle,rgba(255,255,255,.16),rgba(255,255,255,0) 70%);}
-.hero-txt{position:relative;}
+.hero-top{position:relative;display:flex;align-items:center;justify-content:space-between;gap:24px;}
+.hero-txt{position:relative;min-width:0;}
+.hero-kicker{display:inline-block;margin-bottom:8px;font-size:11px;font-weight:800;letter-spacing:2.4px;color:#FFC48A;}
+/* 큰 브랜드 로고 — 배너 오른쪽에 살짝 기울여 크게 보여준다(붓 자국 장식과 함께) */
+.hero-art{position:relative;flex:0 0 auto;width:196px;height:132px;margin-right:18px;}
+.hero-art img{position:absolute;right:0;top:50%;width:132px;height:132px;transform:translateY(-50%) rotate(-6deg);
+              border-radius:30px;filter:drop-shadow(0 14px 22px rgba(4,16,40,.5));}
+.hero-art .bs{position:absolute;display:block;height:9px;border-radius:9px;transform:rotate(-14deg);}
+.hero-art .b1{left:0;top:38px;width:78px;background:rgba(255,255,255,.28);}
+.hero-art .b2{left:14px;top:58px;width:54px;background:rgba(245,130,31,.7);}
 .hero h1{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
 .hero p{font-size:13px;opacity:.86;line-height:1.55;max-width:640px;}
 .tiles{position:relative;display:flex;gap:12px;margin-top:20px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;}
@@ -279,6 +288,9 @@ a{color:inherit;}
   .grid.list .more{grid-column:7;}
 }
 @media (max-width:900px){
+  .hero-art{width:120px;height:96px;margin-right:6px;}
+  .hero-art img{width:92px;height:92px;border-radius:22px;}
+  .hero-art .bs{display:none;}
   .side{position:fixed;left:0;top:0;bottom:0;transform:translateX(-102%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.25);}
   .side.open{transform:none;}
   .icon-btn{display:flex;}
@@ -291,6 +303,7 @@ a{color:inherit;}
   .search kbd{display:none;}
 }
 @media (max-width:560px){
+  .hero-art{display:none;}
   .bar-r .btn .t{display:none;}
   .bar-r .btn{padding:0 14px;}
   .bulk{padding-left:12px;}

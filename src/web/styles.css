@@ -5,7 +5,7 @@ body{font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-ser
 
 .top{height:56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;
      padding:0 16px;gap:12px;position:relative;z-index:30;}
-.mark{width:27px;height:27px;border-radius:6px;flex:0 0 auto;display:block;}
+.mark{width:28px;height:28px;flex:0 0 auto;display:block;}
 .top b.bn{font-size:14.5px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;}
 .sep{width:1px;height:20px;background:var(--line);}
 .fname{height:34px;border:1px solid var(--line);border-radius:9px;padding:0 10px;font-family:inherit;
@@ -225,16 +225,21 @@ h4.gap{margin-top:30px;}
 .sh[data-t=divider]::after{content:"";position:absolute;left:0;right:0;top:50%;height:1.5px;background:#C7CFDA;}
 
 /* 더블클릭 시 요소 자리에 바로 뜨는 문구 편집칸 — 타입별 배경·아이콘을 다 덮어써서 편집 중임이 뚜렷하다 */
-.sh .inline-edit{position:absolute;inset:0;box-sizing:border-box;border:1.5px solid var(--or);
-  border-radius:2px;background:#fff;padding:0 5px;font:inherit;color:var(--ink);outline:none;
+.sh .inline-edit{position:absolute;inset:0;box-sizing:border-box;border:1px solid var(--or);
+  border-radius:0;background:#fff;padding:0 5px;font:inherit;color:var(--ink);outline:none;
   cursor:text;z-index:9;}
+/* 전역 :focus-visible(2px 링 + 2px 띄움)이 편집칸에 겹치면 테두리가 이중·두껍게 깨져 보인다 — 얇은 주황
+   테두리 하나만 남기고, 편집하는 동안엔 그 요소의 선택 테두리·동그란 손잡이도 숨겨 겹쳐 보이지 않게 한다 */
+.sh .inline-edit:focus,.sh .inline-edit:focus-visible{outline:none!important;box-shadow:none;}
+#board:has(.inline-edit) .sel-outline,#board:has(.inline-edit) .sel-bbox{visibility:hidden;}
 
 /* 항목(라디오 선택지·표 컬럼·탭) 이름을 그 자리에서 고치는 편집칸 — 항목 조각 크기에 맞춘 작은 칸 */
-.sh .inline-edit.item-edit{font-size:11px;font-weight:600;padding:0 6px;box-shadow:0 2px 8px rgba(16,24,40,.25);}
+.sh .inline-edit.item-edit{font-size:11px;font-weight:600;padding:0 6px;}
 .sh-radio,.sh-col,.sh-chip{cursor:text;}
 .item-text{cursor:text;}
-.item-rename{flex:1;min-width:0;height:26px;border:1.5px solid var(--or);border-radius:6px;padding:0 7px;
+.item-rename{flex:1;min-width:0;height:26px;border:1px solid var(--or);border-radius:4px;padding:0 7px;
   font:inherit;font-size:12px;color:var(--ink);outline:none;background:#fff;}
+.item-rename:focus,.item-rename:focus-visible{outline:none!important;}
 
 .hh{position:absolute;background:#fff;border:1.5px solid var(--or);border-radius:50%;
     width:9px;height:9px;display:none;z-index:8;}
