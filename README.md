@@ -100,5 +100,6 @@ push/PR 시 GitHub Actions(`.github/workflows/ci.yml`)가 Node 20·22 에서 `np
 - `editor-align.test.js` — 정렬/분배 계산
 - `highlight.test.js` — XML 구문 강조
 - `modules.test.js` — 웹 모듈이 Node 에서 부작용 없이 import 됨
+- `regressions.test.js` — 전체 점검(2026-09-22)에서 고친 버그 회귀 방지(연결 id 재매핑·읽기 순서·XML 주석)
 
 브라우저 상호작용(드래그·스냅·모달)은 수동 검증.

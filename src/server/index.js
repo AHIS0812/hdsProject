@@ -33,6 +33,11 @@ const fflatePath = useLocalVendor
 const pptxgenPath = useLocalVendor
   ? path.join(ROOT, 'vendor/pptxgen.bundle.js')
   : path.join(ROOT, 'node_modules/pptxgenjs/dist/pptxgen.bundle.js');
+// 벤더 파일이 빠져 있으면(npm install 누락 등) 해당 기능(이미지 복사·zip·PPT 산출물)만 조용히 404 로
+// 죽어서 원인을 찾기 어려웠다 — 부팅할 때 한 번 알려 준다.
+for (const [name, p] of [['html2canvas', html2canvasPath], ['fflate', fflatePath], ['pptxgenjs', pptxgenPath]]) {
+  if (!existsSync(p)) console.warn(`[경고] ${name} 파일이 없습니다 (${p}) — npm install 을 실행하세요.`);
+}
 app.get('/vendor/html2canvas.js', (req, res) => res.sendFile(html2canvasPath));
 app.get('/vendor/fflate.js', (req, res) => res.sendFile(fflatePath));
 app.get('/vendor/pptxgen.js', (req, res) => res.sendFile(pptxgenPath));

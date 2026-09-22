@@ -5,6 +5,7 @@ import { generate } from './api.js';
 import { toast } from './toast.js';
 import { highlightXml } from './highlight.js';
 import { NAME } from './constants.js';
+import { readingOrder } from './reading-order.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,6 +14,9 @@ const STEPS = ['배치된 요소 읽기', '읽기 순서로 정렬', '사내 표
 // last.payload = 생성 payload, last.result = /api/generate 결과
 // last.sketch = 생성 요청 시점의 캔버스 스냅샷 { html, w, h } — "내 스케치" 비교용
 let last = { payload: null, result: null, sketch: null };
+// 생성 요청 번호 — 결과를 기다리는 중에 창을 닫고 다시 "화면 생성"을 누르면, 늦게 도착한 이전 응답이
+// 새 결과를 덮어쓰거나 닫힌 창에 그려지던 문제를 막는다(가장 최근 요청의 응답만 반영).
+let buildSeq = 0;
 let currentTab = 'v';
 let viewMode = 'after';   // 화면 탭 보기: after(결과) | split(동시 보기 — 내 스케치 + 결과)
 
@@ -55,6 +59,8 @@ export function openModal() {
 
 export function closeModal() {
   mask().classList.remove('on');
+  previewObservers.forEach((o) => o.disconnect());
+  previewObservers.length = 0;
   document.removeEventListener('keydown', onModalKeydown, true);
   if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
   lastFocus = null;
@@ -208,12 +214,17 @@ function mountPreviewFrame(host, html, { snug = false } = {}) {
 
 /** 스케치 스냅샷을 컨테이너 폭에 맞춰 축소해 붙인다 */
 function mountSketch(host) {
-  const { html, w, h } = last.sketch;
+  const { html, w, h, background } = last.sketch;
   const wrap = document.createElement('div');
   wrap.className = 'sketchwrap';
   const inner = document.createElement('div');
   inner.className = 'sketchscale';
   inner.style.cssText = `width:${w}px;height:${h}px;background:#fff`;
+  // 변경화면 캡처 배경 — 에디터에선 #board 의 배경이라 스냅샷 HTML 에 안 들어 있다
+  if (typeof background === 'string' && background.startsWith('data:image/')) {
+    inner.style.backgroundImage = `url("${background}")`;
+    inner.style.backgroundSize = '100% 100%';
+  }
   inner.innerHTML = html;
   wrap.append(inner);
   host.append(wrap);
@@ -488,13 +499,6 @@ async function saveScreenImage() {
   }
 }
 // ── 산출물 추출 (PPT: 화면 이미지 + 요소 설명) ──────────────
-/** 읽기 순서(위→아래, 같은 줄이면 왼→오른쪽) — deterministic.js 의 readingOrder 와 같은 규칙.
- * 번호를 화면을 보는 순서와 맞추기 위해 여기서도 같은 규칙으로 다시 정렬한다. */
-function readingOrder(shapes) {
-  return [...shapes].sort((a, b) =>
-    (Math.abs((a.y ?? 0) - (b.y ?? 0)) > 18 ? (a.y ?? 0) - (b.y ?? 0) : (a.x ?? 0) - (b.x ?? 0)));
-}
-
 /** "설명(desc)" 또는 "연결(linksTo)" 이 달린 요소만 — 결과 화면의 "📍 설명 붙은 요소 보기" 와
  * 같은 기준이다. 이 목록에 번호를 매겨 이미지 위 배지·오른쪽 설명 목록에 그대로 쓴다. */
 function annotatedShapes() {
@@ -681,15 +685,19 @@ export async function runBuild(payload, title, sketch = null) {
   $('mExportDoc').hidden = true;
   $('mDownload').hidden = true;
   setActiveTab('v');
+  currentTab = 'v';
+  const seq = ++buildSeq;
   const stop = showProgress();
   try {
     const result = await generate(payload);
+    if (seq !== buildSeq || !mask().classList.contains('on')) { stop(); return; }
     last = { payload, result, sketch };
     stop();
     refreshFoot();
     setTab('v');
   } catch (e) {
     stop();
+    if (seq !== buildSeq || !mask().classList.contains('on')) return;
     last = { payload, result: null, sketch };
     const pre = document.createElement('pre');
     pre.className = 'err';

@@ -92,13 +92,18 @@ export function makeCombo(root, opts = {}) {
       e.preventDefault();
       hl = Math.min(filtered.length - 1, hl + 1);
       draw(search.value);
+      list.querySelector('.hl')?.scrollIntoView({ block: 'nearest' });
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       hl = Math.max(0, hl - 1);
       draw(search.value);
+      list.querySelector('.hl')?.scrollIntoView({ block: 'nearest' });
     } else if (e.key === 'Enter') {
+      if (e.isComposing) return;
       e.preventDefault();
-      if (filtered[hl]) pick(filtered[hl].id);
+      // 방향키로 고르지 않고 검색만 한 뒤 Enter — 결과가 하나로 좁혀졌거나 검색어가 있으면 첫 항목을 고른다
+      const it = filtered[hl] || (search.value.trim() ? filtered[0] : null);
+      if (it) pick(it.id);
     } else if (e.key === 'Escape') {
       close();
     }
