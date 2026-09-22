@@ -67,8 +67,6 @@ body{font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-ser
 .saveStat.saved::before{background:#2FB463;}
 .saveStat.dirty{color:#C25E0A;}
 .saveStat.dirty::before{background:var(--or);}
-#btnSave.dirty{background:var(--nv);border-color:var(--nv);color:#fff;}
-#btnSave.dirty:hover{background:var(--nv-d);}
 #projPop{width:340px;}
 .pop-menu{display:flex;flex-direction:column;gap:1px;padding-bottom:6px;border-bottom:1px solid var(--line2);}
 .pop-cmd{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;

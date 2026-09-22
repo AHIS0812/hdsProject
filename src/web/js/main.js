@@ -489,7 +489,6 @@ let savedSig = null;   // 마지막 저장/열기 시점의 내용 서명. null 
 let savedAtTs = null;  // 마지막 저장 시각(ms) — 상태 표시용
 const projNm = $('projNm');
 const saveStat = $('saveStat');
-const btnSave = $('btnSave');
 
 function pickStorage() {
   try { localStorage.getItem('hds:probe'); return localStorage; } catch {
@@ -550,7 +549,6 @@ function refreshStatus() {
   else { text = savedAtTs ? `저장됨 · ${fmtClock(savedAtTs)}` : '저장됨'; cls = 'saved'; }
   saveStat.textContent = text;
   saveStat.className = 'saveStat ' + cls;
-  btnSave.classList.toggle('dirty', unsaved);
   document.title = `${unsaved ? '● ' : ''}${project.name || '제목 없는 프로젝트'} — 하이스케치`;
   if (!$('projPop').hidden) renderProjects();
 }
@@ -839,7 +837,6 @@ $('btnProj').addEventListener('click', () => {
 $('pNew').addEventListener('click', newProject);
 $('pSave').addEventListener('click', () => saveProject());
 $('pSaveAs').addEventListener('click', () => saveProject({ asNew: true }));
-btnSave.addEventListener('click', () => saveProject());
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.savesbox') && !e.target.closest('.dlg-mask')) closeProjPop();
 });
