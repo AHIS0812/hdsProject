@@ -85,13 +85,12 @@ a{color:inherit;}
 .hero-top{position:relative;display:flex;align-items:center;justify-content:space-between;gap:24px;}
 .hero-txt{position:relative;min-width:0;}
 .hero-kicker{display:inline-block;margin-bottom:8px;font-size:11px;font-weight:800;letter-spacing:2.4px;color:#FFC48A;}
-/* 큰 브랜드 로고 — 배너 오른쪽에 살짝 기울여 크게 보여준다(붓 자국 장식과 함께) */
-.hero-art{position:relative;flex:0 0 auto;width:226px;height:158px;margin-right:18px;}
-.hero-art img{position:absolute;right:0;top:50%;width:156px;height:156px;transform:translateY(-50%) rotate(-6deg);
-              filter:drop-shadow(0 14px 22px rgba(4,16,40,.5));}
-.hero-art .bs{position:absolute;display:block;height:9px;border-radius:9px;transform:rotate(-14deg);}
-.hero-art .b1{left:0;top:48px;width:84px;background:rgba(255,255,255,.28);}
-.hero-art .b2{left:16px;top:70px;width:58px;background:rgba(245,130,31,.7);}
+/* 메인 로고 — 원본 이미지(연필·팔레트 포함)를 크게. 작은 곳(사이드바·에디터)은 H 만 남긴 아이콘을 쓴다 */
+.hero-art{position:relative;flex:0 0 auto;width:200px;height:176px;margin-right:14px;}
+.hero-art::before{content:"";position:absolute;right:-30px;top:50%;width:260px;height:260px;transform:translateY(-50%);pointer-events:none;
+                  background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 64%);}
+.hero-art img{position:absolute;right:0;top:50%;width:176px;height:176px;transform:translateY(-50%);
+              filter:drop-shadow(0 16px 26px rgba(4,16,40,.55));}
 .hero h1{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
 .hero p{font-size:13px;opacity:.86;line-height:1.55;max-width:640px;}
 .tiles{position:relative;display:flex;gap:12px;margin-top:20px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;}
@@ -288,9 +287,9 @@ a{color:inherit;}
   .grid.list .more{grid-column:7;}
 }
 @media (max-width:900px){
-  .hero-art{width:120px;height:96px;margin-right:6px;}
-  .hero-art img{width:92px;height:92px;}
-  .hero-art .bs{display:none;}
+  .hero-art{width:124px;height:110px;margin-right:6px;}
+  .hero-art img{width:108px;height:108px;}
+  .hero-art::before{display:none;}
   .side{position:fixed;left:0;top:0;bottom:0;transform:translateX(-102%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.25);}
   .side.open{transform:none;}
   .icon-btn{display:flex;}
