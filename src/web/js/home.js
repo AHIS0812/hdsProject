@@ -590,7 +590,7 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     + '<div class="fld"><label for="wSys">시스템</label><select id="wSys"></select></div>'
     + '<div id="wNew"><div class="fld"><span class="lbl">화면 유형</span><div class="tpl-grid" id="wTpls"></div></div>'
     + '<div class="fld" style="margin-top:16px"><span class="lbl">화면 크기</span><div class="size-row" id="wSizes"></div>'
-    + '<div class="size-custom" id="wCustom" hidden><input id="wCw" type="number" min="200" max="3000" aria-label="가로"><span>×</span><input id="wCh" type="number" min="200" max="3000" aria-label="세로"><span class="hint">px (200~3000)</span></div></div></div>'
+    + '<div class="size-custom" id="wCustom" hidden><input id="wCw" type="number" min="320" max="3000" aria-label="가로"><span>×</span><input id="wCh" type="number" min="240" max="4000" aria-label="세로"><span class="hint">px (가로 320~3000 · 세로 240~4000)</span></div></div></div>'
     + '<div id="wEdit" hidden><div class="fld"><label for="wScr">변경할 화면</label><select id="wScr"></select><p class="hint" id="wScrHint"></p></div></div>'
     + '</div><div class="wiz-pv"><div class="pvbox" id="wPv"></div><div class="cap" id="wCap"></div></div></div>'
     + '<div class="wiz-ft"><button type="button" class="btn" id="wCancel">취소</button><button type="button" class="btn pri" id="wOk">만들기</button></div>'
@@ -620,7 +620,7 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
   q('#wCancel').addEventListener('click', close);
 
   const curSize = () => {
-    if (st.sizeKey === 'custom') return { w: Math.max(200, Math.min(3000, st.cw || 960)), h: Math.max(200, Math.min(3000, st.ch || 600)) };
+    if (st.sizeKey === 'custom') return { w: Math.max(320, Math.min(3000, st.cw || 960)), h: Math.max(240, Math.min(4000, st.ch || 600)) };
     const o = SIZE_OPTS.find((s) => s.key === st.sizeKey);
     return o?.w ? { w: o.w, h: o.h } : boardSizeFor(st.template);
   };
@@ -717,7 +717,12 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     paintPreview();
   }
 
-  selSys.addEventListener('change', () => { st.systemId = selSys.value || null; if (st.mode === 'edit') loadScreens(); });
+  selSys.addEventListener('change', () => {
+    st.systemId = selSys.value || null;
+    // 신규 모드에서 시스템을 바꾼 뒤 변경 모드로 넘어가면 이전 시스템의 화면 목록이 그대로 남아 있었다 — 항상 비운다
+    st.screens = []; st.screenId = ''; st.screenDef = null; st.screensErr = '';
+    if (st.mode === 'edit') loadScreens();
+  });
   q('#wScr').addEventListener('change', async (e) => {
     st.screenId = e.target.value;
     st.screenDef = null;
@@ -778,7 +783,7 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     }
   }
   q('#wOk').addEventListener('click', create);
-  q('#wName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); create(); } });
+  q('#wName').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); create(); } });
 
   paintTpls();
   paintSizes();
@@ -1011,7 +1016,7 @@ store.purgeExpired();
 migrateLegacyDraft();
 render();
 
-api.getSystems().then((list) => {
+const systemsReady = api.getSystems().then((list) => {
   systems = list;
   render();
 }).catch((e) => console.warn('시스템 목록을 불러오지 못했습니다(API 서버 미기동?)', e));
@@ -1019,6 +1024,6 @@ api.getSystems().then((list) => {
 const params = new URLSearchParams(location.search);
 if (params.has('missing')) toast('열려던 프로젝트를 찾지 못했어요. 삭제되었을 수 있어요.');
 if (params.has('new') || params.has('missing') || params.has('q')) {
-  if (params.has('new')) openWizard();
+  if (params.has('new')) systemsReady.finally(() => openWizard());
   history.replaceState(null, '', location.pathname);
 }

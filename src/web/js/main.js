@@ -14,6 +14,8 @@ import { sortProjects, relTime, metaLine, safeFileName } from './home-logic.js';
 import { showDialog } from './dialog.js';
 
 const $ = (id) => document.getElementById(id);
+/** 결과 모달이나 확인 대화상자가 떠 있는지 — 떠 있으면 뒤의 캔버스 단축키·붙여넣기를 멈춘다 */
+const isModalOpen = () => !!document.querySelector('.dlg-mask') || !!$('mask')?.classList.contains('on');
 const scrNm = $('scrNm');
 const abL = $('abL');
 
@@ -23,6 +25,10 @@ let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드�
 // 사용자가 캔버스를 직접 수정했는지. 템플릿/화면/샘플을 "프로그램으로" 로드한 직후엔 false.
 // true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
 let canvasDirty = false;
+// 마지막으로 "프로그램으로" 불러온 캔버스 내용 — 요소를 클릭해 선택만 해도 onChange 가 불려서 예전엔
+// 아무것도 안 고쳤는데도 dirty 가 되어, 템플릿을 바꿀 때 괜한 "초기화되었습니다 · 되돌리기" 토스트가 떴다.
+let canvasBaseline = '[]';
+const shapesSig = () => JSON.stringify(editor.toPayloadShapes());
 // "PC" 비율 프리셋이 돌아갈 기준 크기 — 신규는 화면 유형 기본값, 변경화면은 그 화면의 canvas
 let baseBoardSize = DEFAULT_BOARD;
 
@@ -45,6 +51,7 @@ function loadCanvas(shapes, name, size) {
   if (name != null) scrNm.value = name;
   syncAbL();
   canvasDirty = false;
+  canvasBaseline = shapesSig();
 }
 
 /** 지금 캔버스 상태 스냅샷(되돌리기 토스트용) — 화면 전환류(guardedRun) 직전에만 호출 */
@@ -54,6 +61,8 @@ function snapshotForUndo() {
     scrName: scrNm.value,
     canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
+    // 캡처 배경도 같이 — 빠뜨리면 배경을 새로 깔았다가 되돌렸을 때 이전 배경이 사라졌다
+    background: editor.hasBoardBackground() ? editor.getBoardBackground() : null,
   };
 }
 
@@ -67,9 +76,10 @@ function restoreSnapshot(snap) {
   loadedScreenId = snap.loadedScreenId;
   baseBoardSize = snap.baseBoardSize;
   editor.clearBoardBackground();
-  syncBgButtons();
   editor.setBoardSize(snap.canvas.w, snap.canvas.h);
   editor.setShapes(snap.shapes);
+  if (snap.background) editor.setBoardBackground(snap.background);
+  syncBgButtons();
   scrNm.value = snap.scrName;
   syncAbL();
   if (workMode === 'edit' && loadedScreenId) scrCombo.choose(loadedScreenId, true);
@@ -417,15 +427,15 @@ drop.addEventListener('drop', (e) => {
   addImages(e.dataTransfer.files);
 });
 // 페이지 어디서나 이미지 붙여넣기 → 캔버스에
+// (이미지가 아니면 캔버스에서 Ctrl+C 로 복사해 둔 요소를 붙여넣는다)
 document.addEventListener('paste', (e) => {
-  if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') || isModalOpen()) return;
   const imgs = [...(e.clipboardData?.items || [])]
     .filter((it) => it.type.startsWith('image/'))
     .map((it) => it.getAsFile())
     .filter(Boolean);
-  if (!imgs.length) return;
-  e.preventDefault();
-  addImages(imgs);
+  if (imgs.length) { e.preventDefault(); addImages(imgs); return; }
+  if (editor.pasteShapes()) e.preventDefault();
 });
 
 // ── 프로젝트 (자동 저장) ────────────────────────────────────
@@ -651,7 +661,7 @@ function exportFile() {
   a.href = URL.createObjectURL(new Blob([JSON.stringify(currentDoc(), null, 2)], { type: 'application/json' }));
   a.download = `${name}.hds.json`;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000); // 바로 해제하면 일부 브라우저에서 내려받기가 취소된다
   toast('파일로 내보냈습니다');
   closeProjPop();
 }
@@ -706,7 +716,7 @@ $('projPop').addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
   e.preventDefault();
-  if (document.querySelector('.dlg-mask') || document.getElementById('mask')?.classList.contains('on')) return;
+  if (isModalOpen()) return;
   if (e.shiftKey) duplicateProject(); else saveNow();
 });
 
@@ -800,8 +810,9 @@ function snapshotSketch() {
   const clone = $('board').cloneNode(true);
   // 선택 표시(테두리 오버레이·리사이즈 손잡이)·스냅 가이드·드래그 선택 박스 등 편집 중에만
   // 보이는 UI는 "내 스케치" 비교 화면에는 안 나와야 한다.
-  clone.querySelectorAll('.hh,.gd,.marq,#hint,.coach,.sel-outline,.sel-bbox,.grp-outline').forEach((e) => e.remove());
-  return { html: clone.innerHTML, w, h };
+  clone.querySelectorAll('.hh,.gd,.marq,#hint,.coach,.sel-outline,.sel-bbox,.grp-outline,.inline-edit').forEach((e) => e.remove());
+  // 캡처 배경은 #board 자신의 인라인 스타일이라 innerHTML 에 안 담긴다 — 따로 넘겨야 "동시 보기"에도 보인다
+  return { html: clone.innerHTML, w, h, background: editor.hasBoardBackground() ? editor.getBoardBackground() : null };
 }
 
 function build() {
@@ -828,7 +839,7 @@ function initHelp() {
     if (!helpPop.hidden && !helpPop.contains(e.target) && e.target.id !== 'btnHelp') closeHelp(false);
   });
   document.addEventListener('keydown', (e) => {
-    if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') || isModalOpen()) return;
     if (e.key === '?') { e.preventDefault(); toggleHelp(); }
     else if (e.key === 'Escape' && !helpPop.hidden) closeHelp(true);
   });
@@ -854,7 +865,10 @@ async function boot() {
     return;
   }
 
-  editor.initEditor({ onChange: () => { canvasDirty = true; scheduleAutosave(); } });
+  editor.initEditor({
+    onChange: () => { if (!canvasDirty && shapesSig() !== canvasBaseline) canvasDirty = true; scheduleAutosave(); },
+    isBlocked: isModalOpen,
+  });
   initResultModal();
   initHelp();
   applyMode();

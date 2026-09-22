@@ -77,7 +77,8 @@ export function showDialog({ title, message, input, buttons }) {
     }
     function onKey(e) {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(null); return; }
-      if (e.key === 'Enter' && (field ? e.target === field : true)) {
+      // 한글 조합 중 Enter 는 조합 확정용 — 여기서 확인을 눌러 버리면 마지막 글자가 빠진 채 제출됐다
+      if (e.key === 'Enter' && !e.isComposing && (field ? e.target === field : true)) {
         const i = buttons.findIndex((b) => b.kind === 'primary');
         // 입력창이 아닌 버튼에 포커스가 있을 땐 그 버튼의 기본 동작(클릭)에 맡긴다
         if (i >= 0 && (!e.target.closest?.('button'))) { e.preventDefault(); btnEls[i].click(); }

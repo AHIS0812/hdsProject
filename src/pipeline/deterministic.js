@@ -7,6 +7,9 @@
 // 두 가지는 반영한다: ① 필수(＊) 라벨 → 인접 필드 전파  ② area 안의 요소 → 자식으로 중첩.
 
 import { readJson } from '../shared/paths.js';
+import { readingOrder } from '../web/js/reading-order.js';
+
+export { readingOrder };
 
 const MAPPING = (readJson('catalog/websquare/mapping.json', { default: {} }).default) || {};
 const BUTTON_ROLE_HINTS = readJson('config/policy.json', { buttonRoleHints: {} }).buttonRoleHints || {};
@@ -33,12 +36,9 @@ const splitItems = (s) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
-/** 러프 좌표를 읽기 순서(위→아래, 같은 줄이면 왼→오른쪽)로 정렬 */
-export function readingOrder(shapes) {
-  return [...(shapes || [])].sort((a, b) =>
-    Math.abs((a.y ?? 0) - (b.y ?? 0)) > 18 ? (a.y ?? 0) - (b.y ?? 0) : (a.x ?? 0) - (b.x ?? 0),
-  );
-}
+/** XML 주석 안에는 "--" 가 올 수 없다(XML 1.0) — 화면 이름에 "--" 가 있으면 주석이 깨져 XML 전체가
+ * 파싱되지 않았다. 이스케이프한 뒤 연속 하이픈을 떼어 놓는다. */
+const commentText = (s) => esc(s).replace(/-(?=-)/g, '- ').replace(/-$/, '- ');
 
 function expand(v, n, label) {
   return String(v).replace(/\{n\}/g, n).replace(/\{label\}/g, label);
@@ -125,7 +125,7 @@ export function buildContainmentTree(shapes) {
 /** 한 shape → WebSquare XML 조각 */
 export function shapeToXml(shape, n) {
   const m = MAPPING[shape.type];
-  if (!m) return `<!-- ${esc(shape.type)} (매핑 정의 없음) -->`;
+  if (!m) return `<!-- ${commentText(shape.type)} (매핑 정의 없음) -->`;
   const label = shape.label || '';
   const attrs = attrString(m.attrs, n, label, m.requiredClass && shape.required ? m.requiredClass : '');
   const items = splitItems(shape.items);
@@ -577,7 +577,7 @@ export function compileDeterministic(payload) {
     .join('\n');
 
   const websquareXml =
-    `<!-- ${esc(title)} · 규칙 기반 변환 · 요소 ${shapes.length}개` +
+    `<!-- ${commentText(title)} · 규칙 기반 변환 · 요소 ${shapes.length}개` +
     (propagated ? ` · 필수 전파 ${propagated}건` : '') +
     ` -->\n<w2:group id="screenRoot">\n${body}\n</w2:group>`;
 

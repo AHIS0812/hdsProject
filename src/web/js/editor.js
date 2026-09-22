@@ -32,6 +32,7 @@ let marq = null;          // 드래그 선택 사각형 상태
 let bgSrc = null;         // 변경화면 캡처 배경 이미지 data URL (트레이싱용, 생성 시 배경으로도 쓰인다)
 let pickingLinkFor = null; // 연결할 요소를 고르는 중이면 그 출발 shape id (버튼 → 연결 대상)
 let notify = () => {};
+let isBlocked = () => false; // 모달이 떠 있어 캔버스 단축키를 멈춰야 하는지 (main.js 가 주입)
 // 문구·설명·글자크기 입력칸은 키 입력마다 push() 하면 되돌리기 한 번에 한 글자씩만 되돌아가서
 // 쓸모가 없다 — 그렇다고 아예 안 부르면(예전 버그) 그 사이 다른 조작이 push() 를 한 번이라도
 // 부르는 순간 이 필드에서 고친 내용이 되돌리기 스택에 체크포인트 없이 같이 씻겨나간다.
@@ -279,7 +280,7 @@ function render() {
       }
       if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { toggleSel(s.id); return; }
       if (!isSel(s.id)) setSel([s.id]);
-      push();
+      pushGesture();
       const p = pt(ev);
       if (selIds.length === 1) {
         move = { single: true, id: s.id, dx: p.x - s.x, dy: p.y - s.y };
@@ -342,7 +343,7 @@ function render() {
       h.dataset.d = dir;
       h.onmousedown = (ev) => {
         ev.stopPropagation();
-        push();
+        pushGesture();
         const ids = selIds.slice();
         const orig = {};
         ids.forEach((id) => {
@@ -462,7 +463,7 @@ function renderSelOutlines() {
         h.dataset.d = dir;
         h.onmousedown = (ev) => {
           ev.stopPropagation();
-          push();
+          pushGesture();
           const p = pt(ev);
           rs = { id: s.id, d: dir, ox: s.x, oy: s.y, ow: s.w, oh: s.h, px: p.x, py: p.y };
         };
@@ -516,9 +517,10 @@ function snapSize(s, dir, rs) {
   const others = shapes.filter((o) => o.id !== s.id);
   if (dir.includes('e') || dir.includes('w')) {
     let best = null;
+    const maxW = dir.includes('w') ? rs.ox + rs.ow : BOARD_W - s.x; // 캔버스 밖으로 넘어가는 크기엔 안 붙는다
     others.forEach((o) => {
       const d = Math.abs(s.w - o.w);
-      if (d <= SNAP && (!best || d < best.d)) best = { w: o.w, d };
+      if (d <= SNAP && o.w <= maxW && (!best || d < best.d)) best = { w: o.w, d };
     });
     if (best) {
       s.w = best.w;
@@ -527,14 +529,46 @@ function snapSize(s, dir, rs) {
   }
   if (dir.includes('s') || dir.includes('n')) {
     let best = null;
+    const maxH = dir.includes('n') ? rs.oy + rs.oh : BOARD_H - s.y;
     others.forEach((o) => {
       const d = Math.abs(s.h - o.h);
-      if (d <= SNAP && (!best || d < best.d)) best = { h: o.h, d };
+      if (d <= SNAP && o.h <= maxH && (!best || d < best.d)) best = { h: o.h, d };
     });
     if (best) {
       s.h = best.h;
       if (dir.includes('n')) s.y = rs.oy + rs.oh - best.h; // 아래쪽 가장자리는 그대로 고정
     }
+  }
+}
+
+/** 크기 조절 중 스냅 — 움직이는 변만 다른 요소의 변·중앙선(및 캔버스 중앙)에 붙인다. 예전엔 이동용
+ * guides() 를 그대로 써서, 오른쪽 손잡이를 끄는데 고정돼 있어야 할 왼쪽 변이 근처 요소에 붙으며
+ * 요소 전체가 옆으로 튀었다. */
+function resizeGuides(s, dir, rs) {
+  board.querySelectorAll('.gd').forEach((e) => e.remove());
+  const others = shapes.filter((o) => o.id !== s.id);
+  const vT = [BOARD_W / 2, ...others.flatMap((o) => [o.x, o.x + o.w / 2, o.x + o.w])];
+  const hT = [BOARD_H / 2, ...others.flatMap((o) => [o.y, o.y + o.h / 2, o.y + o.h])];
+  const nearest = (v, targets) => {
+    let best = null;
+    targets.forEach((t) => { const d = Math.abs(v - t); if (d <= SNAP && (!best || d < best.d)) best = { t, d }; });
+    return best;
+  };
+  if (dir.includes('e')) {
+    const b = nearest(s.x + s.w, vT);
+    if (b && b.t - s.x >= 24 && b.t <= BOARD_W) { s.w = Math.round(b.t - s.x); line('v', b.t); }
+  } else if (dir.includes('w')) {
+    const right = rs.ox + rs.ow;
+    const b = nearest(s.x, vT);
+    if (b && right - b.t >= 24 && b.t >= 0) { s.x = Math.round(b.t); s.w = right - s.x; line('v', b.t); }
+  }
+  if (dir.includes('s')) {
+    const b = nearest(s.y + s.h, hT);
+    if (b && b.t - s.y >= 20 && b.t <= BOARD_H) { s.h = Math.round(b.t - s.y); line('h', b.t); }
+  } else if (dir.includes('n')) {
+    const bottom = rs.oy + rs.oh;
+    const b = nearest(s.y, hT);
+    if (b && bottom - b.t >= 20 && b.t >= 0) { s.y = Math.round(b.t); s.h = bottom - s.y; line('h', b.t); }
   }
 }
 
@@ -1050,14 +1084,17 @@ function ungroupSel() {
  * 추가하면 원본도 같이 바뀌는 버그가 있었다. links 도 새 배열로 떠서 독립시킨다. */
 function cloneWithNewGroups(list, ox, oy) {
   const gmap = new Map();
+  // 함께 복사한 요소끼리의 연결(예: 조회 버튼 → 결과 표를 같이 복제)은 복사본끼리 잇는다 — 그대로 두면
+  // 복사한 버튼이 원본 표를 가리킨다. 복사 범위 밖 요소로의 연결은 원래 대상을 그대로 가리킨다.
+  const idMap = new Map(list.map((s) => [s.id, uid++]));
   return list.map((s) => {
     let g = s.g || null;
     if (g) { if (!gmap.has(g)) gmap.set(g, 'g' + gid++); g = gmap.get(g); }
     return {
-      ...s, id: uid++, g,
-      x: Math.min(BOARD_W - s.w, s.x + ox),
-      y: Math.min(BOARD_H - s.h, s.y + oy),
-      links: Array.isArray(s.links) ? [...s.links] : s.links,
+      ...s, id: idMap.get(s.id), g,
+      x: Math.max(0, Math.min(BOARD_W - s.w, s.x + ox)),
+      y: Math.max(0, Math.min(BOARD_H - s.h, s.y + oy)),
+      links: Array.isArray(s.links) ? s.links.map((id) => idMap.get(id) ?? id) : s.links,
     };
   });
 }
@@ -1076,7 +1113,20 @@ function pasteClip() {
   push();
   const copies = cloneWithNewGroups(clip, 20, 20);
   shapes.push(...copies);
+  // 여러 번 붙여넣으면 매번 같은 자리에 겹쳐 쌓이지 않고 조금씩 비켜 놓이게 버퍼 위치를 옮겨 둔다
+  clip = copies.map((c) => ({ ...c, links: Array.isArray(c.links) ? [...c.links] : c.links }));
   setSel(copies.map((c) => c.id));
+}
+
+function copySel() {
+  const ss = selShapes();
+  if (ss.length) clip = ss.map((s) => ({ ...s, links: Array.isArray(s.links) ? [...s.links] : s.links }));
+}
+
+function cutSel() {
+  if (!selIds.length) return;
+  copySel();
+  delSel();
 }
 
 function front() {
@@ -1113,31 +1163,78 @@ function push() {
   if (hist.length > 60) hist.shift();
 }
 
-function normalize(arr) {
-  return (arr || []).map((s, i) => ({
-    id: i + 1,
-    t: s.t || s.type,
-    x: s.x, y: s.y, w: s.w, h: s.h,
-    label: s.label ?? '',
-    cols: s.cols ?? s.items ?? '',
-    req: !!(s.req ?? s.required),
-    g: s.g ?? s.group ?? null,
-    src: s.src ?? null,
-    desc: s.desc ?? '',
-    fs: s.fs ?? s.fontSize ?? null,
-    // linksTo 는 payload 상의 's'+순번 형식 배열 — normalize 는 항상 배열 순서대로 1부터 다시
-    // 번호를 매기므로(toPayloadShapes 도 같은 순서로 내보낸다), 접두사만 떼면 내부 id 와 그대로
-    // 대응한다. link/linkTo(단일값)는 이전 버전 데이터 호환용.
-    links: normalizeLinks(s),
-  }));
+// 드래그 이동·크기 조절은 누르는 순간(mousedown) 체크포인트를 찍는데, 요소를 그냥 클릭해 선택만
+// 하고 끝나면 아무것도 안 바뀐 체크포인트가 쌓여 Ctrl+Z 를 눌러도 반응이 없는 것처럼 보이고
+// 다시 실행(redo) 기록까지 날아갔다 — 제스처가 끝났을 때 바뀐 게 없으면 그 체크포인트를 되무른다.
+let gesture = null;
+function pushGesture() {
+  const prevFuture = future;
+  push();
+  gesture = { snap: hist.at(-1), future: prevFuture, seq: opSeq };
+}
+function endGesture() {
+  if (!gesture) return false;
+  const g = gesture;
+  gesture = null;
+  if (g.seq === opSeq && hist.at(-1) === g.snap && JSON.stringify(shapes) === g.snap) {
+    hist.pop();
+    future = g.future;
+    opSeq--; // 연속 추가(addComponent) 판별이 "선택만 한 클릭" 때문에 끊기지 않게
+    bU.disabled = !hist.length;
+    bR.disabled = !future.length;
+    return false;
+  }
+  return true;
 }
 
-function normalizeLinks(s) {
-  const toInt = (v) => parseInt(String(v).replace(/^s/, ''), 10) || null;
-  if (Array.isArray(s.links)) return s.links.filter((v) => v != null);
-  if (Array.isArray(s.linksTo)) return s.linksTo.map(toInt).filter((v) => v != null);
-  const legacy = s.link ?? (s.linkTo ? toInt(s.linkTo) : null);
-  return legacy != null ? [legacy] : [];
+const finite = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+
+/** 파일 가져오기·예전 저장본처럼 형식이 어긋난 데이터가 들어와도 캔버스가 깨지지 않게, 알 수 없는
+ * 타입·객체가 아닌 항목은 버리고 좌표·크기는 숫자로 맞춘다. */
+function isValidShape(s) {
+  return !!s && typeof s === 'object' && !!DEF[s.t || s.type];
+}
+
+export function normalize(arr) {
+  const list = (Array.isArray(arr) ? arr : []).filter(isValidShape);
+  // 새 id 는 배열 순서대로 1부터 다시 매긴다. 그런데 저장된 id(내부 숫자 또는 payload 의 's'+숫자)는
+  // 삭제·순서 바꾸기(맨 앞으로 등)를 거치면 배열 위치와 어긋나므로, 연결(links/linksTo)은 반드시
+  // "원래 id → 새 id" 표로 옮겨야 한다 — 예전엔 접두사만 떼서 그대로 써서, 요소를 하나 지운 뒤
+  // 다시 열면 버튼이 엉뚱한 요소(심지어 자기 자신)를 가리켰다.
+  const idMap = new Map();
+  list.forEach((s, i) => { if (s.id != null) idMap.set(String(s.id), i + 1); });
+  return list.map((s, i) => {
+    const [dw, dh] = DEF[s.t || s.type];
+    return {
+      id: i + 1,
+      t: s.t || s.type,
+      x: finite(s.x, 0), y: finite(s.y, 0),
+      w: Math.max(1, finite(s.w, dw)), h: Math.max(1, finite(s.h, dh)),
+      label: s.label ?? '',
+      cols: s.cols ?? s.items ?? '',
+      req: !!(s.req ?? s.required),
+      g: s.g ?? s.group ?? null,
+      src: s.src ?? null,
+      desc: s.desc ?? '',
+      fs: s.fs ?? s.fontSize ?? null,
+      links: normalizeLinks(s, idMap, i + 1, list.length),
+    };
+  });
+}
+
+/** 연결 대상 id 들을 새 id 로 옮긴다. 원래 id 가 없는 예전 데이터만 's'+순번 규칙으로 추정한다.
+ * link/linkTo(단일값)는 이전 버전 데이터 호환용. */
+function normalizeLinks(s, idMap, selfId, count) {
+  const raw = Array.isArray(s.links) ? s.links
+    : Array.isArray(s.linksTo) ? s.linksTo
+      : [s.link ?? s.linkTo].filter((v) => v != null);
+  const toNew = (v) => {
+    if (v == null) return null;
+    if (idMap.size) return idMap.get(String(v)) ?? idMap.get(String(v).replace(/^s/, '')) ?? null;
+    const n = parseInt(String(v).replace(/^s/, ''), 10);
+    return n >= 1 && n <= count ? n : null; // 없는 요소를 가리키면 버린다
+  };
+  return [...new Set(raw.map(toNew).filter((v) => v != null && v !== selfId))];
 }
 
 // ── 공개 API ──────────────────────────────────────────────
@@ -1183,6 +1280,7 @@ export function initEditor(opts = {}) {
   bGroup = document.getElementById('bGroup');
   bUngroup = document.getElementById('bUngroup');
   notify = opts.onChange || (() => {});
+  if (opts.isBlocked) isBlocked = opts.isBlocked;
 
   marqEl = document.createElement('div');
   marqEl.className = 'marq';
@@ -1259,12 +1357,14 @@ export function initEditor(opts = {}) {
       const dx = p.x - rs.px;
       const dy = p.y - rs.py;
       const d = rs.d;
-      if (d.includes('e')) s.w = Math.max(24, Math.round(rs.ow + dx));
-      if (d.includes('s')) s.h = Math.max(20, Math.round(rs.oh + dy));
-      if (d.includes('w')) { const w = Math.max(24, Math.round(rs.ow - dx)); s.x = rs.ox + rs.ow - w; s.w = w; }
-      if (d.includes('n')) { const h = Math.max(20, Math.round(rs.oh - dy)); s.y = rs.oy + rs.oh - h; s.h = h; }
+      // 캔버스 밖으로는 늘어나지 않게 한다(이동은 캔버스 안으로 막혀 있는데 크기 조절만 뚫려 있어서,
+      // 가장자리 너머로 늘린 요소는 잘려 보이고 생성 결과에서도 화면 밖으로 삐져나갔다).
+      if (d.includes('e')) s.w = Math.max(24, Math.min(BOARD_W - rs.ox, Math.round(rs.ow + dx)));
+      if (d.includes('s')) s.h = Math.max(20, Math.min(BOARD_H - rs.oy, Math.round(rs.oh + dy)));
+      if (d.includes('w')) { const w = Math.max(24, Math.min(rs.ox + rs.ow, Math.round(rs.ow - dx))); s.x = rs.ox + rs.ow - w; s.w = w; }
+      if (d.includes('n')) { const h = Math.max(20, Math.min(rs.oy + rs.oh, Math.round(rs.oh - dy))); s.y = rs.oy + rs.oh - h; s.h = h; }
       snapSize(s, d, rs);
-      guides(s); quick(s);
+      resizeGuides(s, d, rs); quick(s);
       // 라디오·버튼은 폭이 좁아져 줄바꿈되면 선택 테두리(=도형 높이)도 같이 늘어나야
       // 잘리지 않고 다 보인다 — 가로 방향 리사이즈일 때만(세로만 직접 조절할 땐 그대로 둔다).
       if (WRAP_FIT_TYPES[s.t] && (d.includes('e') || d.includes('w'))) fitWrapHeight(s);
@@ -1309,7 +1409,7 @@ export function initEditor(opts = {}) {
     }
     if (move || rs) {
       board.querySelectorAll('.gd').forEach((e) => e.remove());
-      notify();
+      if (endGesture()) notify();
     }
     move = null;
     rs = null;
@@ -1317,8 +1417,9 @@ export function initEditor(opts = {}) {
       // 라디오가 섞여 있었으면 방금 바뀐 폭 기준으로 줄바꿈 여부를 다시 재서 높이를 맞춘다.
       mrs.ids.forEach((id) => { const sh = find(id); if (sh && WRAP_FIT_TYPES[sh.t]) fitWrapHeight(sh); });
       mrs = null;
-      notify();
+      const changed = endGesture();
       render(); // 바운딩 박스·손잡이를 최종 크기에 맞게 다시 그린다
+      if (changed) notify();
     }
   });
 
@@ -1329,21 +1430,26 @@ export function initEditor(opts = {}) {
     if (!posPop.hidden && e.key === 'Escape') { e.preventDefault(); closePosPop(true); return; }
     if (!alignPop.hidden && e.key === 'Escape') { e.preventDefault(); closeAlignPop(true); return; }
     if (!descPop.hidden && e.key === 'Escape') { e.preventDefault(); closeDescPop(true); return; }
-    if (/INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+    // 결과 모달·확인 대화상자가 떠 있는 동안엔 뒤에 가려진 캔버스를 건드리지 않는다 — 예전엔 모달의
+    // 버튼에 포커스가 있는 채 Delete·방향키·Ctrl+Z 를 누르면 보이지 않는 캔버스의 요소가 지워지거나 움직였다.
+    if (isBlocked()) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable) return;
     const c = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (c && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if (c && k === 'y') { e.preventDefault(); redo(); }
     else if (c && k === 'a') { e.preventDefault(); setSel(shapes.map((s) => s.id)); }
     else if (c && k === 'g') { e.preventDefault(); e.shiftKey ? ungroupSel() : groupSel(); }
-    else if (c && k === 'c') { const ss = selShapes(); if (ss.length) clip = ss.map((s) => ({ ...s })); }
-    else if (c && k === 'v') { e.preventDefault(); pasteClip(); }
+    else if (c && k === 'c') copySel();
+    else if (c && k === 'x') { if (selIds.length) { e.preventDefault(); cutSel(); } }
+    // Ctrl+V 는 여기서 막지 않는다 — keydown 을 preventDefault 하면 paste 이벤트 자체가 안 떠서
+    // 다른 프로그램에서 복사한 이미지 붙여넣기가 통째로 막혔다. main.js 의 paste 처리가 이미지면
+    // 이미지 요소로, 아니면 pasteShapes() 로 복사해 둔 요소를 붙여넣는다.
     else if (c && k === 'd') { e.preventDefault(); dup(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') { if (selIds.length) { e.preventDefault(); delSel(); } }
     else if (e.key === 'Escape') setSel([]);
     else if (e.key.indexOf('Arrow') === 0 && selIds.length) {
       e.preventDefault();
-      push();
       const ss = selShapes();
       const d = e.shiftKey ? 10 : 1;
       let dx = 0;
@@ -1358,6 +1464,8 @@ export function initEditor(opts = {}) {
       const maxB = Math.max(...ss.map((s) => s.y + s.h));
       dx = Math.max(-minX, Math.min(BOARD_W - maxR, dx));
       dy = Math.max(-minY, Math.min(BOARD_H - maxB, dy));
+      if (!dx && !dy) return; // 이미 가장자리 — 되돌리기 기록만 쌓이지 않게
+      push();
       ss.forEach((s) => { s.x += dx; s.y += dy; quick(s); });
       updateOverlays();
       notify();
@@ -1376,7 +1484,8 @@ export function initEditor(opts = {}) {
   bItems.addEventListener('click', toggleItemsPop);
   itemsAddBtn.addEventListener('click', addItemFromInput);
   itemsInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); addItemFromInput(); }
+    // 한글 조합 중 Enter 는 조합 확정용이라 무시한다 — 안 그러면 마지막 글자가 따로 한 항목으로 한 번 더 추가됐다
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addItemFromInput(); }
   });
   bPos.addEventListener('click', togglePosPop);
   bAlign.addEventListener('click', toggleAlignPop);
@@ -1440,6 +1549,8 @@ function menuItems() {
   const hasGroup = selShapes().some((s) => s.g);
   const out = [];
   if (n >= 1) {
+    out.push({ label: '잘라내기', sc: 'Ctrl+X', act: cutSel });
+    out.push({ label: '복사', sc: 'Ctrl+C', act: copySel });
     out.push({ label: '복제', sc: 'Ctrl+D', act: dup });
     out.push({ label: '맨 앞으로', act: front });
     out.push({ label: '맨 뒤로', act: back });
@@ -1616,14 +1727,14 @@ export function undo() {
   if (!hist.length) return;
   future.push(JSON.stringify(shapes));
   shapes = JSON.parse(hist.pop());
-  setSel([]);
+  setSel(selIds); // 되돌린 뒤에도 남아 있는 요소는 선택을 유지한다(PPT·캔바 방식)
 }
 
 export function redo() {
   if (!future.length) return;
   hist.push(JSON.stringify(shapes));
   shapes = JSON.parse(future.pop());
-  setSel([]);
+  setSel(selIds);
 }
 
 export function zoomBy(d) {
@@ -1669,4 +1780,11 @@ export function toPayloadShapes() {
     fontSize: s.fs || undefined,
     linksTo: Array.isArray(s.links) && s.links.length ? s.links.map((id) => 's' + id) : undefined,
   }));
+}
+
+/** 복사해 둔 요소 붙여넣기 (main.js 의 paste 이벤트에서 호출). 붙여넣었으면 true */
+export function pasteShapes() {
+  if (!clip || !clip.length) return false;
+  pasteClip();
+  return true;
 }
