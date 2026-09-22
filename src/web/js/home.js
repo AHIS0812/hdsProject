@@ -2,8 +2,8 @@
 // 프로젝트 저장소(projects.js)는 에디터와 공유하고, 이 화면은 목록·검색·정리·새로 만들기를 맡는다.
 // 프로젝트를 열면 editor.html?p=<id> 로 이동한다(에디터가 그 프로젝트에 자동 저장).
 
-import * as api from './api.js';
 import { createProjectStore, browserStorage, cleanName, UNTITLED, NAME_MAX } from './projects.js';
+import { createSystemStore, NAME_MAX as SYS_NAME_MAX } from './systems.js';
 import { thumbnailSvg, svgDataUrl, makeBgThumb } from './thumbnail.js';
 import {
   filterProjects, sortProjects, countViews, countSystems, relTime, daysLeft, metaLine, fmtSize, safeFileName, SORTS,
@@ -16,6 +16,7 @@ import { docPages, isProjectDoc } from './doc-model.js';
 
 const $ = (id) => document.getElementById(id);
 const store = createProjectStore(browserStorage());
+const sysStore = createSystemStore(browserStorage());
 
 // ── 아이콘(인라인 SVG) ────────────────────────────────────
 const ICONS = {
@@ -36,6 +37,7 @@ const ICONS = {
   open: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   restore: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  gear: '<path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2.06 2.06 0 1 1-2.9 2.9l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V19.6a2.06 2.06 0 1 1-4.12 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2.06 2.06 0 1 1-2.9-2.9l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H4.4a2.06 2.06 0 1 1 0-4.12h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2.06 2.06 0 1 1 2.9-2.9l.06.06a1.7 1.7 0 0 0 1.87.34h.08a1.7 1.7 0 0 0 1.03-1.56V4.4a2.06 2.06 0 1 1 4.12 0v.09a1.7 1.7 0 0 0 1.03 1.56h.08a1.7 1.7 0 0 0 1.87-.34l.06-.06a2.06 2.06 0 1 1 2.9 2.9l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03h.09a2.06 2.06 0 1 1 0 4.12h-.09a1.7 1.7 0 0 0-1.56 1.03Z"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 const fillIcons = (root = document) => root.querySelectorAll('.ico[data-i]').forEach((el) => { el.innerHTML = icon(el.dataset.i); });
@@ -59,7 +61,8 @@ const state = {
   selected: new Set(),
   anchor: null,                // shift 범위 선택의 시작점
 };
-let systems = [];              // [{ id, name, sub }] — API 가 안 떠 있으면 빈 배열
+let systems = [];              // [{ id, name, createdAt }] — sysStore.list()
+const refreshSystems = () => { systems = sysStore.list(); };
 const sysName = (id) => systems.find((s) => s.id === id)?.name || null;
 let visibleIds = [];
 
@@ -74,6 +77,14 @@ const TPL_INFO = [
 const tplThumb = (key) => svgDataUrl(thumbnailSvg(templateShapes(key), boardSizeFor(key)));
 const editorUrl = (id) => `editor.html?p=${encodeURIComponent(id)}`;
 const goEditor = (id) => { store.touchOpened(id); location.href = editorUrl(id); };
+
+// "변경 화면" 후보 — 예전엔 운영 서버 목업에서 가져왔지만, 실제 화면 소스는 폐쇄망에 있어 가져올
+// 방법이 없다. 대신 같은 시스템으로 예전에 저장해 둔 내 프로젝트를 후보로 보여준다.
+function screensFor(systemId) {
+  return store.list()
+    .filter((m) => m.systemId === systemId)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
 
 // ── 렌더링 ───────────────────────────────────────────────
 const grid = $('grid');
@@ -395,6 +406,106 @@ async function emptyTrash() {
   toast('휴지통을 비웠어요');
 }
 
+// ── 시스템 관리 ──────────────────────────────────────────
+// 예전엔 운영 서버 목업(시스템 3개 고정)을 그대로 보여줬지만, 이제 사용자가 직접 추가·삭제한다.
+// 여기서 관리하는 목록이 "새 프로젝트" 의 시스템 선택, "변경 화면" 후보 필터에 그대로 쓰인다.
+function openSystemsManager() {
+  closeMenu();
+  if (document.querySelector('.sysmgr-mask')) return;
+  const prevFocus = document.activeElement;
+  const mask = document.createElement('div');
+  mask.className = 'dlg-mask sysmgr-mask';
+  mask.innerHTML =
+    '<div class="dlg sysmgr" role="dialog" aria-modal="true" aria-labelledby="sysMgrTitle">'
+    + '<b class="dlg-title" id="sysMgrTitle">시스템 관리</b>'
+    + '<p class="dlg-msg">여기서 추가한 시스템은 새 프로젝트를 만들 때 고를 수 있고, "변경 화면"에서 그 시스템으로 저장해 둔 화면을 불러올 때도 쓰여요.</p>'
+    + '<div class="sysmgr-list" id="sysMgrList"></div>'
+    + '<form class="sysmgr-add" id="sysMgrAdd">'
+    + `<input type="text" class="dlg-input" id="sysMgrName" placeholder="새 시스템 이름" maxlength="${SYS_NAME_MAX}" autocomplete="off">`
+    + '<button type="submit" class="btn sm pri">추가</button>'
+    + '</form>'
+    + '<div class="dlg-foot"><button type="button" class="btn sm" id="sysMgrClose">닫기</button></div>'
+    + '</div>';
+  document.body.append(mask);
+  const q = (sel) => mask.querySelector(sel);
+
+  const close = () => {
+    document.removeEventListener('keydown', onKey, true);
+    mask.remove();
+    try { prevFocus?.focus?.(); } catch { /* 포커스 복원 실패는 무시 */ }
+    refreshSystems();
+    render();
+  };
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+  }
+  document.addEventListener('keydown', onKey, true);
+  mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
+  q('#sysMgrClose').addEventListener('click', close);
+
+  function paint() {
+    const list = sysStore.list();
+    const active = store.list();
+    if (!list.length) {
+      q('#sysMgrList').innerHTML = '<div class="pop-empty">등록된 시스템이 없어요</div>';
+      return;
+    }
+    q('#sysMgrList').replaceChildren(...list.map((s) => {
+      const n = active.filter((m) => m.systemId === s.id).length;
+      const row = document.createElement('div');
+      row.className = 'sysmgr-row';
+      row.innerHTML =
+        `<span class="nm" title="${esc(s.name)}">${esc(s.name)}</span>`
+        + `<span class="cnt">${n}개 프로젝트</span>`
+        + `<button type="button" class="icon-sm" data-act="rename" aria-label="${esc(s.name)} 이름 바꾸기" title="이름 바꾸기">${icon('edit')}</button>`
+        + `<button type="button" class="icon-sm dng" data-act="remove" aria-label="${esc(s.name)} 삭제" title="삭제">${icon('trash')}</button>`;
+      row.querySelector('[data-act="rename"]').addEventListener('click', () => renameSystem(s.id));
+      row.querySelector('[data-act="remove"]').addEventListener('click', () => removeSystem(s.id, s.name, n));
+      return row;
+    }));
+  }
+
+  async function renameSystem(id) {
+    const s = sysStore.get(id);
+    if (!s) return;
+    const r = await showDialog({
+      title: '시스템 이름 바꾸기',
+      input: { label: '시스템 이름', value: s.name, maxLength: SYS_NAME_MAX },
+      buttons: [{ label: '취소', action: 'cancel' }, { label: '바꾸기', action: 'ok', kind: 'primary' }],
+    });
+    if (!r || r.action !== 'ok') return;
+    const res = sysStore.rename(id, r.value);
+    if (!res) { toast('이름을 입력하거나, 같은 이름의 시스템이 없는지 확인해 주세요'); return; }
+    paint();
+  }
+
+  async function removeSystem(id, name, count) {
+    const r = await showDialog({
+      title: '시스템 삭제',
+      message: count > 0
+        ? `"${name}" 시스템을 삭제할까요?\n이 시스템으로 저장해 둔 프로젝트 ${count}개는 그대로 남지만, 시스템 목록에는 더 이상 뜨지 않아요.`
+        : `"${name}" 시스템을 삭제할까요?`,
+      buttons: [{ label: '취소', action: 'cancel' }, { label: '삭제', action: 'del', kind: 'danger' }],
+    });
+    if (!r || r.action !== 'del') return;
+    sysStore.remove(id);
+    paint();
+  }
+
+  q('#sysMgrAdd').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = q('#sysMgrName');
+    const s = sysStore.create(input.value);
+    if (!s) { toast('이름을 입력하거나, 같은 이름의 시스템이 없는지 확인해 주세요'); return; }
+    input.value = '';
+    paint();
+    input.focus();
+  });
+
+  paint();
+  q('#sysMgrName').focus();
+}
+
 // ── ⋯ · 우클릭 메뉴 ─────────────────────────────────────
 let menuEl = null;
 let menuAnchor = null;
@@ -695,28 +806,18 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     selSys.value = st.systemId || '';
   }
 
-  async function loadScreens() {
+  function loadScreens() {
     const scr = q('#wScr');
     const hint = q('#wScrHint');
     st.screens = []; st.screenId = ''; st.screenDef = null; st.screensErr = '';
     if (!st.systemId) { scr.innerHTML = '<option value="">시스템을 먼저 골라 주세요</option>'; hint.textContent = ''; paintPreview(); return; }
-    scr.innerHTML = '<option value="">불러오는 중…</option>';
-    try {
-      const list = await api.getScreens(st.systemId);
-      if (!document.body.contains(mask) || st.systemId !== selSys.value) return;
-      st.screens = list;
-      scr.innerHTML = list.length
-        ? '<option value="">화면을 선택하세요</option>' + list.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}${s.template ? ` (${esc(s.template)})` : ''}</option>`).join('')
-        : '<option value="">등록된 화면이 없어요</option>';
-      hint.textContent = list.length ? `${list.length}개의 화면이 있어요.` : '이 시스템에는 변경할 수 있는 화면이 아직 없어요.';
-      hint.className = 'hint';
-    } catch (e) {
-      console.error(e);
-      st.screensErr = '화면 목록을 불러오지 못했어요';
-      scr.innerHTML = '<option value="">불러오지 못했어요</option>';
-      hint.textContent = '서버가 켜져 있는지 확인해 주세요(npm run dev).';
-      hint.className = 'hint err';
-    }
+    const list = screensFor(st.systemId);
+    st.screens = list;
+    scr.innerHTML = list.length
+      ? '<option value="">화면을 선택하세요</option>' + list.map((m) => `<option value="${esc(m.id)}">${esc(m.name)} (${m.mode === 'edit' ? '변경' : '신규'})</option>`).join('')
+      : '<option value="">저장해 둔 화면이 없어요</option>';
+    hint.textContent = list.length ? `이 시스템으로 저장해 둔 화면 ${list.length}개가 있어요.` : '이 시스템으로 저장해 둔 화면이 아직 없어요. 먼저 "신규 화면"으로 하나 만들어 보세요.';
+    hint.className = 'hint';
     paintPreview();
   }
 
@@ -726,15 +827,16 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     st.screens = []; st.screenId = ''; st.screenDef = null; st.screensErr = '';
     if (st.mode === 'edit') loadScreens();
   });
-  q('#wScr').addEventListener('change', async (e) => {
+  q('#wScr').addEventListener('change', (e) => {
     st.screenId = e.target.value;
     st.screenDef = null;
+    if (st.screenId) {
+      const doc = store.get(st.screenId);
+      const meta = store.meta(st.screenId);
+      st.screenDef = doc ? { name: doc.screenName || meta?.name, canvas: doc.canvas, shapes: doc.shapes, template: doc.template } : null;
+      if (!doc) { q('#wScrHint').textContent = '화면 내용을 불러오지 못했어요'; q('#wScrHint').className = 'hint err'; }
+    }
     paintPreview();
-    if (!st.screenId) return;
-    try {
-      const def = await api.getScreen(st.screenId);
-      if (st.screenId === e.target.value) { st.screenDef = def; paintPreview(); }
-    } catch (err) { console.error(err); q('#wScrHint').textContent = '화면 내용을 불러오지 못했어요'; q('#wScrHint').className = 'hint err'; }
   });
   mask.querySelectorAll('#wMode button').forEach((b) => b.addEventListener('click', () => {
     st.mode = b.dataset.m;
@@ -746,33 +848,22 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
   q('#wCw').addEventListener('input', (e) => { st.cw = parseInt(e.target.value, 10) || 0; paintPreview(); });
   q('#wCh').addEventListener('input', (e) => { st.ch = parseInt(e.target.value, 10) || 0; paintPreview(); });
 
-  async function create() {
-    if (st.busy) return;
+  function create() {
     const name = cleanName(q('#wName').value) || UNTITLED;
     let doc;
     if (st.mode === 'new') {
       doc = newDoc({ name, template: st.template, size: curSize(), systemId: st.systemId });
     } else {
       if (!st.screenId) { q('#wScrHint').textContent = '변경할 화면을 먼저 골라 주세요'; q('#wScrHint').className = 'hint err'; q('#wScr').focus(); return; }
-      st.busy = true;
-      q('#wOk').disabled = true;
-      try {
-        const def = st.screenDef || await api.getScreen(st.screenId);
-        doc = {
-          app: 'hds', version: 1, savedAt: new Date().toISOString(),
-          projectName: name, screenName: def.name || '변경 화면',
-          systemId: st.systemId, systemName: sysName(st.systemId),
-          mode: 'edit', template: def.template || 'blank', baseScreenId: st.screenId,
-          canvas: def.canvas || boardSizeFor('blank'), shapes: def.shapes || [],
-        };
-      } catch (e) {
-        console.error(e);
-        toast('화면 내용을 불러오지 못했어요');
-        st.busy = false;
-        q('#wOk').disabled = false;
-        return;
-      }
-      st.busy = false;
+      const def = st.screenDef || store.get(st.screenId);
+      if (!def) { toast('화면 내용을 불러오지 못했어요 (지워진 프로젝트일 수 있어요)'); return; }
+      doc = {
+        app: 'hds', version: 1, savedAt: new Date().toISOString(),
+        projectName: name, screenName: def.name || def.screenName || '변경 화면',
+        systemId: st.systemId, systemName: sysName(st.systemId),
+        mode: 'edit', template: def.template || 'blank', baseScreenId: st.screenId,
+        canvas: def.canvas || boardSizeFor('blank'), shapes: def.shapes || [],
+      };
     }
     try {
       const meta = store.create({ name, doc, thumb: thumbnailSvg(doc.shapes, doc.canvas) });
@@ -831,6 +922,7 @@ function initEvents() {
   $('btnNew').addEventListener('click', () => openWizard());
   $('btnNew2').addEventListener('click', () => openWizard());
   $('btnImport').addEventListener('click', () => fileInput.click());
+  $('btnSysMgr').addEventListener('click', openSystemsManager);
 
   // 빠른 시작 타일
   const tiles = $('tiles');
@@ -1017,16 +1109,14 @@ fillIcons();
 initEvents();
 store.purgeExpired();
 migrateLegacyDraft();
+refreshSystems();
 render();
 
-const systemsReady = api.getSystems().then((list) => {
-  systems = list;
-  render();
-}).catch((e) => console.warn('시스템 목록을 불러오지 못했습니다(API 서버 미기동?)', e));
-
+// 시스템 목록은 위 refreshSystems() 가 이미 동기로 채워 둬서(로컬 저장소라 네트워크 대기가 없다),
+// 예전처럼 로딩을 기다렸다가 마법사를 여는 처리가 필요 없다.
 const params = new URLSearchParams(location.search);
 if (params.has('missing')) toast('열려던 프로젝트를 찾지 못했어요. 삭제되었을 수 있어요.');
 if (params.has('new') || params.has('missing') || params.has('q')) {
-  if (params.has('new')) systemsReady.finally(() => openWizard());
+  if (params.has('new')) openWizard();
   history.replaceState(null, '', location.pathname);
 }

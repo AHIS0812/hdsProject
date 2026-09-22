@@ -2,13 +2,13 @@
 // 예시 프로토타입(samples/화면스케치스튜디오_예시_v1.html)을 src/web 모듈 구조로 이전.
 
 import { COMPS, DEFAULT_BOARD, boardSizeFor } from './constants.js';
-import * as api from './api.js';
 import * as editor from './editor.js';
 import { makeCombo } from './combobox.js';
 import { templateShapes } from './templates.js';
 import { initResultModal, runBuild } from './result-modal.js';
 import { toast } from './toast.js';
 import { createProjectStore, browserStorage, cleanName, UNTITLED } from './projects.js';
+import { createSystemStore } from './systems.js';
 import { thumbnailSvg, makeBgThumb } from './thumbnail.js';
 import { sortProjects, relTime, metaLine, safeFileName } from './home-logic.js';
 import { showDialog } from './dialog.js';
@@ -21,6 +21,11 @@ const $ = (id) => document.getElementById(id);
 const isModalOpen = () => !!document.querySelector('.dlg-mask') || !!$('mask')?.classList.contains('on');
 const scrNm = $('scrNm');
 const abL = $('abL');
+
+// 프로젝트·시스템 보관소 — sysCombo/scrCombo 가 아래에서 바로 쓰므로 파일 앞머리에서 만든다
+// ("프로젝트(자동 저장)" 절 예전 위치에 있던 store 선언을 이리로 옮겼다).
+const store = createProjectStore(browserStorage());
+const sysStore = createSystemStore(browserStorage());
 
 let workMode = 'new';
 let currentTpl = 'blank'; // 처음 열면 빈 화면에서 시작
@@ -271,43 +276,41 @@ document.querySelectorAll('.tpl').forEach((el) => {
 });
 
 // ── 시스템 / 변경화면 콤보박스 ────────────────────────────
+// "변경할 화면" 목록은 예전엔 운영 서버 목업(fixtures)에서 가져왔지만, 실제 화면 소스는 폐쇄망에
+// 있어 가져올 방법이 없다. 대신 같은 시스템으로 예전에 저장해 둔 내 프로젝트들을 후보로 보여주고,
+// 고르면 그 화면(도형)을 지금 프로젝트에 그대로 복사해 온다 — 원본 프로젝트는 그대로 남는다.
+// 지금 열려 있는 프로젝트 자기 자신은 후보에서 뺀다.
+function screensFor(systemId) {
+  return store.list()
+    .filter((m) => m.systemId === systemId && m.id !== project.id)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
 const sysCombo = makeCombo($('sysBox'), {
   placeholder: '시스템 선택',
   emptyText: '시스템이 없습니다',
-  onPick: async (sys) => {
-    scrCombo.setItems([]);
+  onPick: (sys) => {
     loadedScreenId = null;
-    scrCombo.setPlaceholder(sys ? '불러오는 중…' : '먼저 시스템을 선택하세요');
     scheduleAutosave();
-    if (!sys) return;
-    try {
-      const screens = await api.getScreens(sys.id);
-      scrCombo.setItems(screens.map((s) => ({ id: s.id, name: s.name, sub: s.template })));
-      scrCombo.setPlaceholder(screens.length ? '화면 선택' : '등록된 화면이 없습니다');
-    } catch (e) {
-      toast('화면 목록을 불러오지 못했습니다');
-      console.error(e);
-    }
+    const screens = sys ? screensFor(sys.id) : [];
+    scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
+    scrCombo.setPlaceholder(screens.length ? '화면 선택' : (sys ? '저장해 둔 화면이 없습니다' : '먼저 시스템을 선택하세요'));
   },
 });
 
 const scrCombo = makeCombo($('scrBox'), {
   placeholder: '화면 선택',
-  emptyText: '해당 시스템에 등록된 화면이 없습니다',
+  emptyText: '이 시스템에 저장해 둔 화면이 없습니다',
   // 변경할 화면을 바꾸는 건 지금 캔버스(전 화면 또는 편집 중이던 내용)를 지운다는 뜻이라,
   // 작업한 내용이 있으면 적용 후 되돌리기 토스트를 띄운다.
-  onPick: async (scr) => {
+  onPick: (scr) => {
     if (!scr || scr.id === loadedScreenId) return;
-    try {
-      const def = await api.getScreen(scr.id);
-      guardedRun(() => {
-        loadCanvas(def.shapes || [], def.name || scr.name, def.canvas || DEFAULT_BOARD);
-        loadedScreenId = scr.id;
-      });
-    } catch (e) {
-      toast('화면을 불러오지 못했습니다');
-      console.error(e);
-    }
+    const def = store.get(scr.id);
+    if (!def) { toast('화면을 불러오지 못했습니다 (지워진 프로젝트일 수 있어요)'); return; }
+    guardedRun(() => {
+      loadCanvas(def.shapes || [], def.screenName || scr.name, def.canvas || DEFAULT_BOARD);
+      loadedScreenId = scr.id;
+    });
   },
 });
 
@@ -447,7 +450,6 @@ document.addEventListener('paste', (e) => {
 //   · 고치면 잠시 뒤(0.8초) 저장 — 상단에 "저장 중… → 저장됨 · 시각"
 //   · 탭을 닫거나 홈으로 나갈 때(pagehide) 대기 중인 변경을 즉시 저장
 //   · 다른 탭이 같은 프로젝트를 먼저 고쳤으면(수정 시각이 다름) 덮어쓰기 전에 물어본다
-const store = createProjectStore(browserStorage());
 let project = { id: null, name: '' };
 let savedSig = null;   // 마지막으로 저장(또는 열었을 때)한 내용의 서명
 let savedAtTs = null;  // 마지막 저장 시각
@@ -840,18 +842,18 @@ document.addEventListener('keydown', (e) => {
 /**
  * 시스템·변경화면 콤보를 조용히(onPick 없이) 맞춘다 — onPick 을 타면 loadedScreenId 가 초기화되고
  * 화면 콤보가 비워져 변경 모드의 "기준 화면" 선택이 사라진다.
- * @returns {Promise<boolean>} 기준 화면까지 복원했는지
+ * @returns {boolean} 기준 화면까지 복원했는지
  */
-async function restoreSystemAndScreen(systemId, screenId, fallbackName) {
+function restoreSystemAndScreen(systemId, screenId, fallbackName) {
   sysCombo.choose(systemId, true);
-  const screens = await api.getScreens(systemId);
-  scrCombo.setItems(screens.map((s) => ({ id: s.id, name: s.name, sub: s.template })));
-  scrCombo.setPlaceholder(screens.length ? '화면 선택' : '등록된 화면이 없습니다');
+  const screens = screensFor(systemId);
+  scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
+  scrCombo.setPlaceholder(screens.length ? '화면 선택' : '저장해 둔 화면이 없습니다');
   // baseScreenId 가 없는 예전 저장본 — 변경 모드는 화면 이름이 기준 화면 이름으로 고정되므로
   // 그 이름으로 기준 화면을 찾는다(캡처 배경만 깐 저장본은 기준 화면이 없어도 되니 건너뜀).
-  const target = screens.find((s) => s.id === screenId)
+  const target = screens.find((m) => m.id === screenId)
     || (workMode === 'edit' && fallbackName && !editor.hasBoardBackground()
-      ? screens.find((s) => s.name === fallbackName) : null);
+      ? screens.find((m) => m.screenName === fallbackName) : null);
   if (target) {
     scrCombo.choose(target.id, true);
     loadedScreenId = target.id;
@@ -900,22 +902,16 @@ async function applyDoc(doc, { project: p, savedTs = null, message = null }) {
   setProject(p.id, p.name);
   if (message) toast(message);
 
-  try {
-    if (!doc.systemId) {
-      scrCombo.reset();
-    } else {
-      const hasBase = await restoreSystemAndScreen(doc.systemId, doc.baseScreenId, doc.screenName);
-      if (workMode === 'edit' && !hasBase && !editor.hasBoardBackground()) {
-        toast('변경할 화면을 선택해주세요 (이 프로젝트에는 기준 화면 정보가 없습니다)');
-      }
+  if (!doc.systemId) {
+    scrCombo.reset();
+  } else {
+    const hasBase = restoreSystemAndScreen(doc.systemId, doc.baseScreenId, doc.screenName);
+    if (workMode === 'edit' && !hasBase && !editor.hasBoardBackground()) {
+      toast('변경할 화면을 선택해주세요 (이 프로젝트에는 기준 화면 정보가 없습니다)');
     }
-  } catch (e) {
-    toast('화면 목록을 불러오지 못했습니다');
-    console.error(e);
-  } finally {
-    // 시스템·기준 화면 복원까지 끝난 뒤의 상태를 기준으로 삼아야 열자마자 "저장 중" 으로 뜨지 않는다
-    markSaved(savedTs);
   }
+  // 시스템·기준 화면 복원까지 끝난 뒤의 상태를 기준으로 삼아야 열자마자 "저장 중" 으로 뜨지 않는다
+  markSaved(savedTs);
 }
 
 // ── payload / 생성 ────────────────────────────────────────
@@ -1009,14 +1005,8 @@ async function boot() {
   store.touchOpened(pid);
   const opened = store.meta(pid) || meta;
 
-  let systems = [];
-  try {
-    systems = await api.getSystems();
-    sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name })));
-  } catch (e) {
-    toast('API 서버에 연결하지 못했습니다 — npm run dev 로 실행했는지 확인하세요');
-    console.error(e);
-  }
+  const systems = sysStore.list();
+  sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name })));
 
   await applyDoc(doc, { project: { id: pid, name: opened.name }, savedTs: meta.updatedAt });
   // 이번에 고치기 전의 상태를 버전으로 남겨 둔다(버전이 없거나 마지막 버전이 10분 넘게 지났을 때만)

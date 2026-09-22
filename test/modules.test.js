@@ -21,13 +21,16 @@ test('editor / combobox / api / result-modal 이 Node 에서 부작용 없이 im
   assert.equal(typeof modal.initResultModal, 'function');
 });
 
-test('projects / dialog / thumbnail / home-logic 모듈도 Node 에서 부작용 없이 import 된다', async () => {
+test('projects / systems / dialog / thumbnail / home-logic 모듈도 Node 에서 부작용 없이 import 된다', async () => {
   const projects = await import('../src/web/js/projects.js');
+  const systems = await import('../src/web/js/systems.js');
   const dialog = await import('../src/web/js/dialog.js');
   const thumb = await import('../src/web/js/thumbnail.js');
   const logic = await import('../src/web/js/home-logic.js');
   assert.equal(typeof projects.createProjectStore, 'function');
   assert.equal(typeof projects.browserStorage, 'function');
+  assert.equal(typeof systems.createSystemStore, 'function');
+  assert.ok(Array.isArray(systems.SEED_SYSTEMS) && systems.SEED_SYSTEMS.length >= 1);
   assert.equal(typeof dialog.showDialog, 'function');
   assert.equal(typeof thumb.thumbnailSvg, 'function');
   assert.equal(typeof logic.filterProjects, 'function');

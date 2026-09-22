@@ -346,3 +346,19 @@ a{color:inherit;}
   .grid.list .more{grid-column:5;}
   .grid.list .thumb{width:64px;}
 }
+
+/* ── 시스템 관리 대화상자 ─────────────────────────────── */
+.dlg.sysmgr{width:min(440px,94vw);}
+.sysmgr-list{display:flex;flex-direction:column;gap:2px;max-height:280px;overflow-y:auto;}
+.sysmgr-row{display:flex;align-items:center;gap:8px;height:40px;padding:0 4px;border-radius:8px;}
+.sysmgr-row:hover{background:#F7F8FA;}
+.sysmgr-row .nm{flex:1;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sysmgr-row .cnt{font-size:11px;color:var(--mut);flex:0 0 auto;}
+.icon-sm{width:28px;height:28px;flex:0 0 auto;border:none;background:none;border-radius:7px;color:var(--mut);cursor:pointer;
+         display:flex;align-items:center;justify-content:center;}
+.icon-sm svg{width:15px;height:15px;}
+.icon-sm:hover{background:#EEF1F5;color:var(--ink);}
+.icon-sm.dng:hover{background:#FFF0F0;color:#CF222E;}
+.sysmgr-add{display:flex;gap:8px;}
+.sysmgr-add .dlg-input{flex:1;}
+.sysmgr-add .btn{height:36px;flex:0 0 auto;}
