@@ -88,7 +88,7 @@ a{color:inherit;}
 /* 큰 브랜드 로고 — 배너 오른쪽에 살짝 기울여 크게 보여준다(붓 자국 장식과 함께) */
 .hero-art{position:relative;flex:0 0 auto;width:226px;height:158px;margin-right:18px;}
 .hero-art img{position:absolute;right:0;top:50%;width:156px;height:156px;transform:translateY(-50%) rotate(-6deg);
-              border-radius:36px;filter:drop-shadow(0 14px 22px rgba(4,16,40,.5));}
+              filter:drop-shadow(0 14px 22px rgba(4,16,40,.5));}
 .hero-art .bs{position:absolute;display:block;height:9px;border-radius:9px;transform:rotate(-14deg);}
 .hero-art .b1{left:0;top:48px;width:84px;background:rgba(255,255,255,.28);}
 .hero-art .b2{left:16px;top:70px;width:58px;background:rgba(245,130,31,.7);}
@@ -289,7 +289,7 @@ a{color:inherit;}
 }
 @media (max-width:900px){
   .hero-art{width:120px;height:96px;margin-right:6px;}
-  .hero-art img{width:92px;height:92px;border-radius:22px;}
+  .hero-art img{width:92px;height:92px;}
   .hero-art .bs{display:none;}
   .side{position:fixed;left:0;top:0;bottom:0;transform:translateX(-102%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.25);}
   .side.open{transform:none;}
