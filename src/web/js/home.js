@@ -814,7 +814,7 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     const list = screensFor(st.systemId);
     st.screens = list;
     scr.innerHTML = list.length
-      ? '<option value="">화면을 선택하세요</option>' + list.map((m) => `<option value="${esc(m.id)}">${esc(m.name)} (${m.mode === 'edit' ? '변경' : '신규'})</option>`).join('')
+      ? '<option value="">화면을 선택하세요</option>' + list.map((m) => `<option value="${esc(m.id)}">${esc(m.screenName || m.name)}</option>`).join('')
       : '<option value="">저장해 둔 화면이 없어요</option>';
     hint.textContent = list.length ? `이 시스템으로 저장해 둔 화면 ${list.length}개가 있어요.` : '이 시스템으로 저장해 둔 화면이 아직 없어요. 먼저 "신규 화면"으로 하나 만들어 보세요.';
     hint.className = 'hint';

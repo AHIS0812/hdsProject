@@ -293,7 +293,7 @@ const sysCombo = makeCombo($('sysBox'), {
     loadedScreenId = null;
     scheduleAutosave();
     const screens = sys ? screensFor(sys.id) : [];
-    scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
+    scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.screenName || m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
     scrCombo.setPlaceholder(screens.length ? '화면 선택' : (sys ? '저장해 둔 화면이 없습니다' : '먼저 시스템을 선택하세요'));
   },
 });
@@ -847,7 +847,7 @@ document.addEventListener('keydown', (e) => {
 function restoreSystemAndScreen(systemId, screenId, fallbackName) {
   sysCombo.choose(systemId, true);
   const screens = screensFor(systemId);
-  scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
+  scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.screenName || m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
   scrCombo.setPlaceholder(screens.length ? '화면 선택' : '저장해 둔 화면이 없습니다');
   // baseScreenId 가 없는 예전 저장본 — 변경 모드는 화면 이름이 기준 화면 이름으로 고정되므로
   // 그 이름으로 기준 화면을 찾는다(캡처 배경만 깐 저장본은 기준 화면이 없어도 되니 건너뜀).
