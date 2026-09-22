@@ -8,7 +8,9 @@ import { makeCombo } from './combobox.js';
 import { templateShapes } from './templates.js';
 import { initResultModal, runBuild } from './result-modal.js';
 import { toast } from './toast.js';
-import { createProjectStore, cleanName } from './projects.js';
+import { createProjectStore, browserStorage, cleanName, UNTITLED } from './projects.js';
+import { thumbnailSvg, makeBgThumb } from './thumbnail.js';
+import { sortProjects, relTime, metaLine, safeFileName } from './home-logic.js';
 import { showDialog } from './dialog.js';
 
 const $ = (id) => document.getElementById(id);
@@ -24,11 +26,7 @@ let canvasDirty = false;
 // "PC" 비율 프리셋이 돌아갈 기준 크기 — 신규는 화면 유형 기본값, 변경화면은 그 화면의 canvas
 let baseBoardSize = DEFAULT_BOARD;
 
-// 캔버스 편집 내용은 새로고침해도 유지된다 — PPT·캔바처럼 "지금 작업 중인 화면" 하나를
-// 자동 저장(localStorage, 디바운스)해 뒀다가 부팅 시 이어서 불러온다(§AUTOSAVE_KEY 아래).
-// 다른 화면으로 새로 시작하려면 상단 신규/변경 화면 전환이나 화면 유형 타일을 쓴다 — 그 자체가
-// "새로 시작하기" 진입점이고, 그 순간부터 그게 새로운 자동 저장 대상이 된다.
-// 이름 붙여 따로 보관하려면 "저장본" 슬롯(다른 이름으로 저장 = 사본) 또는 .hds.json 내보내기를 쓴다.
+// 편집 내용은 열려 있는 프로젝트(?p=<id>)에 자동 저장된다(§프로젝트 절). 프로젝트를 고르거나 새로 만드는 곳은 홈(/).
 
 /**
  * 캔버스를 새 shapes 로 교체 (프로그램 로드 — dirty 아님)
@@ -80,59 +78,13 @@ function restoreSnapshot(snap) {
   toast('이전 화면으로 되돌렸습니다');
 }
 
-// ── 자동 저장(현재 작업 중인 화면 1개, localStorage) ────────
-// "저장본" 슬롯(이름 붙여 여러 개 보관)과는 별개로, PPT·캔바처럼 지금 캔버스에 있는 내용 그대로를
-// 디바운스해서 계속 최신 상태로 남겨 두고, 새로고침·재접속 시 그 상태를 이어서 연다.
-const AUTOSAVE_KEY = 'hds:autosave';
+// ── 자동 저장 예약 ─────────────────────────────────────────
+// 내용이 바뀔 때마다(여러 경로에서) 호출된다. 실제 저장·충돌 처리는 아래 "프로젝트" 절의 persist().
 let autosaveTimer = null;
-
-/** snapshotForUndo() 와 같은 필드 + 복원에 필요한 시스템 선택·캡처 배경까지 포함한 전체 스냅샷 */
-function autosaveSnapshot() {
-  return {
-    ...snapshotForUndo(),
-    systemId: sysCombo.get()?.id || null,
-    background: editor.hasBoardBackground() ? editor.getBoardBackground() : null,
-    // 열려 있는 프로젝트 — 새로고침해도 같은 프로젝트를 이어서 저장할 수 있게
-    projectId: project.id,
-    projectName: project.name,
-    projectDirty: isDirty(),
-  };
-}
-let booted = false; // 부팅(시스템·화면 콤보 복원)이 끝나기 전엔 반쯤 복원된 상태를 초안으로 덮어쓰지 않는다
 function scheduleAutosave() {
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(() => {
-    if (!booted) return;
-    try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(autosaveSnapshot())); } catch { /* 저장 공간 부족 등 — 조용히 무시 */ }
-  }, 500);
+  autosaveTimer = setTimeout(() => { persist(); }, 800);
   scheduleStatus();
-}
-function readAutosave() {
-  try {
-    const doc = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null');
-    return doc && Array.isArray(doc.shapes) ? doc : null;
-  } catch { return null; }
-}
-/** autosaveSnapshot() 으로 저장해 둔 상태를 부팅 시 그대로 복원한다(시스템/화면 선택은 boot() 이 이어서 처리) */
-function restoreAutosave(snap) {
-  workMode = snap.workMode === 'edit' ? 'edit' : 'new';
-  markMode(workMode);
-  applyMode();
-  currentTpl = document.querySelector(`.tpl[data-tpl="${snap.currentTpl}"]`) ? snap.currentTpl : 'blank';
-  highlightTpl(currentTpl);
-  loadedScreenId = snap.loadedScreenId || null;
-  baseBoardSize = snap.baseBoardSize || DEFAULT_BOARD;
-  editor.clearBoardBackground();
-  editor.setBoardSize(snap.canvas?.w || DEFAULT_BOARD.w, snap.canvas?.h || DEFAULT_BOARD.h);
-  editor.setShapes(snap.shapes);
-  if (snap.background) editor.setBoardBackground(snap.background);
-  syncBgButtons();
-  scrNm.value = snap.scrName || '';
-  // 열려 있던 프로젝트가 그 사이 삭제됐으면 저장 안 된 새 프로젝트로 이어 간다
-  const pid = snap.projectId && store.has(snap.projectId) ? snap.projectId : null;
-  setProject(pid, pid ? store.meta(pid).name : (snap.projectName || ''));
-  syncAbL();
-  canvasDirty = snap.shapes.length > 0; // 이어서 작업 중이던 내용이므로, 비어있지 않으면 dirty 유지
 }
 
 /**
@@ -476,44 +428,41 @@ document.addEventListener('paste', (e) => {
   addImages(imgs);
 });
 
-// ── 프로젝트 (저장 · 열기 · 새로 만들기) ──────────────────
-// PPT·캔바처럼 "지금 열려 있는 프로젝트" 가 있고, 저장(Ctrl+S)은 그 프로젝트를 덮어쓴다.
-//   · project.id 가 없으면 아직 한 번도 저장 안 한 새 프로젝트 — 첫 저장 때 이름을 정한다
-//   · 내용이 마지막 저장/열기 시점과 달라지면 "변경 사항 있음" 으로 표시(내용 서명 비교 —
-//     고쳤다가 되돌리면 다시 "저장됨")
-//   · 새 프로젝트·다른 프로젝트 열기·파일 열기 전에 저장 안 한 변경이 있으면 확인을 받는다
-// 자동 저장(위)은 이와 별개로 "작업 중 초안" 을 새로고침 복구용으로 남긴다.
-const store = createProjectStore(pickStorage());
+// ── 프로젝트 (자동 저장) ────────────────────────────────────
+// 에디터는 항상 프로젝트 하나(?p=<id>)를 열고, 내용이 바뀌면 그 프로젝트에 자동 저장한다(캔바·미리캔버스처럼).
+// 프로젝트를 고르거나 새로 만드는 곳은 홈(/)이다. 저장 안 한 변경이 없으니 "저장하시겠습니까?" 도 없다.
+//   · 고치면 잠시 뒤(0.8초) 저장 — 상단에 "저장 중… → 저장됨 · 시각"
+//   · 탭을 닫거나 홈으로 나갈 때(pagehide) 대기 중인 변경을 즉시 저장
+//   · 다른 탭이 같은 프로젝트를 먼저 고쳤으면(수정 시각이 다름) 덮어쓰기 전에 물어본다
+const store = createProjectStore(browserStorage());
 let project = { id: null, name: '' };
-let savedSig = null;   // 마지막 저장/열기 시점의 내용 서명. null 이면 저장 기록 없음(= 항상 변경됨)
-let savedAtTs = null;  // 마지막 저장 시각(ms) — 상태 표시용
+let savedSig = null;   // 마지막으로 저장(또는 열었을 때)한 내용의 서명
+let savedAtTs = null;  // 마지막 저장 시각
+let lastRev = null;    // 우리가 마지막으로 읽거나 쓴 프로젝트 수정 시각 — 다른 탭이 고쳤는지 감지용
+let saveError = false;
+let booted = false;    // 열기가 끝나기 전엔(반쯤 복원된 상태) 저장하지 않는다
+let conflictOpen = false;
 const projNm = $('projNm');
 const saveStat = $('saveStat');
-const btnSave = $('btnSave');
-
-function pickStorage() {
-  try { localStorage.getItem('hds:probe'); return localStorage; } catch {
-    const m = new Map(); // 사생활 보호 모드 등 — 이 탭이 열려 있는 동안만 유지
-    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); } };
-  }
-}
 
 function currentDoc() {
+  const sys = sysCombo.get();
   return {
     app: 'hds',
     version: 1,
     savedAt: new Date().toISOString(),
     projectName: project.name,
     screenName: scrNm.value,
-    systemId: sysCombo.get()?.id || null,
+    systemId: sys?.id || null,
+    systemName: sys?.name || null,
     mode: workMode,
     template: currentTpl,
-    // 변경 모드에서 어떤 기존 화면을 고치던 중이었는지 — 없으면 불러온 뒤 생성할 때
+    // 변경 모드에서 어떤 기존 화면을 고치던 중이었는지 — 없으면 다시 열었을 때
     // "변경할 화면을 선택하세요" 로 막힌다.
     baseScreenId: workMode === 'edit' ? (scrCombo.get()?.id || null) : null,
     canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
-    // 변경화면 캡처 배경(트레이싱) — 빠지면 저장본·파일을 다시 열었을 때 배경이 사라진다
+    // 변경화면 캡처 배경(트레이싱) — 빠지면 다시 열었을 때 배경이 사라진다
     ...(editor.hasBoardBackground() ? { background: editor.getBoardBackground() } : {}),
   };
 }
@@ -528,31 +477,21 @@ function contentSig() {
   ]);
 }
 const isDirty = () => savedSig === null || contentSig() !== savedSig;
-/** 저장 안 한 변경이 있는가 — 아무 것도 안 그린 새 프로젝트는 잃을 게 없으므로 제외 */
-const hasUnsaved = () => isDirty() && (!!project.id || editor.count() > 0 || editor.hasBoardBackground());
 
 const fmtClock = (ts) => {
   const d = new Date(ts);
   const p = (n) => String(n).padStart(2, '0');
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 };
-function fmtWhen(ts) {
-  const d = new Date(ts);
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
 
 function refreshStatus() {
-  const unsaved = hasUnsaved();
-  let text; let cls = '';
-  if (!project.id) { text = unsaved ? '저장 안 됨' : '새 프로젝트'; if (unsaved) cls = 'dirty'; }
-  else if (unsaved) { text = '변경 사항 있음'; cls = 'dirty'; }
-  else { text = savedAtTs ? `저장됨 · ${fmtClock(savedAtTs)}` : '저장됨'; cls = 'saved'; }
+  let text; let cls = 'saved';
+  if (saveError) { text = '저장 실패 — 다시 시도합니다'; cls = 'err'; }
+  else if (booted && isDirty()) { text = '저장 중…'; cls = 'dirty'; }
+  else { text = savedAtTs ? `저장됨 · ${fmtClock(savedAtTs)}` : '저장됨'; }
   saveStat.textContent = text;
   saveStat.className = 'saveStat ' + cls;
-  btnSave.classList.toggle('dirty', unsaved);
-  document.title = `${unsaved ? '● ' : ''}${project.name || '제목 없는 프로젝트'} — 하이스케치`;
-  if (!$('projPop').hidden) renderProjects();
+  document.title = `${project.name || UNTITLED} — 하이스케치`;
 }
 let statusTimer = null;
 function scheduleStatus() {
@@ -568,23 +507,103 @@ function setProject(id, name) {
 function markSaved(ts = null) {
   savedSig = contentSig();
   savedAtTs = ts;
-  refreshStatus();
-}
-function markUnsaved() {
-  savedSig = null;
-  savedAtTs = null;
+  if (ts != null) lastRev = ts;
   refreshStatus();
 }
 
-// 프로젝트 이름 입력 — 저장된 프로젝트는 입력을 확정할 때(Enter·포커스 이동) 이름이 바뀐다
+// 변경 화면의 캡처 배경은 홈 카드 썸네일에도 보여야 한다. 원본(수백 KB~MB)을 그대로 넣으면 저장 공간이
+// 아까우니 작게 줄인 이미지를 한 번만 만들어 두고(배경이 바뀔 때만 다시), 저장할 때 썸네일에 얹는다.
+let bgThumb = { key: '', url: null };
+let bgThumbPending = '';
+const bgKey = () => (editor.hasBoardBackground() ? `${editor.getBoardBackground().length}:${editor.getBoardBackground().slice(-48)}` : '');
+const bgThumbUrl = () => { const k = bgKey(); return k && bgThumb.key === k ? bgThumb.url : null; };
+function ensureBgThumb() {
+  const k = bgKey();
+  if (!k || bgThumb.key === k || bgThumbPending === k) return;
+  bgThumbPending = k;
+  makeBgThumb(editor.getBoardBackground()).then((url) => {
+    bgThumb = { key: k, url };
+    bgThumbPending = '';
+    // 줄인 이미지가 준비되면, 방금 저장된 프로젝트의 썸네일만 배경을 넣어 다시 써 둔다
+    if (url && project.id && store.has(project.id) && bgKey() === k) {
+      const doc = currentDoc();
+      store.setThumb(project.id, thumbnailSvg(doc.shapes, doc.canvas, { background: url }));
+    }
+  });
+}
+
+/** 실제로 저장소에 쓴다(동기). 실패하면 false */
+function writeProject(sig, id = project.id, name = null) {
+  try {
+    const doc = currentDoc();
+    const stored = store.meta(id);
+    const meta = store.put({
+      id, name: name ?? (stored?.name || project.name), doc,
+      thumb: thumbnailSvg(doc.shapes, doc.canvas, { background: bgThumbUrl() }),
+    });
+    ensureBgThumb();
+    setProject(meta.id, meta.name);
+    lastRev = meta.updatedAt;
+    savedSig = sig;
+    savedAtTs = meta.updatedAt;
+    if (saveError) saveError = false;
+    refreshStatus();
+    return true;
+  } catch (e) {
+    console.error(e);
+    if (!saveError) toast('브라우저 저장 공간이 부족합니다 · 홈에서 안 쓰는 프로젝트를 정리하거나 파일로 내보내주세요');
+    saveError = true;
+    refreshStatus();
+    return false;
+  }
+}
+
+/** 충돌 사본으로 저장(탭을 닫는 중처럼 물어볼 수 없을 때) — 지금 탭이 이 사본을 이어서 쓴다 */
+function saveConflictCopy(sig) {
+  const name = store.uniqueName(`${project.name || UNTITLED} (충돌 사본)`);
+  const ok = writeProject(sig, store.newId(), name);
+  if (ok) history.replaceState(null, '', `editor.html?p=${encodeURIComponent(project.id)}`);
+  return ok;
+}
+
+async function resolveConflict(sig) {
+  if (conflictOpen) return false;
+  conflictOpen = true;
+  const r = await showDialog({
+    title: '다른 곳에서 이 프로젝트를 수정했어요',
+    message: '다른 탭이나 창에서 같은 프로젝트를 먼저 고쳤습니다.\n이 탭의 내용으로 덮어쓸지, 사본으로 따로 남길지 선택하세요.',
+    buttons: [
+      { label: '내 변경 버리고 새로고침', action: 'reload', kind: 'danger' },
+      { label: '사본으로 저장', action: 'copy' },
+      { label: '이 탭 내용으로 덮어쓰기', action: 'overwrite', kind: 'primary' },
+    ],
+  });
+  conflictOpen = false;
+  if (!r) return false; // 취소 — 다음 변경 때 다시 묻는다
+  if (r.action === 'reload') { location.reload(); return false; }
+  if (r.action === 'copy') { const ok = saveConflictCopy(sig); if (ok) toast(`"${project.name}" 사본으로 저장했습니다`); return ok; }
+  return writeProject(sig);
+}
+
+/** 대기 중인 변경을 저장한다. hidden=true 는 탭을 닫는 중이라 대화상자를 못 띄울 때 */
+async function persist({ hidden = false } = {}) {
+  clearTimeout(autosaveTimer);
+  if (!booted || !project.id) return true;
+  const sig = contentSig();
+  if (sig === savedSig) { refreshStatus(); return true; }
+  const stored = store.meta(project.id);
+  if (stored && lastRev != null && stored.updatedAt !== lastRev) {
+    return hidden ? saveConflictCopy(sig) : resolveConflict(sig);
+  }
+  return writeProject(sig);
+}
+const flush = () => { if (booted && !conflictOpen) persist({ hidden: true }); };
+window.addEventListener('pagehide', flush);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+
+// 프로젝트 이름 입력 — 입력을 확정할 때(Enter·포커스 이동) 이름이 바뀐다
 function commitProjectName() {
   const n = cleanName(projNm.value);
-  if (!project.id) {
-    project.name = n;
-    projNm.value = n;
-    scheduleAutosave();
-    return;
-  }
   if (!n || n === project.name) { projNm.value = project.name; return; }
   let meta = null;
   try { meta = store.rename(project.id, n); } catch (e) { console.error(e); }
@@ -593,152 +612,41 @@ function commitProjectName() {
     projNm.value = project.name;
     return;
   }
-  project.name = meta.name;
-  projNm.value = meta.name;
+  setProject(meta.id, meta.name);
   refreshStatus();
-  scheduleAutosave();
   toast(`프로젝트 이름을 "${meta.name}"(으)로 바꿨습니다`);
 }
-projNm.addEventListener('input', () => { if (!project.id) { project.name = projNm.value; scheduleAutosave(); scheduleStatus(); } });
 projNm.addEventListener('change', commitProjectName);
 projNm.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); projNm.blur(); }
   else if (e.key === 'Escape') { projNm.value = project.name; projNm.blur(); }
 });
 
-/**
- * 지금 프로젝트에 저장한다. 처음 저장하거나 asNew 면 이름을 물어 새 프로젝트로 만들고,
- * 이미 저장된 프로젝트는 그 자리에 덮어쓴다.
- * @returns {Promise<boolean>} 저장됐는지(취소·실패면 false)
- */
-async function saveProject({ asNew = false } = {}) {
-  closeProjPop();
-  commitProjectName(); // 이름 입력칸에서 바로 Ctrl+S 를 눌러도 방금 친 이름이 반영되게
-  let id = project.id;
-  let name = project.name;
-
-  if (asNew || (!id && !name)) {
-    const base = asNew && id ? `${name} 사본` : (name || scrNm.value || '새 프로젝트');
-    const r = await showDialog({
-      title: asNew ? '다른 이름으로 저장' : '프로젝트 저장',
-      message: asNew
-        ? '지금 내용을 새 프로젝트로 저장합니다. 원래 프로젝트는 그대로 남고, 이후 저장은 새 프로젝트에 이어집니다.'
-        : '이름을 정하면 이후 저장(Ctrl+S)은 이 프로젝트를 덮어씁니다.',
-      input: { label: '프로젝트 이름', value: store.uniqueName(base), maxLength: 40 },
-      buttons: [{ label: '취소', action: 'cancel' }, { label: '저장', action: 'ok', kind: 'primary' }],
-    });
-    if (!r || r.action !== 'ok') return false;
-    name = cleanName(r.value);
-    if (!name) { toast('프로젝트 이름을 입력하세요'); return false; }
-    id = store.newId();
-  } else if (!id) {
-    id = store.newId(); // 이름 칸에 미리 이름을 적어 둔 새 프로젝트의 첫 저장
-  }
-  if (!store.has(id)) name = store.uniqueName(name); // 새로 만드는 경우만 이름 충돌을 비켜 간다
-
-  const existed = store.has(id);
-  let meta;
-  try {
-    meta = store.put({ id, name, doc: currentDoc() });
-  } catch (e) {
-    console.error(e);
-    toast('브라우저 저장 공간이 부족합니다 · 파일로 내보내기를 이용해주세요');
-    return false;
-  }
-  setProject(meta.id, meta.name);
-  markSaved(meta.updatedAt);
-  scheduleAutosave();
-  toast(existed ? `"${meta.name}" 저장됨` : `"${meta.name}" 프로젝트를 만들어 저장했습니다`);
-  return true;
+/** 지금 저장(Ctrl+S) — 자동 저장을 기다리지 않고 바로 */
+async function saveNow() {
+  if (document.activeElement === projNm) commitProjectName();
+  const ok = await persist();
+  if (ok) toast('저장했습니다');
 }
 
-/** 저장 안 한 변경이 있으면 [저장하고 계속 / 저장 안 함 / 취소] 를 묻는다. 계속해도 되면 true */
-async function confirmDiscard() {
-  if (!hasUnsaved()) return true;
-  const nm = project.name || '제목 없는 프로젝트';
+/** 사본 만들기 — 지금 내용을 새 프로젝트로 저장하고 그 프로젝트를 연다 */
+async function duplicateProject() {
+  closeProjPop();
+  await persist();
   const r = await showDialog({
-    title: '저장하지 않은 변경 사항',
-    message: `"${nm}"에 저장하지 않은 변경 사항이 있습니다.\n저장하지 않고 계속하면 이 변경 내용은 사라집니다.`,
-    buttons: [
-      { label: '취소', action: 'cancel' },
-      { label: '저장 안 함', action: 'discard', kind: 'danger' },
-      { label: '저장하고 계속', action: 'save', kind: 'primary' },
-    ],
-  });
-  if (!r || r.action === 'cancel') return false;
-  if (r.action === 'save') return saveProject();
-  return true;
-}
-
-async function newProject() {
-  closeProjPop();
-  if (!(await confirmDiscard())) return;
-  workMode = 'new';
-  markMode(workMode);
-  applyMode();
-  currentTpl = 'blank';
-  highlightTpl(currentTpl);
-  loadedScreenId = null;
-  scrCombo.reset();
-  loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
-  editor.resetHistory();
-  setProject(null, '');
-  markSaved();
-  scheduleAutosave();
-  toast('새 프로젝트를 시작했습니다');
-}
-
-async function openProject(id) {
-  closeProjPop();
-  if (id === project.id && !isDirty()) { toast('이미 열려 있는 프로젝트입니다'); return; }
-  if (!(await confirmDiscard())) return;
-  const doc = store.get(id);
-  const meta = store.meta(id);
-  if (!doc || !meta) { toast('프로젝트를 찾지 못했습니다'); refreshStatus(); return; }
-  await applyDoc(doc, {
-    project: { id, name: meta.name }, saved: true, savedTs: meta.updatedAt,
-    message: `"${meta.name}" 프로젝트를 열었습니다`,
-  });
-}
-
-async function renameProject(id) {
-  const meta = store.meta(id);
-  if (!meta) return;
-  const r = await showDialog({
-    title: '프로젝트 이름 바꾸기',
-    input: { label: '프로젝트 이름', value: meta.name, maxLength: 40 },
-    buttons: [{ label: '취소', action: 'cancel' }, { label: '바꾸기', action: 'ok', kind: 'primary' }],
+    title: '사본 만들기',
+    message: '지금 내용을 새 프로젝트로 복사합니다. 원래 프로젝트는 그대로 남습니다.',
+    input: { label: '새 프로젝트 이름', value: store.uniqueName(`${project.name} 사본`), maxLength: 40 },
+    buttons: [{ label: '취소', action: 'cancel' }, { label: '사본 만들기', action: 'ok', kind: 'primary' }],
   });
   if (!r || r.action !== 'ok') return;
-  const n = cleanName(r.value);
-  if (!n || n === meta.name) return;
-  let m = null;
-  try { m = store.rename(id, n); } catch (e) { console.error(e); }
-  if (!m) { toast('같은 이름의 프로젝트가 이미 있습니다'); return; }
-  if (id === project.id) { project.name = m.name; projNm.value = m.name; scheduleAutosave(); }
-  refreshStatus();
+  const copy = store.duplicate(project.id, cleanName(r.value) || undefined);
+  if (!copy) { toast('사본을 만들지 못했습니다'); return; }
+  location.href = `editor.html?p=${encodeURIComponent(copy.id)}`;
 }
 
-async function deleteProject(id) {
-  const meta = store.meta(id);
-  if (!meta) return;
-  const isCur = id === project.id;
-  const r = await showDialog({
-    title: '프로젝트 삭제',
-    message: `"${meta.name}" 프로젝트를 삭제합니다. 되돌릴 수 없습니다.`
-      + (isCur ? '\n지금 열려 있는 내용은 캔버스에 남지만 저장되지 않은 상태가 됩니다.' : ''),
-    buttons: [{ label: '취소', action: 'cancel' }, { label: '삭제', action: 'del', kind: 'danger' }],
-  });
-  if (!r || r.action !== 'del') return;
-  store.remove(id);
-  if (isCur) { setProject(null, ''); markUnsaved(); scheduleAutosave(); }
-  refreshStatus();
-  toast(`"${meta.name}" 프로젝트를 삭제했습니다`);
-}
-
-// 파일로 내보내기
-$('btnExport').addEventListener('click', () => {
-  const name = (project.name || scrNm.value || 'screen').replace(/[\\/:*?"<>|]/g, '_');
+function exportFile() {
+  const name = safeFileName(project.name || scrNm.value, 'screen');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(currentDoc(), null, 2)], { type: 'application/json' }));
   a.download = `${name}.hds.json`;
@@ -746,79 +654,26 @@ $('btnExport').addEventListener('click', () => {
   URL.revokeObjectURL(a.href);
   toast('파일로 내보냈습니다');
   closeProjPop();
-});
+}
 
-// 파일에서 열기 — 열린 내용은 아직 어느 프로젝트에도 저장되지 않은 새 프로젝트로 시작한다
-const importInput = document.createElement('input');
-importInput.type = 'file';
-importInput.accept = '.json,application/json';
-importInput.hidden = true;
-document.body.append(importInput);
-$('btnImport').addEventListener('click', () => importInput.click());
-importInput.addEventListener('change', async () => {
-  const file = importInput.files[0];
-  importInput.value = '';
-  if (!file) return;
-  let doc;
-  try {
-    doc = JSON.parse(await file.text());
-  } catch {
-    toast('JSON 파일을 읽지 못했습니다');
-    return;
-  }
-  if (!doc || !Array.isArray(doc.shapes)) { toast('형식이 맞지 않는 파일입니다'); return; }
-  closeProjPop();
-  if (!(await confirmDiscard())) return;
-  const name = cleanName(doc.projectName || file.name.replace(/(\.hds)?\.json$/i, ''));
-  await applyDoc(doc, {
-    project: { id: null, name },
-    message: '파일을 열었습니다 · 저장하면 내 프로젝트에 보관됩니다',
-  });
-});
-
-// ── 프로젝트 메뉴 (새로 만들기 · 저장 · 목록) ─────────────
-function renderProjects() {
+// ── 프로젝트 메뉴 (홈 · 새로 만들기 · 저장 · 사본 · 내보내기 · 최근 프로젝트) ──
+function renderRecent() {
   const box = $('projList');
-  const list = store.list();
+  const list = sortProjects(store.list().filter((m) => m.id !== project.id), 'opened').slice(0, 6);
   if (!list.length) {
-    box.replaceChildren(Object.assign(document.createElement('div'), {
-      className: 'pop-empty', textContent: '저장한 프로젝트가 없습니다 · Ctrl+S 로 저장하세요',
-    }));
+    box.replaceChildren(Object.assign(document.createElement('div'), { className: 'pop-empty', textContent: '다른 프로젝트가 없습니다' }));
     return;
   }
   box.replaceChildren(...list.map((m) => {
-    const cur = m.id === project.id;
     const row = document.createElement('div');
-    row.className = 'pop-item' + (cur ? ' cur' : '');
-    const main = document.createElement('button');
-    main.type = 'button';
-    main.className = 'pop-item-main';
-    main.innerHTML = '<b></b><span></span>';
-    main.querySelector('b').textContent = m.name;
-    if (cur) {
-      const chip = document.createElement('i');
-      chip.className = 'pcur';
-      chip.textContent = '열려 있음';
-      main.querySelector('b').append(chip);
-    }
-    main.querySelector('span').textContent =
-      `${m.screenName || '제목 없음'} · ${m.mode === 'edit' ? '변경' : '신규'} · 요소 ${m.shapes ?? 0} · ${fmtWhen(m.updatedAt)}`;
-    main.addEventListener('click', () => openProject(m.id));
-    const ren = document.createElement('button');
-    ren.type = 'button';
-    ren.className = 'pop-item-btn';
-    ren.textContent = '✎';
-    ren.title = '이름 바꾸기';
-    ren.setAttribute('aria-label', `프로젝트 "${m.name}" 이름 바꾸기`);
-    ren.addEventListener('click', (e) => { e.stopPropagation(); renameProject(m.id); });
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'pop-item-del';
-    del.textContent = '✕';
-    del.title = '삭제';
-    del.setAttribute('aria-label', `프로젝트 "${m.name}" 삭제`);
-    del.addEventListener('click', (e) => { e.stopPropagation(); deleteProject(m.id); });
-    row.append(main, ren, del);
+    row.className = 'pop-item';
+    const a = document.createElement('a');
+    a.className = 'pop-item-main';
+    a.href = `editor.html?p=${encodeURIComponent(m.id)}`;
+    a.innerHTML = '<b></b><span></span>';
+    a.querySelector('b').textContent = m.name;
+    a.querySelector('span').textContent = `${metaLine(m)} · ${relTime(m.updatedAt)}`;
+    row.append(a);
     return row;
   }));
 }
@@ -834,24 +689,25 @@ $('btnProj').addEventListener('click', () => {
   pop.hidden = !open;
   $('btnProj').classList.toggle('on', open);
   $('btnProj').setAttribute('aria-expanded', String(open));
-  if (open) renderProjects();
+  if (open) renderRecent();
 });
-$('pNew').addEventListener('click', newProject);
-$('pSave').addEventListener('click', () => saveProject());
-$('pSaveAs').addEventListener('click', () => saveProject({ asNew: true }));
-btnSave.addEventListener('click', () => saveProject());
+$('pHome').addEventListener('click', () => { location.href = '/'; });
+$('pNew').addEventListener('click', () => { location.href = '/?new=1'; });
+$('pSave').addEventListener('click', () => { closeProjPop(); saveNow(); });
+$('pDup').addEventListener('click', duplicateProject);
+$('btnExport').addEventListener('click', exportFile);
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.savesbox') && !e.target.closest('.dlg-mask')) closeProjPop();
 });
 $('projPop').addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { closeProjPop(); $('btnProj').focus(); }
 });
-// Ctrl+S 저장 · Ctrl+Shift+S 다른 이름으로 저장 (브라우저의 "페이지 저장" 대신)
+// Ctrl+S 지금 저장 · Ctrl+Shift+S 사본 만들기 (브라우저의 "페이지 저장" 대신)
 document.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
   e.preventDefault();
   if (document.querySelector('.dlg-mask') || document.getElementById('mask')?.classList.contains('on')) return;
-  saveProject({ asNew: e.shiftKey });
+  if (e.shiftKey) duplicateProject(); else saveNow();
 });
 
 /**
@@ -878,15 +734,10 @@ async function restoreSystemAndScreen(systemId, screenId, fallbackName) {
 }
 
 /**
- * 저장된 내용(doc)으로 캔버스·시스템·기준 화면을 통째로 바꾼다.
- * @param {{ project?: {id:string|null,name:string}, saved?: boolean, savedTs?: number|null, message?: string }} [opts]
- *   saved=true 면 불러온 내용이 곧 "저장된 상태"(프로젝트 열기), 아니면 아직 저장 안 된 상태(파일 열기)
+ * 저장된 내용(doc)으로 캔버스·시스템·기준 화면을 통째로 바꾼다(프로젝트를 열 때).
+ * @param {{ project: {id:string,name:string}, savedTs?: number|null, message?: string|null }} opts
  */
-async function applyDoc(doc, { project: p = { id: null, name: '' }, saved = false, savedTs = null, message = '불러왔습니다' } = {}) {
-  if (!doc || !Array.isArray(doc.shapes)) {
-    toast('형식이 맞지 않는 파일입니다');
-    return;
-  }
+async function applyDoc(doc, { project: p, savedTs = null, message = null }) {
   workMode = doc.mode === 'edit' ? 'edit' : 'new';
   markMode(workMode);
   applyMode();
@@ -903,9 +754,9 @@ async function applyDoc(doc, { project: p = { id: null, name: '' }, saved = fals
     editor.setBoardBackground(doc.background);
     syncBgButtons();
   }
-  editor.resetHistory(); // 이전에 열려 있던 내용으로 Ctrl+Z 가 되돌아가지 않게
+  editor.resetHistory(); // 이전 내용으로 Ctrl+Z 가 되돌아가지 않게
   setProject(p.id, p.name);
-  toast(message);
+  if (message) toast(message);
 
   try {
     if (!doc.systemId) {
@@ -913,16 +764,15 @@ async function applyDoc(doc, { project: p = { id: null, name: '' }, saved = fals
     } else {
       const hasBase = await restoreSystemAndScreen(doc.systemId, doc.baseScreenId, doc.screenName);
       if (workMode === 'edit' && !hasBase && !editor.hasBoardBackground()) {
-        toast('변경할 화면을 선택해주세요 (이 저장본에는 기준 화면 정보가 없습니다)');
+        toast('변경할 화면을 선택해주세요 (이 프로젝트에는 기준 화면 정보가 없습니다)');
       }
     }
   } catch (e) {
     toast('화면 목록을 불러오지 못했습니다');
     console.error(e);
   } finally {
-    // 시스템·기준 화면 복원까지 끝난 뒤의 상태를 기준으로 삼아야 열자마자 "변경됨" 으로 뜨지 않는다
-    if (saved) markSaved(savedTs); else markUnsaved();
-    scheduleAutosave();
+    // 시스템·기준 화면 복원까지 끝난 뒤의 상태를 기준으로 삼아야 열자마자 "저장 중" 으로 뜨지 않는다
+    markSaved(savedTs);
   }
 }
 
@@ -995,54 +845,40 @@ function initHelp() {
 
 // ── 부팅 ─────────────────────────────────────────────────
 async function boot() {
-  // 예전 버전의 자동 저장 초안이 남아 있으면 정리 (형식이 달라 더 이상 복원 못 함)
-  try { localStorage.removeItem('aiScreenDraft:v1'); } catch { /* 무시 */ }
+  const pid = new URLSearchParams(location.search).get('p');
+  const meta = pid ? store.meta(pid) : null;
+  const doc = meta ? store.get(pid) : null;
+  if (!meta || !doc) {
+    // 프로젝트 없이 열렸거나 이미 지워진 프로젝트 — 홈에서 고르게 한다
+    location.replace(pid ? '/?missing=1' : '/');
+    return;
+  }
 
   editor.initEditor({ onChange: () => { canvasDirty = true; scheduleAutosave(); } });
   initResultModal();
   initHelp();
-
   applyMode();
-  const draft = readAutosave();
-  if (draft) {
-    restoreAutosave(draft);
-    toast('작업 중이던 화면을 이어서 불러왔습니다');
-  } else {
-    // 자동 저장된 내용이 없으면(첫 방문 등) 선택된 유형(빈 화면)의 프리셋을 올려 시작 상태로
-    loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
-    syncAbL();
-    canvasDirty = false; // 부팅 시점의 로드는 사용자 수정이 아님
-  }
 
+  if (meta.trashedAt) store.restore(pid); // 휴지통 항목을 주소로 열면 꺼내서 연다
+  store.touchOpened(pid);
+  const opened = store.meta(pid) || meta;
+
+  let systems = [];
   try {
-    const systems = await api.getSystems();
+    systems = await api.getSystems();
     sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name, sub: s.sub })));
-    const draftSys = draft?.systemId && systems.some((s) => s.id === draft.systemId) ? draft.systemId : null;
-    if (draftSys) {
-      // 자동 저장된 시스템 선택을 조용히 재현(onPick 을 타면 loadedScreenId 가 초기화돼 버린다) —
-      // 화면 목록도 같이 불러와 변경화면 선택까지 이어 붙인다.
-      try {
-        await restoreSystemAndScreen(draftSys, draft.loadedScreenId);
-      } catch (e) {
-        toast('화면 목록을 불러오지 못했습니다');
-        console.error(e);
-      }
-    } else {
-      const want = systems.find((s) => s.id === 'salesportal') ? 'salesportal' : systems[0]?.id;
-      if (want) sysCombo.choose(want);
-    }
   } catch (e) {
     toast('API 서버에 연결하지 못했습니다 — npm run dev 로 실행했는지 확인하세요');
     console.error(e);
   }
 
-  // 열려 있던 프로젝트와의 관계 확정 — 시스템·기준 화면까지 복원된 뒤의 상태를 기준으로 삼는다.
-  // 초안이 "저장된 상태 그대로" 였다면 저장됨, 아니면(또는 예전 초안이면) 변경 사항 있음으로 이어 간다.
-  if (draft && draft.projectDirty === false) markSaved(project.id ? store.meta(project.id)?.updatedAt ?? null : null);
-  else if (draft) markUnsaved();
-  else markSaved();
+  await applyDoc(doc, { project: { id: pid, name: opened.name }, savedTs: meta.updatedAt });
+  // 시스템이 정해지지 않은 프로젝트(파일에서 가져온 것 등)는 기본 시스템을 골라 준다
+  if (!doc.systemId && systems.length) {
+    sysCombo.choose(systems.find((s) => s.id === 'salesportal') ? 'salesportal' : systems[0].id);
+  }
   booted = true;
-  scheduleAutosave();
+  refreshStatus();
 }
 
 boot();

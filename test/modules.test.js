@@ -21,11 +21,25 @@ test('editor / combobox / api / result-modal 이 Node 에서 부작용 없이 im
   assert.equal(typeof modal.initResultModal, 'function');
 });
 
-test('projects / dialog 모듈도 Node 에서 부작용 없이 import 된다', async () => {
+test('projects / dialog / thumbnail / home-logic 모듈도 Node 에서 부작용 없이 import 된다', async () => {
   const projects = await import('../src/web/js/projects.js');
   const dialog = await import('../src/web/js/dialog.js');
+  const thumb = await import('../src/web/js/thumbnail.js');
+  const logic = await import('../src/web/js/home-logic.js');
   assert.equal(typeof projects.createProjectStore, 'function');
+  assert.equal(typeof projects.browserStorage, 'function');
   assert.equal(typeof dialog.showDialog, 'function');
+  assert.equal(typeof thumb.thumbnailSvg, 'function');
+  assert.equal(typeof logic.filterProjects, 'function');
+});
+
+test('browserStorage — localStorage 가 없는 환경(Node)에서는 메모리 저장소로 동작한다', async () => {
+  const { browserStorage } = await import('../src/web/js/projects.js');
+  const s = browserStorage();
+  s.setItem('k', 'v');
+  assert.equal(s.getItem('k'), 'v');
+  s.removeItem('k');
+  assert.equal(s.getItem('k'), null);
 });
 
 test('editor.resetHistory 는 초기화 전에 호출해도 안전하다', async () => {

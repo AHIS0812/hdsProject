@@ -2,7 +2,7 @@
 // 다중 선택(Shift·드래그) / 그룹화 / 정렬·분배 / 플로팅 컨텍스트 툴바 / 우클릭 메뉴 / 단축키.
 // 개발지시서 U-2 ~ U-5.
 
-import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, HAS_TEXT, HAS_REQ, defaultLabel, defaultCols } from './constants.js';
+import { DEFAULT_BOARD, SNAP, DEF, NAME, HAS_ITEMS, HAS_TEXT, HAS_REQ, defaultLabel, defaultCols, renameItemAt } from './constants.js';
 
 let board, boardWrap, ctx, hint, ctxT, fL, bReq, bU, bR, zv, cv, ctxSingle, ctxAlign, marqEl, cmenu, bGroup, bUngroup;
 let bItems, itemsPop, itemsList, itemsInput, itemsAddBtn;
@@ -163,6 +163,81 @@ function startInlineEdit(s) {
   input.select();
 }
 
+/** 캔버스 위에서 항목 하나로 보이는 조각들(라디오 선택지 / 표 컬럼 / 탭) */
+const ITEM_SEL = '.sh-radio,.sh-col,.sh-chip';
+
+/**
+ * 라디오 선택지·표 컬럼·탭 이름처럼 항목을 쓰는 요소는, 그 항목을 더블클릭하면 그 자리에서 바로
+ * 이름을 고칠 수 있다(예전엔 항목을 지우고 다시 만들어야 했다). Enter 확정 · Esc 취소 ·
+ * Tab/Shift+Tab 은 확정하고 다음/이전 항목으로 넘어가 연달아 고칠 수 있다.
+ * @returns {boolean} 편집칸을 열었는지
+ */
+function startItemEdit(s, idx) {
+  if (!HAS_ITEMS[s.t] || pickingLinkFor != null) return false;
+  if (selIds.length !== 1 || selIds[0] !== s.id) setSel([s.id]);
+  const el = board.querySelector(`.sh[data-id="${s.id}"]`);
+  if (!el || el.querySelector('.inline-edit')) return false;
+  const itemEl = el.querySelectorAll(ITEM_SEL)[idx];
+  const cur = itemsArray(s)[idx];
+  if (!itemEl || cur == null) return false;
+
+  // 항목 조각이 놓인 자리에 편집칸을 겹친다(화면 배율은 board 좌표로 되돌려 계산)
+  const k = zm / 100;
+  const er = el.getBoundingClientRect();
+  const ir = itemEl.getBoundingClientRect();
+  const width = Math.max(ir.width / k + 8, 64);
+  const height = Math.max(ir.height / k, 18);
+  const input = document.createElement('input');
+  input.className = 'inline-edit item-edit';
+  input.value = cur;
+  input.setAttribute('aria-label', `${NAME[s.t]} 항목 ${idx + 1} 이름`);
+  Object.assign(input.style, {
+    inset: 'auto',
+    left: Math.max(0, Math.min((ir.left - er.left) / k - 2, el.offsetWidth - width)) + 'px',
+    top: Math.max(0, (ir.top - er.top) / k - (height - ir.height / k) / 2) + 'px',
+    width: width + 'px', height: height + 'px',
+  });
+  input.addEventListener('mousedown', (e) => e.stopPropagation());
+  let done = false;
+  const commit = (then) => {
+    if (done) return;
+    done = true;
+    const next = input.value;
+    input.remove();
+    renameItem(s, idx, next);
+    if (then) then();
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.isComposing) return;
+    if (e.key === 'Enter') { e.preventDefault(); commit(() => board.focus({ preventScroll: true })); }
+    else if (e.key === 'Escape') { e.preventDefault(); done = true; input.remove(); board.focus({ preventScroll: true }); }
+    else if (e.key === 'Tab') {
+      e.preventDefault();
+      const n = itemsArray(s).length;
+      const nextIdx = idx + (e.shiftKey ? -1 : 1);
+      commit(() => { if (nextIdx >= 0 && nextIdx < n) startItemEdit(s, nextIdx); else board.focus({ preventScroll: true }); });
+    }
+  });
+  input.addEventListener('blur', () => commit());
+  el.appendChild(input);
+  input.focus();
+  input.select();
+  return true;
+}
+
+/** 항목 하나의 이름을 바꾼다(되돌리기 1단계). 팝오버가 열려 있으면 목록도 같이 갱신 */
+function renameItem(s, idx, next) {
+  const cols = renameItemAt(s.cols, idx, next);
+  if (cols == null) return false;
+  push();
+  s.cols = cols;
+  refreshShapeEl(s);
+  if (!itemsPop.hidden) renderItemsList();
+  notify();
+  return true;
+}
+
 /** 선택 id 목록에 같은 그룹의 나머지 요소들을 더한다 (그룹은 한 덩어리로 선택) */
 function withGroups(ids) {
   const gids = new Set(ids.map((id) => find(id)?.g).filter(Boolean));
@@ -214,7 +289,20 @@ function render() {
       }
     };
     // 더블클릭하면 상단 툴바까지 갈 필요 없이 그 자리에서 바로 문구를 고칠 수 있다(PPT·캔바 방식).
-    d.ondblclick = (ev) => { ev.stopPropagation(); startInlineEdit(s); };
+    d.ondblclick = (ev) => {
+      ev.stopPropagation();
+      if (HAS_ITEMS[s.t]) {
+        // 항목(선택지·컬럼·탭 이름) 위를 더블클릭 → 그 항목 이름을 그 자리에서 수정
+        const hit = ev.target.closest?.(ITEM_SEL);
+        const idx = hit && d.contains(hit) ? [...d.querySelectorAll(ITEM_SEL)].indexOf(hit) : -1;
+        if (idx >= 0 && startItemEdit(s, idx)) return;
+        // 항목이 캔버스에 안 보이는 요소(선택 박스 등)나 항목 밖 빈 곳 → 항목 편집 팝오버
+        if (selIds.length !== 1 || selIds[0] !== s.id) setSel([s.id]);
+        setItemsPop(true);
+        return;
+      }
+      startInlineEdit(s);
+    };
     board.appendChild(d);
   });
   renderSelOutlines();
@@ -624,6 +712,8 @@ function renderItemsList() {
     const text = document.createElement('span');
     text.className = 'item-text';
     text.textContent = label;
+    text.title = '더블클릭해서 이름 수정';
+    text.addEventListener('dblclick', () => editItemRow(row, text, i));
     row.append(
       text,
       Object.assign(document.createElement('button'), {
@@ -643,6 +733,35 @@ function renderItemsList() {
     );
     return row;
   }));
+}
+
+/** 팝오버 목록에서 항목 이름을 그 자리에서 고친다(더블클릭) */
+function editItemRow(row, textEl, i) {
+  if (selIds.length !== 1) return;
+  const s = find(selIds[0]);
+  if (!s || row.querySelector('input')) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'item-rename';
+  input.value = itemsArray(s)[i] ?? '';
+  input.setAttribute('aria-label', '항목 이름 수정');
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    if (save) renameItem(s, i, input.value);
+    renderItemsList(); // 저장 여부와 관계없이 목록을 원래 모양으로
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.isComposing) return;
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  textEl.replaceWith(input);
+  input.focus();
+  input.select();
 }
 
 function setItemsPop(open) {
