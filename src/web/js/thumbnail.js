@@ -154,3 +154,26 @@ export function makeBgThumb(src, maxW = 360) {
 
 /** <img src> 로 쓸 수 있는 data URL — 스크립트가 실행되지 않는 이미지로만 다룬다 */
 export const svgDataUrl = (svg) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+// ── 캡처 배경 썸네일 캐시 — 원본(수백 KB~MB)을 줄인 이미지를 한 번만 만든다(버전 기록 미리보기 등)
+const bgCache = new Map(); // key → url | null(만드는 중)
+/**
+ * 줄인 배경 이미지를 돌려준다. 아직 없으면 만들기 시작하고 null — 다 만들어지면 onReady(url) 을 부른다.
+ * @returns {string|null}
+ */
+export function cachedBgThumb(src, onReady) {
+  if (typeof src !== 'string' || !src.startsWith('data:image/')) return null;
+  const k = `${src.length}:${src.slice(-48)}`;
+  if (bgCache.has(k)) return bgCache.get(k);
+  bgCache.set(k, null);
+  makeBgThumb(src).then((url) => {
+    bgCache.set(k, url);
+    if (url) onReady?.(url);
+  });
+  return null;
+}
+
+/** 화면 하나({ shapes, canvas, background })의 썸네일 SVG — 배경이 준비 안 됐으면 요소만 */
+export function pageThumbSvg(page, onBgReady) {
+  return thumbnailSvg(page.shapes, page.canvas, { background: cachedBgThumb(page.background, onBgReady) });
+}

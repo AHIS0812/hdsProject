@@ -12,6 +12,9 @@ import { createProjectStore, browserStorage, cleanName, UNTITLED } from './proje
 import { thumbnailSvg, makeBgThumb } from './thumbnail.js';
 import { sortProjects, relTime, metaLine, safeFileName } from './home-logic.js';
 import { showDialog } from './dialog.js';
+import { openVersionPanel } from './version-panel.js';
+import { AUTO_INTERVAL_MS } from './versions.js';
+import { docPages, activeIndex, makeDoc } from './doc-model.js';
 
 const $ = (id) => document.getElementById(id);
 /** 결과 모달이나 확인 대화상자가 떠 있는지 — 떠 있으면 뒤의 캔버스 단축키·붙여넣기를 멈춘다 */
@@ -455,7 +458,28 @@ let conflictOpen = false;
 const projNm = $('projNm');
 const saveStat = $('saveStat');
 
+// 여러 화면(v2) 형식으로 저장된 프로젝트 — 여러 화면 편집 UI 는 아직 준비 중이라 저장된 화면 하나만
+// 캔버스에 열고, 나머지 화면은 손대지 않은 채 그대로 들고 있다가 저장할 때 다시 합친다(데이터 보존).
+let heldPages = null;  // docPages(doc) 결과 — v1 문서면 null
+let heldIndex = 0;     // 그중 지금 캔버스에 열린 화면 번호
+
 function currentDoc() {
+  const one = singleDoc();
+  if (!heldPages) return one;
+  const cur = {
+    ...heldPages[heldIndex],
+    screenName: one.screenName, mode: one.mode, template: one.template, baseScreenId: one.baseScreenId,
+    canvas: one.canvas, shapes: one.shapes,
+  };
+  if (one.background) cur.background = one.background; else delete cur.background;
+  return makeDoc({
+    projectName: one.projectName, systemId: one.systemId, systemName: one.systemName,
+    pages: heldPages.map((pg, i) => (i === heldIndex ? cur : pg)), activePage: heldIndex,
+  });
+}
+
+/** 지금 캔버스의 화면 하나를 v1 문서 형식으로 */
+function singleDoc() {
   const sys = sysCombo.get();
   return {
     app: 'hds',
@@ -510,6 +534,7 @@ function scheduleStatus() {
 }
 
 function setProject(id, name) {
+  if ((id || null) !== project.id) nextAutoVersionAt = null; // 다른 프로젝트(충돌 사본 등)로 바뀌면 다시 읽는다
   project = { id: id || null, name: name || '' };
   projNm.value = project.name;
 }
@@ -536,10 +561,38 @@ function ensureBgThumb() {
     bgThumbPending = '';
     // 줄인 이미지가 준비되면, 방금 저장된 프로젝트의 썸네일만 배경을 넣어 다시 써 둔다
     if (url && project.id && store.has(project.id) && bgKey() === k) {
-      const doc = currentDoc();
+      if (heldPages && heldIndex !== 0) return; // 표지(첫 화면)가 아닌 화면의 배경이다
+      const doc = singleDoc();
       store.setThumb(project.id, thumbnailSvg(doc.shapes, doc.canvas, { background: url }));
     }
   });
+}
+
+// 버전 기록 — 저장할 때 마지막 버전에서 AUTO_INTERVAL(10분)이 지났으면 자동 버전을 하나 남긴다.
+// (저장은 0.8초마다 일어날 수 있어 매번 버전 목록을 읽지 않도록 다음 자동 버전 시각만 기억해 둔다)
+let versionWarned = false;
+let nextAutoVersionAt = null;
+function autoVersion(doc) {
+  if (!project.id) return;
+  const now = Date.now();
+  if (nextAutoVersionAt == null) {
+    const last = store.versions.latest(project.id);
+    nextAutoVersionAt = last ? last.ts + AUTO_INTERVAL_MS : 0;
+  }
+  if (now < nextAutoVersionAt) return;
+  nextAutoVersionAt = now + AUTO_INTERVAL_MS;
+  try { store.versions.add(project.id, doc, { auto: true, now }); } catch (e) {
+    console.warn(e);
+    if (!versionWarned) toast('저장 공간이 부족해 버전 기록을 남기지 못했습니다 (프로젝트 저장은 정상)');
+    versionWarned = true;
+  }
+}
+
+/** 홈 카드 썸네일 — 첫 화면(표지). 캡처 배경은 지금 캔버스가 표지일 때만 줄인 이미지를 얹는다 */
+function coverThumb(doc) {
+  const cover = docPages(doc)[0];
+  const isCurrent = !heldPages || heldIndex === 0;
+  return thumbnailSvg(cover.shapes, cover.canvas, { background: isCurrent ? bgThumbUrl() : null });
 }
 
 /** 실제로 저장소에 쓴다(동기). 실패하면 false */
@@ -549,10 +602,11 @@ function writeProject(sig, id = project.id, name = null) {
     const stored = store.meta(id);
     const meta = store.put({
       id, name: name ?? (stored?.name || project.name), doc,
-      thumb: thumbnailSvg(doc.shapes, doc.canvas, { background: bgThumbUrl() }),
+      thumb: coverThumb(doc),
     });
     ensureBgThumb();
     setProject(meta.id, meta.name);
+    autoVersion(doc);
     lastRev = meta.updatedAt;
     savedSig = sig;
     savedAtTs = meta.updatedAt;
@@ -706,6 +760,69 @@ $('pNew').addEventListener('click', () => { location.href = '/?new=1'; });
 $('pSave').addEventListener('click', () => { closeProjPop(); saveNow(); });
 $('pDup').addEventListener('click', duplicateProject);
 $('btnExport').addEventListener('click', exportFile);
+$('pVersions').addEventListener('click', () => { closeProjPop(); openVersions(); });
+
+// ── 버전 기록 ─────────────────────────────────────────────
+async function openVersions() {
+  if (!project.id) return;
+  await persist(); // 방금 고친 내용까지 저장된 상태에서 연다
+  openVersionPanel({
+    versions: store.versions,
+    projectId: project.id,
+    onSaveNamed: async (label) => {
+      await persist();
+      try {
+        store.versions.add(project.id, currentDoc(), { label, auto: false });
+        nextAutoVersionAt = null;
+        toast(`"${label}" 버전으로 저장했습니다`);
+        return true;
+      } catch (e) {
+        console.error(e);
+        toast('저장 공간이 부족해 버전을 저장하지 못했습니다 · 오래된 버전을 지워 주세요');
+        return false;
+      }
+    },
+    onRestore: async (vid, meta) => {
+      const doc = store.versions.get(project.id, vid);
+      if (!doc) { toast('이 버전을 읽지 못했습니다'); return false; }
+      await persist();
+      // 복원 직전 상태도 버전으로 남겨 두어, 복원을 취소하고 싶으면 그 버전으로 다시 돌아갈 수 있게 한다
+      let before = null;
+      try { before = store.versions.add(project.id, currentDoc(), { label: '복원 직전', auto: false }); } catch (e) { console.warn(e); }
+      nextAutoVersionAt = null;
+      await applyDoc(doc, { project: { ...project } });
+      savedSig = null; // 복원한 내용을 곧바로 저장한다
+      await persist();
+      const when = new Date(meta.ts);
+      toast(`${when.getMonth() + 1}월 ${when.getDate()}일 ${fmtClock(meta.ts)} 버전으로 복원했습니다`, before ? {
+        actionLabel: '복원 취소', ms: 7000,
+        onAction: async () => {
+          const prev = store.versions.get(project.id, before.id);
+          if (!prev) return;
+          await applyDoc(prev, { project: { ...project } });
+          savedSig = null;
+          await persist();
+          toast('복원을 취소했습니다');
+        },
+      } : {});
+      return true;
+    },
+    onOpenCopy: (vid, meta) => {
+      const doc = store.versions.get(project.id, vid);
+      if (!doc) { toast('이 버전을 읽지 못했습니다'); return; }
+      const when = new Date(meta.ts);
+      const label = meta.label || `${when.getMonth() + 1}.${when.getDate()} ${fmtClock(meta.ts)}`;
+      try {
+        const cover = docPages(doc)[0];
+        const copy = store.create({ name: `${project.name || UNTITLED} (${label})`, doc, thumb: thumbnailSvg(cover.shapes, cover.canvas) });
+        location.href = `editor.html?p=${encodeURIComponent(copy.id)}`;
+      } catch (e) {
+        console.error(e);
+        toast('저장 공간이 부족해 사본을 만들지 못했습니다');
+      }
+    },
+  });
+}
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('.savesbox') && !e.target.closest('.dlg-mask')) closeProjPop();
 });
@@ -748,6 +865,21 @@ async function restoreSystemAndScreen(systemId, screenId, fallbackName) {
  * @param {{ project: {id:string,name:string}, savedTs?: number|null, message?: string|null }} opts
  */
 async function applyDoc(doc, { project: p, savedTs = null, message = null }) {
+  if (Array.isArray(doc.pages) && doc.pages.length) {
+    heldPages = docPages(doc);
+    heldIndex = activeIndex(doc, heldPages);
+    const pg = heldPages[heldIndex];
+    doc = {
+      ...doc, screenName: pg.screenName, mode: pg.mode, template: pg.template, baseScreenId: pg.baseScreenId,
+      canvas: pg.canvas, shapes: pg.shapes, background: pg.background,
+    };
+    if (heldPages.length > 1) {
+      message = `이 프로젝트에는 화면이 ${heldPages.length}개 있습니다 — 여러 화면 편집은 준비 중이라 ${heldIndex + 1}번째 화면만 표시합니다(다른 화면은 그대로 보존됩니다)`;
+    }
+  } else {
+    heldPages = null;
+    heldIndex = 0;
+  }
   workMode = doc.mode === 'edit' ? 'edit' : 'new';
   markMode(workMode);
   applyMode();
@@ -887,6 +1019,8 @@ async function boot() {
   }
 
   await applyDoc(doc, { project: { id: pid, name: opened.name }, savedTs: meta.updatedAt });
+  // 이번에 고치기 전의 상태를 버전으로 남겨 둔다(버전이 없거나 마지막 버전이 10분 넘게 지났을 때만)
+  try { if (store.versions.dueForAuto(pid)) store.versions.add(pid, doc, { auto: true }); } catch (e) { console.warn(e); }
   // 시스템이 정해지지 않은 프로젝트(파일에서 가져온 것 등)는 기본 시스템을 골라 준다
   if (!doc.systemId && systems.length) {
     sysCombo.choose(systems.find((s) => s.id === 'salesportal') ? 'salesportal' : systems[0].id);

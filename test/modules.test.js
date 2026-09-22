@@ -33,6 +33,17 @@ test('projects / dialog / thumbnail / home-logic 모듈도 Node 에서 부작용
   assert.equal(typeof logic.filterProjects, 'function');
 });
 
+test('버전 기록 모듈(doc-model / versions / version-panel)도 부작용 없이 import 된다', async () => {
+  const dm = await import('../src/web/js/doc-model.js');
+  const vs = await import('../src/web/js/versions.js');
+  const vp = await import('../src/web/js/version-panel.js');
+  const th = await import('../src/web/js/thumbnail.js');
+  assert.equal(typeof dm.docPages, 'function');
+  assert.equal(typeof vs.createVersionStore, 'function');
+  assert.equal(typeof vp.openVersionPanel, 'function');
+  assert.equal(th.cachedBgThumb('not-an-image'), null);
+});
+
 test('browserStorage — localStorage 가 없는 환경(Node)에서는 메모리 저장소로 동작한다', async () => {
   const { browserStorage } = await import('../src/web/js/projects.js');
   const s = browserStorage();

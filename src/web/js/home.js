@@ -12,6 +12,7 @@ import { templateShapes } from './templates.js';
 import { boardSizeFor } from './constants.js';
 import { toast } from './toast.js';
 import { showDialog } from './dialog.js';
+import { docPages, isProjectDoc } from './doc-model.js';
 
 const $ = (id) => document.getElementById(id);
 const store = createProjectStore(browserStorage());
@@ -185,7 +186,7 @@ function buildCard(m, missing) {
     + '<div class="info">'
     + `<div class="ttl"><b class="name" title="${esc(m.name)}">${esc(m.name)}</b></div>`
     + `<button type="button" class="more" aria-haspopup="menu" aria-label="${esc(m.name)} 메뉴" title="더보기"><span class="ico">${icon('more')}</span></button>`
-    + `<div class="sub"><span class="tag${m.mode === 'edit' ? ' edit' : ''}">${kind}</span><span class="txt">${esc(sysNm ? `${sysNm} · ` : '')}요소 ${m.shapes ?? 0}개</span></div>`
+    + `<div class="sub"><span class="tag${m.mode === 'edit' ? ' edit' : ''}">${kind}</span><span class="txt">${esc(sysNm ? `${sysNm} · ` : '')}${m.pages > 1 ? `화면 ${m.pages}개 · ` : ''}요소 ${m.shapes ?? 0}개</span></div>`
     + `<div class="when">${esc(when)}</div>`
     + `<span class="tag lst-tag${m.mode === 'edit' ? ' edit' : ''}">${kind}</span><span class="lst-sys">${esc(sysNm)}</span><span class="lst-when">${esc(trashed ? when : relTime(m.updatedAt))}</span>`
     + '</div>';
@@ -236,9 +237,11 @@ function renderBulk() {
 
 /** 프로젝트 본문으로 썸네일 SVG 를 만든다 — 캡처 배경이 있으면 작게 줄여 함께 넣는다 */
 async function buildThumb(doc) {
-  const bg = typeof doc.background === 'string' && doc.background.startsWith('data:image/') ? await makeBgThumb(doc.background) : null;
-  return thumbnailSvg(doc.shapes, doc.canvas, { background: bg });
+  const cover = docPages(doc)[0]; // 여러 화면(v2) 프로젝트는 첫 화면이 표지
+  const bg = cover.background ? await makeBgThumb(cover.background) : null;
+  return thumbnailSvg(cover.shapes, cover.canvas, { background: bg });
 }
+const quickThumb = (doc) => { const cover = docPages(doc)[0]; return thumbnailSvg(cover.shapes, cover.canvas); };
 
 /** 썸네일이 없거나 캡처 배경이 빠진 프로젝트 — 첫 화면을 그린 뒤 하나씩 다시 만든다 */
 const thumbQueue = [];
@@ -255,7 +258,7 @@ function fillMissingThumbs(ids) {
       if (doc) {
         const svg = await buildThumb(doc);
         store.setThumb(id, svg);
-        store.setMeta(id, { hasBg: !!doc.background }); // 다음부터는 이 프로젝트를 다시 검사하지 않는다
+        store.setMeta(id, { hasBg: docPages(doc).some((pg) => !!pg.background) }); // 다음부터는 이 프로젝트를 다시 검사하지 않는다
         const th = grid.querySelector(`.card[data-id="${CSS.escape(id)}"] .thumb`);
         if (th) th.innerHTML = `<img alt="" src="${svgDataUrl(svg)}">`;
       }
@@ -476,12 +479,12 @@ async function importFiles(files) {
     let docs = [];
     try { docs = await readDocs(f); } catch { fail++; continue; }
     for (const { name, doc } of docs) {
-      if (!doc || !Array.isArray(doc.shapes)) { fail++; continue; }
+      if (!isProjectDoc(doc)) { fail++; continue; }
       try {
         const meta = store.create({
           name: doc.projectName || name,
           doc: { ...doc, systemName: doc.systemName || sysName(doc.systemId) || null },
-          thumb: thumbnailSvg(doc.shapes, doc.canvas),
+          thumb: quickThumb(doc),
         });
         ok++; last = meta;
       } catch (e) {
