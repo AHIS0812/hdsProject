@@ -688,7 +688,7 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
   if (!systems.length) {
     selSys.innerHTML = '<option value="">시스템 목록을 불러오지 못했어요 (나중에 에디터에서 고를 수 있어요)</option>';
   } else {
-    selSys.innerHTML = systems.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}${s.sub ? ` — ${esc(s.sub)}` : ''}</option>`).join('');
+    selSys.innerHTML = systems.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
     selSys.value = st.systemId || '';
   }
 

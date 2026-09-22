@@ -866,7 +866,7 @@ async function boot() {
   let systems = [];
   try {
     systems = await api.getSystems();
-    sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name, sub: s.sub })));
+    sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name })));
   } catch (e) {
     toast('API 서버에 연결하지 못했습니다 — npm run dev 로 실행했는지 확인하세요');
     console.error(e);
