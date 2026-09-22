@@ -60,12 +60,12 @@ test('systemId 없는 payload 는 오류 목록을 돌려준다', () => {
   assert.ok(Array.isArray(errs) && errs.length > 0);
 });
 
-test('mode=edit 인데 baseScreen·background 둘 다 없으면 실패한다', () => {
+test('mode=edit 는 baseScreen·background 둘 다 없어도 통과한다 (변경 화면은 이제 원본 프로젝트 자체를 여는 것이라 "기준 화면" 표시가 필요 없다)', () => {
   const errs = validateScreenDraft({
     systemId: 'portal', mode: 'edit',
     canvas: { w: 960, h: 600 }, shapes: [],
   });
-  assert.ok(Array.isArray(errs) && errs.length > 0);
+  assert.equal(errs, null);
 });
 
 test('mode=edit 인데 baseScreen 없어도 캡처 배경(background)이 있으면 통과한다', () => {

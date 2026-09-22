@@ -29,7 +29,6 @@ const sysStore = createSystemStore(browserStorage());
 
 let workMode = 'new';
 let currentTpl = 'blank'; // 처음 열면 빈 화면에서 시작
-let loadedScreenId = null;   // 변경 모드에서 현재 캔버스에 로드된 화면 id
 // 사용자가 캔버스를 직접 수정했는지. 템플릿/화면/샘플을 "프로그램으로" 로드한 직후엔 false.
 // true 일 때만 다른 템플릿·화면으로 전환 시 확인을 묻는다.
 let canvasDirty = false;
@@ -65,7 +64,7 @@ function loadCanvas(shapes, name, size) {
 /** 지금 캔버스 상태 스냅샷(되돌리기 토스트용) — 화면 전환류(guardedRun) 직전에만 호출 */
 function snapshotForUndo() {
   return {
-    workMode, currentTpl, loadedScreenId, baseBoardSize,
+    workMode, currentTpl, baseBoardSize,
     scrName: scrNm.value,
     canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
@@ -81,7 +80,6 @@ function restoreSnapshot(snap) {
   applyMode();
   currentTpl = snap.currentTpl;
   highlightTpl(currentTpl);
-  loadedScreenId = snap.loadedScreenId;
   baseBoardSize = snap.baseBoardSize;
   editor.clearBoardBackground();
   editor.setBoardSize(snap.canvas.w, snap.canvas.h);
@@ -90,8 +88,7 @@ function restoreSnapshot(snap) {
   syncBgButtons();
   scrNm.value = snap.scrName;
   syncAbL();
-  if (workMode === 'edit' && loadedScreenId) scrCombo.choose(loadedScreenId, true);
-  else scrCombo.reset();
+  scrCombo.reset();
   canvasDirty = true; // 되돌린 내용도 사용자가 실제로 작업했던 내용이므로 dirty 로 유지
   toast('이전 화면으로 되돌렸습니다');
 }
@@ -224,9 +221,6 @@ document.addEventListener('keydown', (e) => {
 function applyMode() {
   $('newBlock').classList.toggle('hidden', workMode !== 'new');
   $('editBlock').classList.toggle('hidden', workMode !== 'edit');
-  // 신규: 화면 이름 직접 입력 / 변경: 불러온 화면 이름 고정
-  scrNm.readOnly = workMode === 'edit';
-  scrNm.title = workMode === 'edit' ? '변경 모드에서는 화면 이름을 바꿀 수 없습니다' : '화면 이름 (클릭해서 수정)';
 }
 // 세그먼트 선택 상태를 aria-checked 로 표시
 function markMode(mode) {
@@ -241,7 +235,6 @@ document.querySelectorAll('#modeSeg button').forEach((el) => {
       workMode = next;
       markMode(workMode);
       applyMode();
-      loadedScreenId = null;
       if (workMode === 'new') {
         loadCanvas(templateShapes(currentTpl), '새 화면', boardSizeFor(currentTpl));
       } else {
@@ -268,18 +261,17 @@ document.querySelectorAll('.tpl').forEach((el) => {
     guardedRun(() => {
       currentTpl = key;
       highlightTpl(key);
-      // 방금까지 기존 화면을 보고 있었다면 이름을 새 화면 기본값으로
-      loadCanvas(templateShapes(key), loadedScreenId ? '새 화면' : undefined, boardSizeFor(key));
-      loadedScreenId = null;
+      loadCanvas(templateShapes(key), undefined, boardSizeFor(key));
     });
   });
 });
 
 // ── 시스템 / 변경화면 콤보박스 ────────────────────────────
-// "변경할 화면" 목록은 예전엔 운영 서버 목업(fixtures)에서 가져왔지만, 실제 화면 소스는 폐쇄망에
-// 있어 가져올 방법이 없다. 대신 같은 시스템으로 예전에 저장해 둔 내 프로젝트들을 후보로 보여주고,
-// 고르면 그 화면(도형)을 지금 프로젝트에 그대로 복사해 온다 — 원본 프로젝트는 그대로 남는다.
-// 지금 열려 있는 프로젝트 자기 자신은 후보에서 뺀다.
+// "변경할 화면" 목록은 같은 시스템으로 예전에 저장해 둔 내 프로젝트들이다(운영 서버 실 연동은
+// 폐쇄망 제약으로 불가 — docs/01 §6.3). 화면을 고르면 그 프로젝트(원본) 자체를 그대로 연다 —
+// 도형을 복사해 별도 프로젝트를 새로 만들지 않는다. "신규로 만든 화면을 변경하면 그 화면 자체가
+// 갱신되어야지, 따로따로 파일이 생기면 안 된다"는 원칙. 지금 열려 있는 프로젝트 자기 자신은
+// (자기 자신을 열 이유가 없으니) 후보에서 뺀다.
 function screensFor(systemId) {
   return store.list()
     .filter((m) => m.systemId === systemId && m.id !== project.id)
@@ -290,7 +282,6 @@ const sysCombo = makeCombo($('sysBox'), {
   placeholder: '시스템 선택',
   emptyText: '시스템이 없습니다',
   onPick: (sys) => {
-    loadedScreenId = null;
     scheduleAutosave();
     const screens = sys ? screensFor(sys.id) : [];
     scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.screenName || m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
@@ -301,16 +292,12 @@ const sysCombo = makeCombo($('sysBox'), {
 const scrCombo = makeCombo($('scrBox'), {
   placeholder: '화면 선택',
   emptyText: '이 시스템에 저장해 둔 화면이 없습니다',
-  // 변경할 화면을 바꾸는 건 지금 캔버스(전 화면 또는 편집 중이던 내용)를 지운다는 뜻이라,
-  // 작업한 내용이 있으면 적용 후 되돌리기 토스트를 띄운다.
-  onPick: (scr) => {
-    if (!scr || scr.id === loadedScreenId) return;
-    const def = store.get(scr.id);
-    if (!def) { toast('화면을 불러오지 못했습니다 (지워진 프로젝트일 수 있어요)'); return; }
-    guardedRun(() => {
-      loadCanvas(def.shapes || [], def.screenName || scr.name, def.canvas || DEFAULT_BOARD);
-      loadedScreenId = scr.id;
-    });
+  // 화면을 고르면 그 프로젝트로 곧장 이동해서 편다(지금 프로젝트는 그 전에 저장해 둔다) —
+  // 복사해 오지 않으므로 "선택된 화면" 상태를 콤보에 유지할 필요가 없다.
+  onPick: async (scr) => {
+    if (!scr) return;
+    await persist();
+    location.href = `editor.html?p=${encodeURIComponent(scr.id)}`;
   },
 });
 
@@ -470,7 +457,7 @@ function currentDoc() {
   if (!heldPages) return one;
   const cur = {
     ...heldPages[heldIndex],
-    screenName: one.screenName, mode: one.mode, template: one.template, baseScreenId: one.baseScreenId,
+    screenName: one.screenName, mode: one.mode, template: one.template,
     canvas: one.canvas, shapes: one.shapes,
   };
   if (one.background) cur.background = one.background; else delete cur.background;
@@ -493,9 +480,6 @@ function singleDoc() {
     systemName: sys?.name || null,
     mode: workMode,
     template: currentTpl,
-    // 변경 모드에서 어떤 기존 화면을 고치던 중이었는지 — 없으면 다시 열었을 때
-    // "변경할 화면을 선택하세요" 로 막힌다.
-    baseScreenId: workMode === 'edit' ? (scrCombo.get()?.id || null) : null,
     canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
     // 변경화면 캡처 배경(트레이싱) — 빠지면 다시 열었을 때 배경이 사라진다
@@ -507,8 +491,7 @@ function singleDoc() {
 function contentSig() {
   const bg = editor.hasBoardBackground() ? editor.getBoardBackground() : '';
   return JSON.stringify([
-    workMode, scrNm.value, sysCombo.get()?.id || null,
-    workMode === 'edit' ? (scrCombo.get()?.id || null) : currentTpl,
+    workMode, scrNm.value, sysCombo.get()?.id || null, currentTpl,
     editor.getBoardSize(), editor.toPayloadShapes(), bg.length, bg.slice(-48),
   ]);
 }
@@ -840,30 +823,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 /**
- * 시스템·변경화면 콤보를 조용히(onPick 없이) 맞춘다 — onPick 을 타면 loadedScreenId 가 초기화되고
- * 화면 콤보가 비워져 변경 모드의 "기준 화면" 선택이 사라진다.
- * @returns {boolean} 기준 화면까지 복원했는지
- */
-function restoreSystemAndScreen(systemId, screenId, fallbackName) {
-  sysCombo.choose(systemId, true);
-  const screens = screensFor(systemId);
-  scrCombo.setItems(screens.map((m) => ({ id: m.id, name: m.screenName || m.name, sub: `${m.mode === 'edit' ? '변경' : '신규'} · ${relTime(m.updatedAt)}` })));
-  scrCombo.setPlaceholder(screens.length ? '화면 선택' : '저장해 둔 화면이 없습니다');
-  // baseScreenId 가 없는 예전 저장본 — 변경 모드는 화면 이름이 기준 화면 이름으로 고정되므로
-  // 그 이름으로 기준 화면을 찾는다(캡처 배경만 깐 저장본은 기준 화면이 없어도 되니 건너뜀).
-  const target = screens.find((m) => m.id === screenId)
-    || (workMode === 'edit' && fallbackName && !editor.hasBoardBackground()
-      ? screens.find((m) => m.screenName === fallbackName) : null);
-  if (target) {
-    scrCombo.choose(target.id, true);
-    loadedScreenId = target.id;
-    return true;
-  }
-  return false;
-}
-
-/**
- * 저장된 내용(doc)으로 캔버스·시스템·기준 화면을 통째로 바꾼다(프로젝트를 열 때).
+ * 저장된 내용(doc)으로 캔버스·시스템을 통째로 바꾼다(프로젝트를 열 때). 변경 모드라도 "기준 화면"을
+ * 따로 복원하지 않는다 — 이 프로젝트 자체가 곧 그 화면이기 때문(§시스템/변경화면 콤보박스 참고).
  * @param {{ project: {id:string,name:string}, savedTs?: number|null, message?: string|null }} opts
  */
 async function applyDoc(doc, { project: p, savedTs = null, message = null }) {
@@ -872,7 +833,7 @@ async function applyDoc(doc, { project: p, savedTs = null, message = null }) {
     heldIndex = activeIndex(doc, heldPages);
     const pg = heldPages[heldIndex];
     doc = {
-      ...doc, screenName: pg.screenName, mode: pg.mode, template: pg.template, baseScreenId: pg.baseScreenId,
+      ...doc, screenName: pg.screenName, mode: pg.mode, template: pg.template,
       canvas: pg.canvas, shapes: pg.shapes, background: pg.background,
     };
     if (heldPages.length > 1) {
@@ -892,7 +853,6 @@ async function applyDoc(doc, { project: p, savedTs = null, message = null }) {
   }
 
   loadCanvas(doc.shapes, doc.screenName || '새 화면', doc.canvas || DEFAULT_BOARD);
-  loadedScreenId = null;
   // loadCanvas 가 배경을 지우므로 그 뒤에 복원(이미지 data URL 만 허용)
   if (typeof doc.background === 'string' && doc.background.startsWith('data:image/')) {
     editor.setBoardBackground(doc.background);
@@ -902,22 +862,16 @@ async function applyDoc(doc, { project: p, savedTs = null, message = null }) {
   setProject(p.id, p.name);
   if (message) toast(message);
 
-  if (!doc.systemId) {
-    scrCombo.reset();
-  } else {
-    const hasBase = restoreSystemAndScreen(doc.systemId, doc.baseScreenId, doc.screenName);
-    if (workMode === 'edit' && !hasBase && !editor.hasBoardBackground()) {
-      toast('변경할 화면을 선택해주세요 (이 프로젝트에는 기준 화면 정보가 없습니다)');
-    }
-  }
-  // 시스템·기준 화면 복원까지 끝난 뒤의 상태를 기준으로 삼아야 열자마자 "저장 중" 으로 뜨지 않는다
+  if (doc.systemId) sysCombo.choose(doc.systemId, true);
+  scrCombo.reset();
+
+  // 시스템 복원까지 끝난 뒤의 상태를 기준으로 삼아야 열자마자 "저장 중" 으로 뜨지 않는다
   markSaved(savedTs);
 }
 
 // ── payload / 생성 ────────────────────────────────────────
 function payload() {
   const sys = sysCombo.get();
-  const scr = scrCombo.get();
   const p = {
     systemId: sys?.id,
     systemName: sys?.name,
@@ -927,7 +881,6 @@ function payload() {
     shapes: editor.toPayloadShapes(),
   };
   if (workMode === 'new') p.template = currentTpl;
-  if (workMode === 'edit' && scr) p.baseScreen = { id: scr.id, name: scr.name };
   if (editor.hasBoardBackground()) p.background = editor.getBoardBackground();
   return p;
 }
@@ -946,7 +899,6 @@ function snapshotSketch() {
 function build() {
   if (!editor.count()) { toast('먼저 화면 요소를 배치해주세요'); return; }
   if (!sysCombo.get()) { toast('시스템을 선택해주세요'); return; }
-  if (workMode === 'edit' && !scrCombo.get() && !editor.hasBoardBackground()) { toast('변경할 화면을 선택하거나 캡처 이미지를 배경으로 깔아주세요'); return; }
   runBuild(payload(), scrNm.value || '생성 결과', snapshotSketch());
 }
 

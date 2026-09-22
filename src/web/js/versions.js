@@ -7,7 +7,7 @@
 // 캡처 배경·이미지 요소는 수백 KB~MB 라 버전마다 그대로 넣으면 localStorage(약 5MB)가 금방 찬다.
 // 그래서 버전 본문에서는 "@asset:<hash>" 참조로 바꿔 두고, 참조가 모두 사라진 이미지는 지운다.
 
-import { docPages, docSignature } from './doc-model.js';
+import { docPages, docSignature, docSummary } from './doc-model.js';
 
 const VER_PREFIX = 'hds:ver:';
 const ASSET_PREFIX = 'hds:asset:';
@@ -77,7 +77,21 @@ export function createVersionStore(storage) {
     const live = allRefs(after);
     allRefs(before).forEach((h) => { if (!live.has(h)) { try { storage.removeItem(assetKey(pid, h)); } catch { /* 무시 */ } } });
   };
-  const meta = ({ doc, ...m }) => m;
+  // 본문(doc)에서 홈 화면 카드에 필요한 요약(시스템·화면 이름 등)만 뽑아 meta 에 얹는다 — 이름 붙인
+  // 버전을 "모든 프로젝트" 목록에 프로젝트처럼 나란히 보여주려면 본문 전체를 열지 않고도 이 정보가 있어야 한다.
+  const meta = ({ doc, ...m }) => {
+    const s = docSummary(doc);
+    return {
+      ...m,
+      systemId: doc.systemId || null,
+      systemName: doc.systemName || null,
+      projectName: doc.projectName || '',
+      screenName: s.screenName,
+      mode: s.mode,
+      canvas: s.canvas,
+      hasBg: s.hasBg,
+    };
+  };
 
   /** 오래된 것부터 개수 제한을 넘는 버전을 걷어낸다(자동·이름 붙인 버전 따로 센다) */
   const prune = (items) => {
@@ -88,11 +102,11 @@ export function createVersionStore(storage) {
   const vs = {
     /** 버전 목록(본문 제외), 최신이 앞 */
     list(pid) {
-      return read(pid).items.map(meta);
+      return read(pid).items.map((it) => ({ ...meta(it), projectId: pid }));
     },
     latest(pid) {
       const it = read(pid).items[0];
-      return it ? meta(it) : null;
+      return it ? { ...meta(it), projectId: pid } : null;
     },
     /** 버전 본문(이미지 참조를 실제 data URL 로 되돌려서). 없으면 null */
     get(pid, vid) {
@@ -123,7 +137,7 @@ export function createVersionStore(storage) {
         // 같은 내용의 버전이 이미 있으면 새로 만들지 않는다. 이름 없는 자동 버전이면 그 버전에 이름을 붙이고,
         // 사용자가 이미 이름 붙여 둔 버전이면 그 이름을 덮어쓰지 않고 그대로 돌려준다(예: "복원 직전" 이
         // "1차 검토본" 을 지워 버리던 문제).
-        return head.label ? meta(head) : vs.rename(pid, head.id, clean);
+        return head.label ? { ...meta(head), projectId: pid } : vs.rename(pid, head.id, clean);
       }
       let prev = before;
       const pages = docPages(doc);
@@ -149,7 +163,7 @@ export function createVersionStore(storage) {
           }
           storage.setItem(key(pid), JSON.stringify({ items }));
           gc(pid, prev, items);
-          return meta(item);
+          return { ...meta(item), projectId: pid };
         } catch (e) {
           // 공간 부족 — 가장 오래된 자동 버전 하나를 "먼저 목록에서 확정해 지운 뒤" 그 이미지를 치우고 다시 시도한다
           // (목록에 아직 남아 있는 버전의 이미지를 먼저 지우면, 여기서 실패했을 때 그 버전이 깨진다)
@@ -172,7 +186,7 @@ export function createVersionStore(storage) {
       const items = prune(rec.items);
       storage.setItem(key(pid), JSON.stringify({ items }));
       gc(pid, rec.items, items);
-      return meta(it);
+      return { ...meta(it), projectId: pid };
     },
     remove(pid, vid) {
       const rec = read(pid);

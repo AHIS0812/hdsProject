@@ -13,6 +13,7 @@
     "baseScreen": {
       "type": "object",
       "additionalProperties": false,
+      "description": "더 이상 프론트가 채우지 않음(레거시 payload 호환용으로 필드만 남겨 둠) — 변경 화면은 이제 원본 프로젝트 자체를 열어서 고치므로 별도로 '기준 화면'을 표시할 필요가 없다",
       "required": ["id", "name"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
@@ -42,15 +43,6 @@
     {
       "if": { "properties": { "mode": { "const": "new" } } },
       "then": { "required": ["template"] }
-    },
-    {
-      "if": { "properties": { "mode": { "const": "edit" } } },
-      "then": {
-        "anyOf": [
-          { "required": ["baseScreen"] },
-          { "required": ["background"] }
-        ]
-      }
     }
   ],
   "$defs": {

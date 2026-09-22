@@ -176,6 +176,9 @@ a{color:inherit;}
 .card:hover,.card:focus-visible{box-shadow:var(--shadow-2);border-color:var(--line3);transform:translateY(-2px);}
 .card:focus-visible{outline:2px solid var(--or) !important;outline-offset:2px !important;}
 .card.sel-on{border-color:var(--or);box-shadow:0 0 0 2px var(--or),var(--shadow-2);}
+/* 이름 붙인 버전 카드 — 같은 최종 파일의 "그때 모습" 이라 프로젝트 카드와 톤을 살짝 다르게(남색 테두리) */
+.card.ver{border-color:#C7D6EE;background:#FAFBFE;}
+.card.ver .thumb{background:linear-gradient(180deg,#EEF2FB,#E4E9F7);}
 .thumb{position:relative;aspect-ratio:16/10;background:linear-gradient(180deg,#EEF2F8,#E6EBF3);padding:12px;display:flex;align-items:center;justify-content:center;}
 .thumb img{max-width:100%;max-height:100%;width:auto;height:auto;display:block;background:#fff;border-radius:6px;
            box-shadow:0 2px 8px rgba(16,24,40,.14);object-fit:contain;}

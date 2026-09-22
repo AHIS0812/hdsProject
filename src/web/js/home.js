@@ -6,7 +6,7 @@ import { createProjectStore, browserStorage, cleanName, UNTITLED, NAME_MAX } fro
 import { createSystemStore, NAME_MAX as SYS_NAME_MAX } from './systems.js';
 import { thumbnailSvg, svgDataUrl, makeBgThumb } from './thumbnail.js';
 import {
-  filterProjects, sortProjects, countViews, countSystems, relTime, daysLeft, metaLine, fmtSize, safeFileName, SORTS,
+  filterProjects, sortProjects, countViews, countSystems, namedVersionCards, relTime, daysLeft, metaLine, fmtSize, safeFileName, SORTS,
 } from './home-logic.js';
 import { templateShapes } from './templates.js';
 import { boardSizeFor } from './constants.js';
@@ -78,6 +78,13 @@ const tplThumb = (key) => svgDataUrl(thumbnailSvg(templateShapes(key), boardSize
 const editorUrl = (id) => `editor.html?p=${encodeURIComponent(id)}`;
 const goEditor = (id) => { store.touchOpened(id); location.href = editorUrl(id); };
 
+// "이름 붙인 버전" 카드 — id를 "ver:<projectId>:<versionId>" 로 인코딩해 프로젝트 id와 절대 겹치지
+// 않게 한다(프로젝트 id 는 항상 's'로 시작). 카드를 열면 그 버전이 아니라 원본 프로젝트가 열린다.
+const isVersionId = (id) => typeof id === 'string' && id.startsWith('ver:');
+const parseVersionId = (id) => { const [, pid, vid] = id.split(':'); return { pid, vid }; };
+/** 시스템별 보기에서는 화면명을, 그 외(모든 프로젝트 등)에서는 이름(버전이면 버전 이름)을 카드 제목으로 */
+const cardTitle = (m) => (state.systemId && m.kind !== 'version' ? (m.screenName || m.name) : m.name);
+
 // "변경 화면" 후보 — 예전엔 운영 서버 목업에서 가져왔지만, 실제 화면 소스는 폐쇄망에 있어 가져올
 // 방법이 없다. 대신 같은 시스템으로 예전에 저장해 둔 내 프로젝트를 후보로 보여준다.
 function screensFor(systemId) {
@@ -92,7 +99,13 @@ let renderTimer = null;
 const scheduleRender = () => { clearTimeout(renderTimer); renderTimer = setTimeout(render, 60); };
 
 function currentList() {
-  const list = filterProjects(store.all(), { view: state.view, q: state.q, mode: state.view === 'trash' ? 'all' : state.mode, systemId: state.systemId });
+  const all = store.all();
+  // "모든 프로젝트"(시스템별 보기가 아닐 때)에서만 이름 붙인 버전을 프로젝트와 나란히 보여준다 —
+  // 시스템별 보기·즐겨찾기·휴지통은 프로젝트(파일) 단위 개념이라 버전을 안 섞는다.
+  const versions = (state.view === 'all' && !state.systemId)
+    ? namedVersionCards(all.filter((m) => !m.trashedAt), (pid) => store.versions.list(pid))
+    : [];
+  const list = filterProjects([...all, ...versions], { view: state.view, q: state.q, mode: state.view === 'trash' ? 'all' : state.mode, systemId: state.systemId });
   return state.view === 'trash' ? list.sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0)) : sortProjects(list, state.sort);
 }
 
@@ -175,31 +188,40 @@ function render() {
 }
 
 function buildCard(m, missing) {
+  const isVer = m.kind === 'version';
   const trashed = !!m.trashedAt;
-  const picked = state.selected.has(m.id);
+  const picked = !isVer && state.selected.has(m.id);
+  const title = cardTitle(m);
   const el = document.createElement('article');
-  el.className = 'card' + (picked ? ' sel-on' : '') + (trashed ? ' trashed' : '');
+  el.className = 'card' + (picked ? ' sel-on' : '') + (trashed ? ' trashed' : '') + (isVer ? ' ver' : '');
   el.dataset.id = m.id;
   el.tabIndex = 0;
   el.setAttribute('role', 'group');
-  el.setAttribute('aria-label', `${m.name}${trashed ? ' (휴지통)' : ''}`);
-  const svg = store.thumb(m.id);
-  // 썸네일이 없거나, 캡처 배경이 있는 프로젝트인데 썸네일에 배경이 빠져 있으면(예전 저장분) 다시 만든다.
-  // hasBg 를 아직 모르는 변경 화면 프로젝트는 한 번 열어 보고 채운다.
-  if (!svg || (m.hasBg && !svg.includes('<image')) || (m.hasBg === undefined && m.mode === 'edit')) missing.push(m.id);
+  el.setAttribute('aria-label', `${title}${trashed ? ' (휴지통)' : ''}${isVer ? ' (버전)' : ''}`);
+  let svg;
+  if (isVer) {
+    svg = versionThumbCache.get(m.id) || null;
+    if (!svg) missing.push(m.id);
+  } else {
+    svg = store.thumb(m.id);
+    // 썸네일이 없거나, 캡처 배경이 있는 프로젝트인데 썸네일에 배경이 빠져 있으면(예전 저장분) 다시 만든다.
+    // hasBg 를 아직 모르는 변경 화면 프로젝트는 한 번 열어 보고 채운다.
+    if (!svg || (m.hasBg && !svg.includes('<image')) || (m.hasBg === undefined && m.mode === 'edit')) missing.push(m.id);
+  }
   const sysNm = sysName(m.systemId) || m.systemName || '';
   const kind = m.mode === 'edit' ? '변경' : '신규';
-  const when = trashed ? `${daysLeft(m.trashedAt)}일 후 영구 삭제` : `${relTime(m.updatedAt)} 수정`;
+  const when = trashed ? `${daysLeft(m.trashedAt)}일 후 영구 삭제` : `${relTime(m.updatedAt)} ${isVer ? '버전' : '수정'}`;
+  const subTxt = `${esc(sysNm ? `${sysNm} · ` : '')}${isVer && m.screenName ? `${esc(m.screenName)} · ` : ''}${m.pages > 1 ? `화면 ${m.pages}개 · ` : ''}요소 ${m.shapes ?? 0}개`;
   el.innerHTML =
-    `<button type="button" class="chk${picked ? ' on' : ''}" role="checkbox" aria-checked="${picked}" aria-label="${esc(m.name)} 선택"><span class="ico">${icon('check')}</span></button>`
-    + (trashed ? '' : `<button type="button" class="fav${m.favorite ? ' on' : ''}" aria-pressed="${!!m.favorite}" aria-label="${esc(m.name)} 즐겨찾기" title="${m.favorite ? '즐겨찾기 해제' : '즐겨찾기'}"><span class="ico">${icon('star')}</span></button>`)
+    (isVer ? '' : `<button type="button" class="chk${picked ? ' on' : ''}" role="checkbox" aria-checked="${picked}" aria-label="${esc(title)} 선택"><span class="ico">${icon('check')}</span></button>`)
+    + (!isVer && !trashed ? `<button type="button" class="fav${m.favorite ? ' on' : ''}" aria-pressed="${!!m.favorite}" aria-label="${esc(title)} 즐겨찾기" title="${m.favorite ? '즐겨찾기 해제' : '즐겨찾기'}"><span class="ico">${icon('star')}</span></button>` : '')
     + `<div class="thumb">${svg ? `<img alt="" loading="lazy" src="${svgDataUrl(svg)}">` : '<div class="ph"></div>'}</div>`
     + '<div class="info">'
-    + `<div class="ttl"><b class="name" title="${esc(m.name)}">${esc(m.name)}</b></div>`
-    + `<button type="button" class="more" aria-haspopup="menu" aria-label="${esc(m.name)} 메뉴" title="더보기"><span class="ico">${icon('more')}</span></button>`
-    + `<div class="sub"><span class="tag${m.mode === 'edit' ? ' edit' : ''}">${kind}</span><span class="txt">${esc(sysNm ? `${sysNm} · ` : '')}${m.pages > 1 ? `화면 ${m.pages}개 · ` : ''}요소 ${m.shapes ?? 0}개</span></div>`
+    + `<div class="ttl"><b class="name" title="${esc(title)}">${esc(title)}</b></div>`
+    + `<button type="button" class="more" aria-haspopup="menu" aria-label="${esc(title)} 메뉴" title="더보기"><span class="ico">${icon('more')}</span></button>`
+    + `<div class="sub"><span class="tag${m.mode === 'edit' ? ' edit' : ''}">${isVer ? '버전' : kind}</span><span class="txt">${subTxt}</span></div>`
     + `<div class="when">${esc(when)}</div>`
-    + `<span class="tag lst-tag${m.mode === 'edit' ? ' edit' : ''}">${kind}</span><span class="lst-sys">${esc(sysNm)}</span><span class="lst-when">${esc(trashed ? when : relTime(m.updatedAt))}</span>`
+    + `<span class="tag lst-tag${m.mode === 'edit' ? ' edit' : ''}">${isVer ? '버전' : kind}</span><span class="lst-sys">${esc(sysNm)}</span><span class="lst-when">${esc(trashed ? when : relTime(m.updatedAt))}</span>`
     + '</div>';
   return el;
 }
@@ -257,6 +279,9 @@ const quickThumb = (doc) => { const cover = docPages(doc)[0]; return thumbnailSv
 /** 썸네일이 없거나 캡처 배경이 빠진 프로젝트 — 첫 화면을 그린 뒤 하나씩 다시 만든다 */
 const thumbQueue = [];
 let thumbRunning = false;
+// 이름 붙인 버전의 썸네일 — store.thumb 처럼 영구 저장하지 않고, 이번에 홈을 열어 둔 동안만 메모리에 둔다
+// (버전 본문은 이미지 참조를 되살려야 해서 프로젝트 썸네일보다 조금 더 무겁다 — 매번 새로 만들 정도는 아니다).
+const versionThumbCache = new Map();
 function fillMissingThumbs(ids) {
   for (const id of ids) if (!thumbQueue.includes(id)) thumbQueue.push(id);
   if (thumbRunning) return;
@@ -265,13 +290,24 @@ function fillMissingThumbs(ids) {
     const id = thumbQueue.shift();
     if (!id) { thumbRunning = false; return; }
     try {
-      const doc = store.get(id);
-      if (doc) {
-        const svg = await buildThumb(doc);
-        store.setThumb(id, svg);
-        store.setMeta(id, { hasBg: docPages(doc).some((pg) => !!pg.background) }); // 다음부터는 이 프로젝트를 다시 검사하지 않는다
-        const th = grid.querySelector(`.card[data-id="${CSS.escape(id)}"] .thumb`);
-        if (th) th.innerHTML = `<img alt="" src="${svgDataUrl(svg)}">`;
+      if (isVersionId(id)) {
+        const { pid, vid } = parseVersionId(id);
+        const doc = store.versions.get(pid, vid);
+        if (doc) {
+          const svg = await buildThumb(doc);
+          versionThumbCache.set(id, svg);
+          const th = grid.querySelector(`.card[data-id="${CSS.escape(id)}"] .thumb`);
+          if (th) th.innerHTML = `<img alt="" src="${svgDataUrl(svg)}">`;
+        }
+      } else {
+        const doc = store.get(id);
+        if (doc) {
+          const svg = await buildThumb(doc);
+          store.setThumb(id, svg);
+          store.setMeta(id, { hasBg: docPages(doc).some((pg) => !!pg.background) }); // 다음부터는 이 프로젝트를 다시 검사하지 않는다
+          const th = grid.querySelector(`.card[data-id="${CSS.escape(id)}"] .thumb`);
+          if (th) th.innerHTML = `<img alt="" src="${svgDataUrl(svg)}">`;
+        }
       }
     } catch (e) { console.error(e); }
     setTimeout(step, 20);
@@ -344,6 +380,29 @@ async function renameProject(id) {
   try { res = store.rename(id, n); } catch (e) { console.error(e); }
   if (!res) { toast('같은 이름의 프로젝트가 이미 있어요'); return; }
   render();
+}
+
+async function renameVersion(pid, vid) {
+  const v = store.versions.list(pid).find((x) => x.id === vid);
+  if (!v) return;
+  const r = await showDialog({
+    title: '버전 이름 바꾸기',
+    input: { label: '버전 이름', value: v.name, maxLength: NAME_MAX },
+    buttons: [{ label: '취소', action: 'cancel' }, { label: '바꾸기', action: 'ok', kind: 'primary' }],
+  });
+  if (!r || r.action !== 'ok') return;
+  const n = cleanName(r.value);
+  if (!n) { toast('이름을 입력해 주세요'); return; }
+  store.versions.rename(pid, vid, n);
+  versionThumbCache.delete(`ver:${pid}:${vid}`);
+  render();
+}
+
+function removeVersion(pid, vid) {
+  store.versions.remove(pid, vid);
+  versionThumbCache.delete(`ver:${pid}:${vid}`);
+  render();
+  toast('버전을 삭제했어요');
 }
 
 function duplicateProject(id) {
@@ -538,6 +597,17 @@ function showMenu(items, x, y, anchor = null) {
 }
 
 function menuFor(id) {
+  if (isVersionId(id)) {
+    const { pid, vid } = parseVersionId(id);
+    const v = store.versions.list(pid).find((x) => x.id === vid);
+    if (!v) return [];
+    return [
+      { icon: 'open', label: '프로젝트 열기', run: () => goEditor(pid) },
+      { icon: 'edit', label: '버전 이름 바꾸기', run: () => renameVersion(pid, vid) },
+      '-',
+      { icon: 'trash', label: '이 버전 삭제', danger: true, run: () => removeVersion(pid, vid) },
+    ];
+  }
   const m = store.meta(id);
   if (!m) return [];
   const multi = state.selected.size > 1 && state.selected.has(id);
@@ -656,7 +726,7 @@ function newDoc({ name, template, size, systemId }) {
     app: 'hds', version: 1, savedAt: new Date().toISOString(),
     projectName: name, screenName: '새 화면',
     systemId: systemId || null, systemName: sysName(systemId),
-    mode: 'new', template, baseScreenId: null,
+    mode: 'new', template,
     canvas: size || boardSizeFor(template),
     shapes: templateShapes(template),
   };
@@ -697,7 +767,7 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     '<div class="dlg wiz" role="dialog" aria-modal="true" aria-labelledby="wizTitle">'
     + '<div class="wiz-hd"><b id="wizTitle">새 프로젝트 만들기</b><button type="button" class="x" aria-label="닫기"><span class="ico" data-i="x"></span></button></div>'
     + '<div class="wiz-bd"><div class="wiz-form">'
-    + '<div class="fld"><label for="wName">프로젝트 이름</label><input id="wName" type="text" maxlength="' + NAME_MAX + '" placeholder="' + esc(UNTITLED) + '" autocomplete="off"></div>'
+    + '<div class="fld"><label for="wName" id="wNameLbl">프로젝트 이름</label><input id="wName" type="text" maxlength="' + NAME_MAX + '" placeholder="' + esc(UNTITLED) + '" autocomplete="off"><p class="hint" id="wNameHint"></p></div>'
     + '<div class="fld"><span class="lbl" id="wModeLbl">작업 구분</span><div class="seg3" id="wMode" role="radiogroup" aria-labelledby="wModeLbl">'
     + '<button type="button" role="radio" data-m="new">신규 화면</button><button type="button" role="radio" data-m="edit">변경 화면</button></div>'
     + '<p class="hint" id="wModeHint"></p></div>'
@@ -768,7 +838,14 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     q('#wEdit').hidden = st.mode !== 'edit';
     q('#wModeHint').textContent = st.mode === 'new'
       ? '새로 그리는 화면이에요. 유형을 고르면 기본 배치가 깔려요.'
-      : '이미 있는 화면을 불러와 고치는 작업이에요. 원본은 바뀌지 않아요.';
+      : '예전에 저장해 둔 화면을 열어서 이어서 고치는 거예요 — 그 화면(프로젝트) 자체가 업데이트돼요.';
+    // 신규 모드에서는 이 이름이 프로젝트 이름이 되고, 변경 모드에서는 "이번 작업"에 붙이는 버전 이름이 된다
+    // (원본 프로젝트 이름은 그대로 두고, 지금 모습을 이 이름의 버전으로 남겨서 나중에 "1차/2차 수정 때
+    // 뭘 고쳤는지" 버전 기록에서 비교해 볼 수 있게 한다).
+    q('#wNameLbl').textContent = st.mode === 'new' ? '프로젝트 이름' : '이번 변경 이름 (선택)';
+    q('#wName').placeholder = st.mode === 'new' ? esc(UNTITLED) : '예: 1차 수정';
+    q('#wNameHint').textContent = st.mode === 'new' ? '' : '적어 두면 지금 화면 모습이 이 이름의 버전으로 남아요 — 나중에 "프로젝트 ▾ → 버전 기록"에서 무엇이 바뀌었는지 비교해 볼 수 있어요.';
+    q('#wOk').textContent = st.mode === 'new' ? '만들기' : '열기';
     q('#wOk').disabled = false;
     paintPreview();
   }
@@ -849,22 +926,24 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
   q('#wCh').addEventListener('input', (e) => { st.ch = parseInt(e.target.value, 10) || 0; paintPreview(); });
 
   function create() {
-    const name = cleanName(q('#wName').value) || UNTITLED;
-    let doc;
-    if (st.mode === 'new') {
-      doc = newDoc({ name, template: st.template, size: curSize(), systemId: st.systemId });
-    } else {
+    if (st.mode === 'edit') {
+      // 변경 화면은 새 프로젝트를 만들지 않는다 — 고른 화면(프로젝트) 자체를 그대로 열어서
+      // 이어서 고치고, 그대로 저장한다("1번 파일"이 계속 1번 파일이어야지 사본이 생기면 안 된다).
       if (!st.screenId) { q('#wScrHint').textContent = '변경할 화면을 먼저 골라 주세요'; q('#wScrHint').className = 'hint err'; q('#wScr').focus(); return; }
-      const def = st.screenDef || store.get(st.screenId);
-      if (!def) { toast('화면 내용을 불러오지 못했어요 (지워진 프로젝트일 수 있어요)'); return; }
-      doc = {
-        app: 'hds', version: 1, savedAt: new Date().toISOString(),
-        projectName: name, screenName: def.name || def.screenName || '변경 화면',
-        systemId: st.systemId, systemName: sysName(st.systemId),
-        mode: 'edit', template: def.template || 'blank', baseScreenId: st.screenId,
-        canvas: def.canvas || boardSizeFor('blank'), shapes: def.shapes || [],
-      };
+      const label = cleanName(q('#wName').value);
+      if (label) {
+        // 이번 작업을 시작하기 직전의 모습을 이 이름의 버전으로 남긴다 — 나중에 버전 기록에서
+        // "1차 수정 이후 뭐가 바뀌었는지" 같은 걸 이름으로 구분해서 비교해 볼 수 있다.
+        const doc = store.get(st.screenId);
+        if (doc) { try { store.versions.add(st.screenId, doc, { label, auto: false }); } catch (e) { console.warn(e); } }
+      }
+      rememberSystem(st.systemId);
+      close();
+      goEditor(st.screenId);
+      return;
     }
+    const name = cleanName(q('#wName').value) || UNTITLED;
+    const doc = newDoc({ name, template: st.template, size: curSize(), systemId: st.systemId });
     try {
       const meta = store.create({ name, doc, thumb: thumbnailSvg(doc.shapes, doc.canvas) });
       rememberSystem(st.systemId);
@@ -1007,6 +1086,18 @@ function initEvents() {
     const card = e.target.closest('.card');
     if (!card) return;
     const id = card.dataset.id;
+    if (isVersionId(id)) {
+      // 버전 카드는 선택·즐겨찾기가 없다 — "···" 메뉴 아니면 클릭 시 그 원본 프로젝트를 연다.
+      if (e.target.closest('.more')) {
+        const btn = e.target.closest('.more');
+        if (menuAnchor === btn) { closeMenu(); return; }
+        const r = btn.getBoundingClientRect();
+        showMenu(menuFor(id), r.right - 196, r.bottom + 4, btn);
+        return;
+      }
+      goEditor(parseVersionId(id).pid);
+      return;
+    }
     if (e.target.closest('.chk')) { toggleSelect(id, { range: e.shiftKey }); return; }
     if (e.target.closest('.fav')) { const m = store.meta(id); if (m) setFavorite([id], !m.favorite); return; }
     if (e.target.closest('.more')) {
@@ -1031,6 +1122,15 @@ function initEvents() {
     const card = e.target.closest('.card');
     if (!card || e.target !== card) return;
     const id = card.dataset.id;
+    if (isVersionId(id)) {
+      if (e.key === 'Enter') { e.preventDefault(); goEditor(parseVersionId(id).pid); }
+      else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+        e.preventDefault();
+        const r = card.getBoundingClientRect();
+        showMenu(menuFor(id), r.left + 24, r.top + 24);
+      }
+      return;
+    }
     if (e.key === 'Enter') { e.preventDefault(); if (state.selected.size || store.meta(id)?.trashedAt) toggleSelect(id); else goEditor(id); }
     else if (e.key === ' ') { e.preventDefault(); toggleSelect(id); }
     else if (e.key === 'Delete' || e.key === 'Backspace') {

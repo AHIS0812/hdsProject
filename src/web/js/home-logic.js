@@ -58,6 +58,45 @@ export function filterProjects(all, { view = 'all', q = '', mode = 'all', system
   });
 }
 
+/**
+ * "모든 프로젝트" 목록에 프로젝트들과 나란히 보여줄 "이름 붙인 버전" 카드들을 만든다 — 변경 화면
+ * 마법사에서 이름을 붙여 저장해 둔 각 작업 차수("1번 프로젝트", "2번 프로젝트" 등)를 프로젝트 카드처럼
+ * 구분해서 볼 수 있게 한다. 실제로 열면(goEditor) 항상 그 원본 프로젝트(최종 파일) 자체가 열린다 —
+ * 별도 파일이 아니라 한 파일 안의 "이름 붙은 시점"일 뿐이다.
+ * @param {object[]} projects 휴지통 제외 프로젝트 메타 목록
+ * @param {(id:string)=>object[]} versionsOf 프로젝트 id -> 그 프로젝트의 버전 메타 목록(versions.list 결과 — systemId/systemName/screenName/mode 포함)
+ * @returns {object[]} kind:'version' 카드 목록. id 는 "ver:<projectId>:<versionId>"
+ */
+export function namedVersionCards(projects, versionsOf) {
+  const out = [];
+  for (const p of projects) {
+    for (const v of versionsOf(p.id) || []) {
+      if (!v.label) continue; // 이름 없는 자동 버전은 카드로 안 보여준다
+      out.push({
+        id: `ver:${p.id}:${v.id}`,
+        kind: 'version',
+        projectId: p.id,
+        versionId: v.id,
+        name: v.label,
+        screenName: v.screenName || '',
+        systemId: v.systemId || null,
+        systemName: v.systemName || null,
+        mode: v.mode === 'edit' ? 'edit' : 'new',
+        shapes: v.shapes ?? 0,
+        pages: v.pages ?? 1,
+        canvas: v.canvas || null,
+        hasBg: !!v.hasBg,
+        favorite: false,
+        trashedAt: null,
+        createdAt: v.ts,
+        updatedAt: v.ts,
+        lastOpenedAt: v.ts,
+      });
+    }
+  }
+  return out;
+}
+
 /** 정렬(원본은 건드리지 않는다). 이름순은 한글 사전 순, 나머지는 큰 값(최근)이 앞 */
 export function sortProjects(list, key = 'updated') {
   const arr = [...list];

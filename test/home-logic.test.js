@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  relTime, daysLeft, matchesQuery, filterProjects, sortProjects, countViews, countSystems,
+  relTime, daysLeft, matchesQuery, filterProjects, sortProjects, countViews, countSystems, namedVersionCards,
   metaLine, fmtSize, safeFileName, SORTS,
 } from '../src/web/js/home-logic.js';
 
@@ -54,6 +54,35 @@ test('filterProjects — 보기(전체/즐겨찾기/휴지통)·작업구분·�
   assert.deepEqual(ids({ q: '상세' }), ['b']);
   assert.deepEqual(ids({ view: 'trash', q: '삭제' }), ['c']);
   assert.deepEqual(ids({ q: '삭제' }), []); // 휴지통 항목은 일반 검색에 나오지 않는다
+});
+
+test('namedVersionCards — 이름 붙인 버전만 카드로, 원본 참조를 담는다', () => {
+  const projects = [P({ id: 'p1', name: '1번 프로젝트' }), P({ id: 'p2', name: '다른 프로젝트' })];
+  const versionsOf = (pid) => (pid === 'p1' ? [
+    { id: 'v1', ts: 1, label: '', screenName: '화면A', mode: 'new', shapes: 0 },            // 이름 없음 — 제외
+    { id: 'v2', ts: 2, label: '2번 프로젝트', screenName: '화면A', systemId: 's1', systemName: '영업포탈', mode: 'edit', shapes: 3, pages: 1 },
+  ] : []);
+  const cards = namedVersionCards(projects, versionsOf);
+  assert.equal(cards.length, 1);
+  const c = cards[0];
+  assert.equal(c.id, 'ver:p1:v2');
+  assert.equal(c.kind, 'version');
+  assert.equal(c.projectId, 'p1');
+  assert.equal(c.versionId, 'v2');
+  assert.equal(c.name, '2번 프로젝트');
+  assert.equal(c.screenName, '화면A');
+  assert.equal(c.systemName, '영업포탈');
+  assert.equal(c.mode, 'edit');
+  assert.equal(c.trashedAt, null);
+  assert.equal(c.favorite, false);
+});
+
+test('namedVersionCards — 버전 카드도 filterProjects/sortProjects 로 다룰 수 있다', () => {
+  const projects = [P({ id: 'p1', name: '1번 프로젝트', updatedAt: 100 })];
+  const versionsOf = () => [{ id: 'v1', ts: 200, label: '2번 프로젝트', screenName: '화면A', mode: 'new', shapes: 1 }];
+  const cards = namedVersionCards(projects, versionsOf);
+  const merged = filterProjects([...projects, ...cards], {});
+  assert.deepEqual(sortProjects(merged, 'updated').map((m) => m.id), ['ver:p1:v1', 'p1']);
 });
 
 test('sortProjects — 최근 수정·연 순·만든 순·이름순, 원본 불변', () => {
