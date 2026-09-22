@@ -3,9 +3,15 @@
 //
 // 키는 예전 "저장본" 슬롯과 같다 — 이미 만들어 둔 저장본이 그대로 프로젝트 목록에 나타난다.
 //   hds:saves          목록 메타 [{ id, name, createdAt, updatedAt, lastOpenedAt, favorite, trashedAt,
-//                                  screenName, mode, systemId, systemName, hasBg, shapes, canvas }]
+//                                  screenName, mode, systemId, systemName, hasBg, shapes, pages, canvas }]
 //   hds:save:<id>      프로젝트 본문(currentDoc 형식)
 //   hds:thumb:<id>     카드용 썸네일(SVG 문자열) — 없어도 프로젝트는 정상 동작
+//   hds:ver:<id> …     버전 기록(versions.js)
+//
+// 본문은 v2(여러 화면, doc-model.js) — 예전 v1(화면 하나) 본문도 그대로 읽힌다.
+
+import { isProjectDoc, docSummary } from './doc-model.js';
+import { createVersionStore } from './versions.js';
 
 const INDEX_KEY = 'hds:saves';
 const DOC_PREFIX = 'hds:save:';
@@ -54,7 +60,10 @@ export function createProjectStore(storage) {
     return next;
   };
 
+  const versions = createVersionStore(storage);
   const store = {
+    /** 버전 기록 저장소(versions.js) */
+    versions,
     /**
      * @param {{ trashed?: boolean }} [opts] trashed=true 면 휴지통 항목만, 기본은 휴지통 제외
      * 최근 수정 순
@@ -78,7 +87,7 @@ export function createProjectStore(storage) {
     get(id) {
       try {
         const doc = JSON.parse(storage.getItem(DOC_PREFIX + id) || 'null');
-        return doc && Array.isArray(doc.shapes) ? doc : null;
+        return isProjectDoc(doc) ? doc : null;
       } catch { return null; }
     },
     thumb(id) {
@@ -118,6 +127,7 @@ export function createProjectStore(storage) {
       const list = readIndex();
       const prev = list.find((m) => m.id === id) || null;
       const now = Date.now();
+      const sum = docSummary(doc);
       const meta = {
         id,
         name: cleanName(name) || UNTITLED,
@@ -126,13 +136,14 @@ export function createProjectStore(storage) {
         lastOpenedAt: prev?.lastOpenedAt || now,
         favorite: !!prev?.favorite,
         trashedAt: null,
-        screenName: doc.screenName || '',
-        mode: doc.mode === 'edit' ? 'edit' : 'new',
+        screenName: sum.screenName || '',
+        mode: sum.mode,
         systemId: doc.systemId || null,
         systemName: doc.systemName || prev?.systemName || null,
-        hasBg: !!doc.background,
-        shapes: doc.shapes.length,
-        canvas: doc.canvas && doc.canvas.w ? { w: doc.canvas.w, h: doc.canvas.h } : null,
+        hasBg: sum.hasBg,
+        shapes: sum.shapes,
+        pages: sum.pages,
+        canvas: sum.canvas ? { w: sum.canvas.w, h: sum.canvas.h } : null,
       };
       const prevRaw = storage.getItem(DOC_PREFIX + id);
       try {
@@ -205,6 +216,7 @@ export function createProjectStore(storage) {
     remove(id) {
       try { storage.removeItem(DOC_PREFIX + id); } catch { /* 무시 */ }
       try { storage.removeItem(THUMB_PREFIX + id); } catch { /* 무시 */ }
+      versions.removeAll(id);
       writeIndex(readIndex().filter((m) => m.id !== id));
     },
     emptyTrash() {
@@ -224,6 +236,7 @@ export function createProjectStore(storage) {
       for (const m of readIndex()) {
         chars += (storage.getItem(DOC_PREFIX + m.id) || '').length;
         chars += (storage.getItem(THUMB_PREFIX + m.id) || '').length;
+        chars += versions.usage(m.id);
       }
       return { chars, limit: STORAGE_LIMIT_CHARS, ratio: Math.min(1, chars / STORAGE_LIMIT_CHARS) };
     },

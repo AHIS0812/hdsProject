@@ -97,6 +97,7 @@ export function metaLine(m, systemName) {
   const parts = [m.mode === 'edit' ? '변경' : '신규'];
   const sys = systemName || m.systemName;
   if (sys) parts.push(sys);
+  if (m.pages > 1) parts.push(`화면 ${m.pages}개`);
   parts.push(`요소 ${m.shapes ?? 0}개`);
   return parts.join(' · ');
 }

@@ -1723,10 +1723,18 @@ export function clearShapes() {
   setSel([]);
 }
 
+/** 되돌리기로 예전 상태를 불러오면 그 안의 id 가 지금 카운터보다 클 수 있다(다른 화면을 다녀오며
+ * 번호를 다시 매긴 경우 등) — 새로 만드는 요소가 기존 id 와 겹치지 않게 카운터를 끌어올린다. */
+function syncCounters() {
+  uid = Math.max(uid, ...shapes.map((s) => (Number(s.id) || 0) + 1));
+  gid = Math.max(gid, ...shapes.map((s) => (parseInt(String(s.g || '').replace(/\D/g, ''), 10) || 0) + 1));
+}
+
 export function undo() {
   if (!hist.length) return;
   future.push(JSON.stringify(shapes));
   shapes = JSON.parse(hist.pop());
+  syncCounters();
   setSel(selIds); // 되돌린 뒤에도 남아 있는 요소는 선택을 유지한다(PPT·캔바 방식)
 }
 
@@ -1734,7 +1742,23 @@ export function redo() {
   if (!future.length) return;
   hist.push(JSON.stringify(shapes));
   shapes = JSON.parse(future.pop());
+  syncCounters();
   setSel(selIds);
+}
+
+/** 화면(페이지)을 오갈 때 화면마다 편집 상태(요소·되돌리기 기록·id 카운터)를 그대로 보관한다(main.js).
+ * payload 로 내보냈다 다시 읽으면 id 가 새로 매겨져 되돌리기 기록과 어긋나므로, 내부 형식 그대로 둔다. */
+export function exportState() {
+  return { shapes: JSON.stringify(shapes), hist: hist.slice(), future: future.slice(), uid, gid };
+}
+export function importState(st) {
+  shapes = JSON.parse(st.shapes);
+  hist = st.hist.slice();
+  future = st.future.slice();
+  uid = st.uid;
+  gid = st.gid;
+  syncCounters();
+  setSel([]);
 }
 
 export function zoomBy(d) {
