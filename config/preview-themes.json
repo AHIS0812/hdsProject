@@ -24,15 +24,15 @@
     "tabInactiveBg": "#eef1f5", "tabInactiveText": "#5a6472"
   },
   "salesportal": {
-    "$comment": "영업포탈 — 빨강 핵심 액션 + 주황 보조, 각진 버튼, 회색 그리드(사내 업무 시스템 캡처 기준)",
-    "primary": "#D6303B", "primaryText": "#fff",
+    "$comment": "영업포탈 — 진한 주황 핵심 액션 + 밝은 주황 보조, 각진 버튼, 회색 그리드(사내 업무 시스템 캡처 기준)",
+    "primary": "#D9480F", "primaryText": "#fff",
     "solid": "#F5821F", "solidText": "#fff",
     "outlineBorder": "#9aa5b1", "outlineText": "#333333",
     "radius": "2px",
     "inputBorder": "#c7cdd6",
     "areaBorder": "#e0e0e0", "areaText": "#333333",
     "gridHeaderBg": "#F0F0F0",
-    "tabActiveBg": "#D6303B", "tabActiveText": "#fff",
+    "tabActiveBg": "#D9480F", "tabActiveText": "#fff",
     "tabInactiveBg": "#eef1f5", "tabInactiveText": "#5a6472"
   },
   "homepage": {
