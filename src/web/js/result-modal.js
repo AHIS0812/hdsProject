@@ -11,21 +11,18 @@ const $ = (id) => document.getElementById(id);
 
 const STEPS = ['배치된 요소 읽기', '읽기 순서로 정렬', '사내 표준 컴포넌트로 치환', 'WebSquare XML · 미리보기 생성'];
 
-// deck = 이 프로젝트의 화면들 [{ title, payload, sketch, result }] — "화면 생성"을 누르면 모든 화면을
+// deck = 이 프로젝트의 화면들 [{ title, payload, result }] — "화면 생성"을 누르면 모든 화면을
 // 한 묶음으로 받아 두고, 지금 작업하던 화면부터 보여 준다. 좌우 화살표로 다른 화면 결과도 볼 수 있고,
 // 결과는 그 화면을 처음 열 때 만든다(필요할 때만 변환 요청).
-// last 는 그중 "지금 보고 있는 화면" — 아래 함수들이 그대로 쓴다.
-//   payload = 생성 payload, result = /api/generate 결과,
-//   sketch  = 생성 요청 시점의 캔버스 스냅샷 { html, w, h } — "내 스케치" 비교용(지금 편집 중인 화면만)
+// last 는 그중 "지금 보고 있는 화면" — payload = 생성 payload, result = /api/generate 결과.
 let deck = [];
 let cur = 0;
 let projectName = '';
-let last = { payload: null, result: null, sketch: null };
+let last = { payload: null, result: null };
 // 생성 요청 번호 — 결과를 기다리는 중에 창을 닫고 다시 "화면 생성"을 누르면, 늦게 도착한 이전 응답이
 // 새 결과를 덮어쓰거나 닫힌 창에 그려지던 문제를 막는다(가장 최근 요청의 응답만 반영).
 let buildSeq = 0;
 let currentTab = 'v';
-let viewMode = 'after';   // 화면 탭 보기: after(결과) | split(동시 보기 — 내 스케치 + 결과)
 
 const mask = () => $('mask');
 const mbody = () => $('mbody');
@@ -139,11 +136,6 @@ function renderTab(p) {
   }
   const html = r.preview?.html;
 
-  if (viewMode === 'split' && last.sketch) {
-    maxModalSize(); // 두 화면을 나란히 놓으려면 넓게
-    b.replaceChildren(buildCompare(html));
-    return;
-  }
   if (!html) {
     b.innerHTML = '<pre>(preview HTML 없음)</pre>';
     return;
@@ -165,11 +157,6 @@ const modalEl = () => document.querySelector('#mask .modal');
 function resetModalSize() {
   const m = modalEl();
   if (m) { m.style.width = ''; m.style.height = ''; }
-}
-/** 동시 보기처럼 넓게 써야 하는 경우 — 뷰포트가 허용하는 최대 크기 */
-function maxModalSize() {
-  const m = modalEl();
-  if (m) { m.style.width = 'min(1680px,100%)'; m.style.height = 'min(1040px,100%)'; }
 }
 /**
  * 결과 창을 미리보기 크기에 딱 맞춘다 — 창 프레임(머리글·보기줄·하단바) + 본문 여백 + 화면 크기.
@@ -226,66 +213,6 @@ function mountPreviewFrame(host, html, { snug = false } = {}) {
   previewObservers.push(ro);
 }
 
-/** 스케치 스냅샷을 컨테이너 폭에 맞춰 축소해 붙인다 */
-function mountSketch(host) {
-  const { html, w, h, background } = last.sketch;
-  const wrap = document.createElement('div');
-  wrap.className = 'sketchwrap';
-  const inner = document.createElement('div');
-  inner.className = 'sketchscale';
-  inner.style.cssText = `width:${w}px;height:${h}px;background:#fff`;
-  // 변경화면 캡처 배경 — 에디터에선 #board 의 배경이라 스냅샷 HTML 에 안 들어 있다
-  if (typeof background === 'string' && background.startsWith('data:image/')) {
-    inner.style.backgroundImage = `url("${background}")`;
-    inner.style.backgroundSize = '100% 100%';
-  }
-  inner.innerHTML = html;
-  wrap.append(inner);
-  host.append(wrap);
-  requestAnimationFrame(() => {
-    const r = wrap.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const k = Math.min((r.width - 4) / w, (r.height - 4) / h, 1);
-    inner.style.transform = `scale(${k})`;
-  });
-}
-
-/** 내 스케치 ↔ 생성 결과 나란히 */
-function buildCompare(html) {
-  const box = document.createElement('div');
-  box.className = 'mcompare';
-  const mk = (caption, fill) => {
-    const fig = document.createElement('figure');
-    const cap = document.createElement('figcaption');
-    cap.textContent = caption;
-    const pane = document.createElement('div');
-    pane.className = 'pane-box';
-    fill(pane);
-    fig.append(cap, pane);
-    return fig;
-  };
-  box.append(
-    mk('내 스케치', (pane) => mountSketch(pane)),
-    mk('생성 결과', (pane) => {
-      if (html) {
-        mountPreviewFrame(pane, html);
-      } else {
-        pane.innerHTML = '<pre>(preview HTML 없음)</pre>';
-      }
-    }),
-  );
-  return box;
-}
-
-function updateViewBar(p = currentTab) {
-  $('mView').hidden = !(p === 'v' && !!last.sketch);
-  [...$('mSeg').children].forEach((b) => {
-    const on = b.dataset.v === viewMode;
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', String(on));
-  });
-}
-
 function setActiveTab(p) {
   document.querySelectorAll('.mtab').forEach((x) => {
     const on = x.dataset.p === p;
@@ -327,7 +254,6 @@ async function showScreen(i) {
   if (i < 0 || i >= deck.length) return;
   cur = i;
   last = deck[i];
-  viewMode = last.sketch ? viewMode : 'after'; // 스케치가 없는 화면은 동시 보기를 쓸 수 없다
   renderNav();
   resetModalSize();
   if (!last.result && !last.error) {
@@ -352,7 +278,6 @@ async function showScreen(i) {
 function setTab(p) {
   currentTab = p;
   setActiveTab(p);
-  updateViewBar(p);
   renderTab(p);
   const hasPreview = !!last.result?.preview?.html;
   const canCopy = p === 'v' ? hasPreview : !!textForTab(p);
@@ -420,8 +345,7 @@ async function copyText(text) {
 }
 /**
  * 생성 결과 preview HTML 을 전용 iframe 에 다시 렌더해 실제 화면 영역(.d-cv)만 캔버스로 찍는다
- * (화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 있고, 동시 보기에서는 준비 전일 수도 있어
- * 콘텐츠 전체 크기로 새로 렌더한다). "설명 붙은 요소 보기" 토글 버튼·안내 문구 같은 미리보기
+ * (화면에 보이는 iframe 은 모달 크기에 맞춰 잘려 있어 콘텐츠 전체 크기로 새로 렌더한다). "설명 붙은 요소 보기" 토글 버튼·안내 문구 같은 미리보기
  * 전용 UI는 .d-cv 밖이라 자동으로 빠진다.
  * @param {(doc: Document, cap: HTMLIFrameElement) => void|Promise<void>} [applyState]
  *   캡처 직전에 iframe 문서에 재현해 둘 상태(말풍선·화살표 등) — 이미지 복사/저장에서만 쓴다.
@@ -758,10 +682,9 @@ function download() {
 /**
  * @param {object} payload  화면정의 payload
  * @param {string} title    모달 제목
- * @param {{html:string,w:number,h:number}} [sketch]  생성 요청 시점 캔버스 스냅샷
  */
 /**
- * @param {{title:string, payload:object, sketch?:object|null}[]} screens  이 프로젝트의 화면들(순서대로)
+ * @param {{title:string, payload:object}[]} screens  이 프로젝트의 화면들(순서대로)
  * @param {number} startIndex  처음 보여 줄 화면(보통 지금 편집 중이던 화면)
  * @param {{ projectName?: string }} [opts]
  */
@@ -769,12 +692,10 @@ export async function runBuild(screens, startIndex = 0, { projectName: pname = '
   deck = (screens || []).map((s) => ({ ...s, result: null, error: null }));
   cur = Math.max(0, Math.min(deck.length - 1, startIndex));
   projectName = pname;
-  viewMode = 'after';
   resetModalSize(); // 이전 결과 크기에 맞춰졌던 창을 로딩 화면용 기본 크기로
   openModal();
   $('mClose').focus();
   mfoot().hidden = true;
-  $('mView').hidden = true;
   $('mCopy').hidden = true;
   $('mSaveImg').hidden = true;
   $('mExportDoc').hidden = true;
@@ -792,12 +713,6 @@ export function initResultModal() {
   $('mSaveImg').addEventListener('click', saveScreenImage);
   $('mExportDoc').addEventListener('click', exportDeliverable);
   document.querySelectorAll('.mtab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.p)));
-  $('mSeg').addEventListener('click', (e) => {
-    const v = e.target.closest('button')?.dataset.v;
-    if (!v || v === viewMode) return;
-    viewMode = v;
-    setTab('v');
-  });
   $('mPrev').addEventListener('click', () => showScreen(cur - 1));
   $('mNext').addEventListener('click', () => showScreen(cur + 1));
   mask().addEventListener('mousedown', (e) => { if (e.target === mask()) closeModal(); });

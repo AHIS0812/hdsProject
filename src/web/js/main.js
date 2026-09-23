@@ -928,17 +928,6 @@ function payloadFor(page) {
   return p;
 }
 
-/** 생성 요청 직전 캔버스 모습 스냅샷 (결과 모달의 "내 스케치" 비교용) */
-function snapshotSketch() {
-  const { w, h } = editor.getBoardSize();
-  const clone = $('board').cloneNode(true);
-  // 선택 표시(테두리 오버레이·리사이즈 손잡이)·스냅 가이드·드래그 선택 박스 등 편집 중에만
-  // 보이는 UI는 "내 스케치" 비교 화면에는 안 나와야 한다.
-  clone.querySelectorAll('.hh,.gd,.marq,#hint,.coach,.sel-outline,.sel-bbox,.grp-outline,.inline-edit').forEach((e) => e.remove());
-  // 캡처 배경은 #board 자신의 인라인 스타일이라 innerHTML 에 안 담긴다 — 따로 넘겨야 "동시 보기"에도 보인다
-  return { html: clone.innerHTML, w, h, background: editor.hasBoardBackground() ? editor.getBoardBackground() : null };
-}
-
 function build() {
   if (!editor.count()) { toast('먼저 화면 요소를 배치해주세요'); return; }
   if (!sysCombo.get()) { toast('시스템을 선택해주세요'); return; }
@@ -950,12 +939,7 @@ function build() {
   list.forEach((pg, i) => {
     if (i !== activePage && !(pg.shapes || []).length) return;
     if (i === activePage) start = screens.length;
-    screens.push({
-      title: pg.screenName || '생성 결과',
-      payload: payloadFor(pg),
-      // "내 스케치" 비교는 지금 캔버스에 열려 있는 화면만 가능하다(다른 화면은 화면에 그려져 있지 않다)
-      sketch: i === activePage ? snapshotSketch() : null,
-    });
+    screens.push({ title: pg.screenName || '생성 결과', payload: payloadFor(pg) });
   });
   runBuild(screens, start, { projectName: project.name });
 }
