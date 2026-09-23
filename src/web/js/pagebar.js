@@ -27,6 +27,15 @@ export function pageThumbSvg(page, onBgReady) {
   return thumbnailSvg(page.shapes, page.canvas, { background: cachedBgThumb(page.background, onBgReady) });
 }
 
+// 접어 둔 상태는 브라우저에 기억해 둔다(다음에 열 때도 그대로). 한 번도 고른 적이 없으면 화면이 하나일 때만 접는다.
+const COLLAPSE_KEY = 'hds:pagebar';
+function readCollapsePref() {
+  try { return localStorage.getItem(COLLAPSE_KEY); } catch { return null; }
+}
+function writeCollapsePref(v) {
+  try { localStorage.setItem(COLLAPSE_KEY, v); } catch { /* 저장 못 해도 동작에는 지장 없음 */ }
+}
+
 const thumbUrlCache = new Map();
 function thumbUrl(page, onBgReady) {
   const svg = pageThumbSvg(page, onBgReady);
@@ -52,6 +61,9 @@ export function createPageBar(root, cb) {
   let menu = null;
   let dragFrom = -1;
 
+  let collapsed = readCollapsePref() === 'mini';
+  let userChose = readCollapsePref() != null;
+
   const list = document.createElement('div');
   list.className = 'pg-list';
   list.setAttribute('role', 'listbox');
@@ -63,9 +75,70 @@ export function createPageBar(root, cb) {
   add.title = '새 화면 추가';
   add.innerHTML = '<span aria-hidden="true">＋</span>화면 추가';
   add.addEventListener('click', () => cb.onAdd());
+
+  // 접었을 때 줄 하나로 남는 조작부 — 이전/다음 화면, 번호, 화면 추가
+  const mini = document.createElement('div');
+  mini.className = 'pg-mini';
+  const miniPrev = document.createElement('button');
+  miniPrev.type = 'button';
+  miniPrev.className = 'pg-nav';
+  miniPrev.textContent = '‹';
+  miniPrev.title = '이전 화면 (PgUp)';
+  miniPrev.setAttribute('aria-label', '이전 화면');
+  miniPrev.addEventListener('click', () => cb.onSelect(active - 1));
+  const miniNext = document.createElement('button');
+  miniNext.type = 'button';
+  miniNext.className = 'pg-nav';
+  miniNext.textContent = '›';
+  miniNext.title = '다음 화면 (PgDn)';
+  miniNext.setAttribute('aria-label', '다음 화면');
+  miniNext.addEventListener('click', () => cb.onSelect(active + 1));
+  const miniLabel = document.createElement('button');
+  miniLabel.type = 'button';
+  miniLabel.className = 'pg-mini-label';
+  miniLabel.title = '화면 목록 펼치기';
+  miniLabel.addEventListener('click', () => setCollapsed(false));
+  const miniAdd = document.createElement('button');
+  miniAdd.type = 'button';
+  miniAdd.className = 'pg-nav add';
+  miniAdd.textContent = '＋';
+  miniAdd.title = '새 화면 추가';
+  miniAdd.setAttribute('aria-label', '새 화면 추가');
+  miniAdd.addEventListener('click', () => cb.onAdd());
+  mini.append(miniPrev, miniLabel, miniNext, miniAdd);
+
   const count = document.createElement('span');
   count.className = 'pg-count';
-  root.replaceChildren(list, add, count);
+
+  // 접기·펼치기 손잡이
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'pg-toggle';
+  toggle.setAttribute('aria-controls', root.id || 'pageBar');
+  toggle.addEventListener('click', () => setCollapsed(!collapsed));
+
+  root.replaceChildren(mini, list, add, count, toggle);
+
+  /** 접기/펼치기 — 캔버스 높이(--pagebar-h)도 같이 바뀐다(styles.css) */
+  function setCollapsed(next, remember = true) {
+    collapsed = !!next;
+    if (remember) { userChose = true; writeCollapsePref(collapsed ? 'mini' : 'full'); }
+    closeMenu();
+    paintCollapsed();
+  }
+
+  function paintCollapsed() {
+    root.classList.toggle('mini', collapsed);
+    document.body.classList.toggle('pgbar-mini', collapsed);
+    toggle.textContent = collapsed ? '▲' : '▼';
+    toggle.title = collapsed ? '화면 목록 펼치기' : '화면 목록 접기';
+    toggle.setAttribute('aria-label', toggle.title);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    miniPrev.disabled = active <= 0;
+    miniNext.disabled = active >= pages.length - 1;
+    miniAdd.disabled = pages.length >= cb.maxPages;
+    miniLabel.textContent = `${active + 1} / ${pages.length} · ${pages[active]?.screenName || '제목 없음'}`;
+  }
 
   function closeMenu() { menu?.remove(); menu = null; }
 
@@ -223,14 +296,17 @@ export function createPageBar(root, cb) {
   function render(nextPages, nextActive) {
     pages = nextPages;
     active = nextActive;
+    if (!userChose) setCollapsed(pages.length <= 1, false); // 직접 고르기 전까지는 화면 수에 맞춰 알아서
+    paintCollapsed();
     const hadFocus = list.contains(document.activeElement);
     list.replaceChildren(...pages.map(item));
     add.disabled = pages.length >= cb.maxPages;
     count.textContent = `${active + 1} / ${pages.length}`;
     const cur = list.children[active];
     if (hadFocus) cur?.focus({ preventScroll: true });
-    cur?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (!collapsed) cur?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
-  return { render, closeMenu };
+  paintCollapsed();
+  return { render, closeMenu, setCollapsed, isCollapsed: () => collapsed };
 }

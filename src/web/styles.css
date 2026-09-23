@@ -615,3 +615,24 @@ h4.gap{margin-top:30px;}
   .pagebar{position:static;margin:12px;border-radius:16px;border:none;box-shadow:var(--sh);height:auto;padding:4px 12px;}
 }
 
+
+/* 화면 띠 접기 — 접으면 줄 하나(36px)만 남고 캔버스가 그만큼 넓어진다 */
+body.pgbar-mini{--pagebar-h:38px;}
+/* 접었을 때 높이는 클래스로 직접 준다 — CSS 변수만 바꾸면(캔버스 여백 계산용) 띠 자신의 높이는
+   브라우저가 다시 잡아주지 않는 경우가 있다 */
+.pagebar.mini{height:38px;padding:0 12px 0 16px;gap:6px;}
+.pagebar .pg-mini{display:none;align-items:center;gap:4px;min-width:0;}
+.pagebar.mini .pg-mini{display:flex;}
+.pagebar.mini .pg-list,.pagebar.mini .pg-add,.pagebar.mini .pg-count{display:none;}
+.pg-nav{flex:0 0 auto;width:26px;height:26px;border:1px solid var(--line);background:#fff;border-radius:7px;
+  color:var(--sub);font-family:inherit;font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;}
+.pg-nav:hover:not(:disabled){border-color:#C2C9D4;color:var(--ink);background:#F7F8FA;}
+.pg-nav:disabled{opacity:.35;cursor:default;}
+.pg-nav.add{color:var(--or-d);border-color:#F3C69B;background:var(--or-l);font-weight:700;margin-left:4px;}
+.pg-mini-label{flex:0 1 auto;min-width:0;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border:none;background:none;font-family:inherit;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;padding:0 4px;}
+.pg-mini-label:hover{color:var(--or-d);text-decoration:underline;}
+.pg-toggle{position:absolute;right:12px;top:6px;width:26px;height:22px;border:1px solid var(--line);background:#fff;
+  border-radius:7px;color:var(--mut);font-size:10px;line-height:1;cursor:pointer;font-family:inherit;display:grid;place-items:center;}
+.pagebar.mini .pg-toggle{top:6px;}
+.pg-toggle:hover{border-color:#C2C9D4;color:var(--ink);background:#F7F8FA;}
