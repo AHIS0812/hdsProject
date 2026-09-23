@@ -574,7 +574,7 @@ h4.gap{margin-top:30px;}
 .canvas.panning,.canvas.panning *{cursor:grabbing!important;}
 
 /* ── 하단 화면(페이지) 띠 — 캔바·미리캔버스의 페이지 목록 ── */
-:root{--pagebar-h:104px;}
+:root{--pagebar-h:104px;--pagebar-full:104px;}
 @media (min-width:901px){
   .canvas{bottom:var(--pagebar-h);}
   .tools{bottom:calc(var(--pagebar-h) + 14px);}
@@ -632,10 +632,21 @@ body.pgbar-mini{--pagebar-h:38px;}
 .pg-mini-label{flex:0 1 auto;min-width:0;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   border:none;background:none;font-family:inherit;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;padding:0 4px;}
 .pg-mini-label:hover{color:var(--or-d);text-decoration:underline;}
-.pg-toggle{position:absolute;right:12px;top:6px;width:26px;height:22px;border:1px solid var(--line);background:#fff;
-  border-radius:7px;color:var(--mut);font-size:10px;line-height:1;cursor:pointer;font-family:inherit;display:grid;place-items:center;}
-.pagebar.mini .pg-toggle{top:6px;}
-.pg-toggle:hover{border-color:#C2C9D4;color:var(--ink);background:#F7F8FA;}
+/* 손잡이 — 띠 위쪽 가운데에 서랍 손잡이처럼 걸쳐 둔다(구석보다 눈에 잘 띈다) */
+.pg-toggle{position:absolute;left:50%;transform:translateX(-50%);top:-15px;width:74px;height:16px;
+  border:1px solid var(--line);border-bottom:none;background:#fff;border-radius:9px 9px 0 0;color:var(--mut);
+  font-size:9px;line-height:1;cursor:pointer;font-family:inherit;display:grid;place-items:center;
+  box-shadow:0 -2px 6px rgba(16,24,40,.06);}
+.pg-toggle:hover{color:var(--or-d);background:var(--or-l);border-color:#F3C69B;}
+.pg-toggle:focus-visible{outline:2px solid var(--or);outline-offset:2px;}
+
+/* 접힌 띠 위에 마우스를 올리면 잠깐 펼쳐 보여 준다 — 캔버스 위로 겹쳐 뜨고, 비키면 다시 접힌다 */
+body.pgbar-peek .tools{bottom:calc(var(--pagebar-full) + 14px);z-index:27;}
+.pagebar.mini.peek{height:var(--pagebar-full,104px);z-index:26;box-shadow:0 -10px 28px rgba(16,24,40,.16);
+  padding:0 16px;gap:10px;}
+.pagebar.mini.peek .pg-mini{display:none;}
+.pagebar.mini.peek .pg-list,.pagebar.mini.peek .pg-add,.pagebar.mini.peek .pg-count{display:flex;}
+.pagebar.mini.peek .pg-count{display:inline;}
 
 .tools button.on{background:var(--or);color:#fff;}
 .tools button.on:hover{background:var(--or-d);color:#fff;}

@@ -124,6 +124,8 @@
     <button id="bU" data-act="undo" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶</button>
     <button id="bR" data-act="redo" title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">↷</button>
     <div class="dv" aria-hidden="true"></div>
+    <button id="btnPages" data-act="pages" title="화면 목록 보기 / 숨기기" aria-label="화면 목록" aria-pressed="false">▤ 화면</button>
+    <div class="dv" aria-hidden="true"></div>
     <button id="btnHand" data-act="hand" title="손 도구 — 드래그로 캔버스 이동 (H · Space 를 눌러도 잠깐 켜짐)" aria-label="손 도구" aria-pressed="false">✋</button>
     <div class="dv" aria-hidden="true"></div>
     <button data-act="zoomOut" title="축소 (Ctrl+−, Ctrl+휠)" aria-label="축소">−</button>
@@ -156,7 +158,7 @@
       <dl>
         <dt>프로젝트 저장</dt><dd><kbd>Ctrl</kbd>+<kbd>S</kbd> 지금 프로젝트에 덮어쓰기 · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> 다른 이름으로 저장 (상단 <b>프로젝트 ▾</b>에서 새 프로젝트·열기)</dd>
         <dt>버전 기록</dt><dd>상단 <b>프로젝트 ▾ → 버전 기록</b> — 10분마다 자동으로 남고, 이름 붙여 저장·미리보기·복원·새 프로젝트로 열기</dd>
-        <dt>화면 여러 개</dt><dd>하단 띠에서 <b>＋ 화면 추가</b> · 클릭해서 전환 · 끌어서 순서 바꾸기 · 우클릭/⋯ 메뉴로 복제·삭제 · <kbd>PgUp</kbd>/<kbd>PgDn</kbd> 이전·다음 화면 · 띠에서 <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> 순서 이동. 오른쪽 <b>▼</b> 로 띠를 접으면 캔버스가 넓어지고, 접힌 줄에서도 화면 이동·추가가 됩니다</dd>
+        <dt>화면 여러 개</dt><dd>하단 띠에서 <b>＋ 화면 추가</b> · 클릭해서 전환 · 끌어서 순서 바꾸기 · 우클릭/⋯ 메뉴로 복제·삭제 · <kbd>PgUp</kbd>/<kbd>PgDn</kbd> 이전·다음 화면 · 띠에서 <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> 순서 이동. 하단 도구 모음의 <b>▤ 화면</b> 버튼이나 띠 위 가운데 손잡이로 접고 펼칩니다(접어도 마우스를 올리면 잠깐 보입니다)</dd>
         <dt>요소 추가</dt><dd>왼쪽 팔레트에서 클릭</dd>
         <dt>선택</dt><dd>클릭 · <kbd>Shift</kbd>/<kbd>Ctrl</kbd>+클릭(여러 개) · 빈 곳 드래그(범위 안에 완전히 들어온 것만)</dd>
         <dt>전체 선택</dt><dd><kbd>Ctrl</kbd>+<kbd>A</kbd></dd>

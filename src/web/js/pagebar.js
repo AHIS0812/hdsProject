@@ -110,19 +110,42 @@ export function createPageBar(root, cb) {
   const count = document.createElement('span');
   count.className = 'pg-count';
 
-  // 접기·펼치기 손잡이
+  // 접기·펼치기 손잡이 — 서랍 손잡이처럼 띠 위쪽 가운데에 둔다(구석에 있으면 잘 안 보인다).
+  // 같은 기능을 하단 도구 모음의 "화면 n/m" 버튼(main.js)에서도 쓴다.
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'pg-toggle';
   toggle.setAttribute('aria-controls', root.id || 'pageBar');
   toggle.addEventListener('click', () => setCollapsed(!collapsed));
 
-  root.replaceChildren(mini, list, add, count, toggle);
+  root.replaceChildren(toggle, mini, list, add, count);
+
+  // 접어 둔 상태에서 띠 위에 마우스를 올리면 잠깐 펼쳐 보여 준다(살짝 엿보기).
+  // 설정 자체는 바꾸지 않으므로, 마우스를 떼면 다시 접힌다.
+  let peekTimer = null;
+  const setPeek = (on) => {
+    clearTimeout(peekTimer);
+    if (on === root.classList.contains('peek')) return;
+    root.classList.toggle('peek', on);
+    document.body.classList.toggle('pgbar-peek', on);
+    if (on) paintList(); // 접혀 있는 동안 밀린 썸네일 갱신
+  };
+  root.addEventListener('mouseenter', () => {
+    if (!collapsed) return;
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(() => setPeek(true), 180); // 지나가다 살짝 스친 것으로는 안 열리게
+  });
+  root.addEventListener('mouseleave', () => {
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(() => setPeek(false), 260);
+  });
 
   /** 접기/펼치기 — 캔버스 높이(--pagebar-h)도 같이 바뀐다(styles.css) */
   function setCollapsed(next, remember = true) {
     collapsed = !!next;
     if (remember) { userChose = true; writeCollapsePref(collapsed ? 'mini' : 'full'); }
+    if (!collapsed) setPeek(false);
+    document.body.classList.toggle('pgbar-peek', collapsed && root.classList.contains('peek'));
     closeMenu();
     paintCollapsed();
   }
@@ -130,7 +153,7 @@ export function createPageBar(root, cb) {
   function paintCollapsed() {
     root.classList.toggle('mini', collapsed);
     document.body.classList.toggle('pgbar-mini', collapsed);
-    toggle.textContent = collapsed ? '▲' : '▼';
+    toggle.innerHTML = `<span aria-hidden="true">${collapsed ? '▲' : '▼'}</span>`;
     toggle.title = collapsed ? '화면 목록 펼치기' : '화면 목록 접기';
     toggle.setAttribute('aria-label', toggle.title);
     toggle.setAttribute('aria-expanded', String(!collapsed));
@@ -138,6 +161,7 @@ export function createPageBar(root, cb) {
     miniNext.disabled = active >= pages.length - 1;
     miniAdd.disabled = pages.length >= cb.maxPages;
     miniLabel.textContent = `${active + 1} / ${pages.length} · ${pages[active]?.screenName || '제목 없음'}`;
+    cb.onCollapsedChange?.(collapsed, { active, total: pages.length });
   }
 
   function closeMenu() { menu?.remove(); menu = null; }
@@ -293,18 +317,22 @@ export function createPageBar(root, cb) {
     if (to !== from) cb.onMove(from, to);
   });
 
-  function render(nextPages, nextActive) {
-    pages = nextPages;
-    active = nextActive;
-    if (!userChose) setCollapsed(pages.length <= 1, false); // 직접 고르기 전까지는 화면 수에 맞춰 알아서
-    paintCollapsed();
+  function paintList() {
     const hadFocus = list.contains(document.activeElement);
     list.replaceChildren(...pages.map(item));
     add.disabled = pages.length >= cb.maxPages;
     count.textContent = `${active + 1} / ${pages.length}`;
     const cur = list.children[active];
     if (hadFocus) cur?.focus({ preventScroll: true });
-    if (!collapsed) cur?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (!collapsed || root.classList.contains('peek')) cur?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  function render(nextPages, nextActive) {
+    pages = nextPages;
+    active = nextActive;
+    if (!userChose) setCollapsed(pages.length <= 1, false); // 직접 고르기 전까지는 화면 수에 맞춰 알아서
+    paintCollapsed();
+    paintList();
   }
 
   paintCollapsed();

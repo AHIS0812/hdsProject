@@ -165,6 +165,7 @@ clist.replaceChildren(
 
 // ── 하단 툴바 (되돌리기 / 줌) ─────────────────────────────
 const TOOL = {
+  pages: () => pageBar?.setCollapsed(!pageBar.isCollapsed()),
   hand: () => editor.setHandTool(!editor.isHandTool()),
   undo: editor.undo, redo: editor.redo,
   zoomIn: () => editor.zoomBy(10), zoomOut: () => editor.zoomBy(-10), zoomReset: editor.zoomReset,
@@ -863,6 +864,15 @@ pageBar = createPageBar($('pageBar'), {
   maxPages: MAX_PAGES,
   onSelect: switchPage, onAdd: addPage, onDuplicate: duplicatePage, onDelete: deletePage,
   onMove: movePageTo, onRename: renamePage,
+  // 하단 도구 모음 버튼에 지금 화면 번호와 열림 상태를 비춘다
+  onCollapsedChange: (collapsed, { active, total }) => {
+    const b = $('btnPages');
+    if (!b) return;
+    b.textContent = `▤ ${active + 1}/${total}`;
+    b.classList.toggle('on', !collapsed);
+    b.setAttribute('aria-pressed', String(!collapsed));
+    b.title = collapsed ? '화면 목록 보기' : '화면 목록 숨기기';
+  },
 });
 function renderPageBar() { clearTimeout(pageBarTimer); pageBar?.render(livePages(), activePage); }
 function schedulePageBar() { clearTimeout(pageBarTimer); pageBarTimer = setTimeout(renderPageBar, 400); }
