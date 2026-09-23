@@ -111,3 +111,34 @@ test('compileDeterministic — area 를 감싸고 필수를 전파한다', () =>
   // 저장 버튼은 area 밖(screenRoot 직속)
   assert.match(out.websquareXml, /<\/w2:group>\n\s*<w2:trigger[^>]*value="저장"/);
 });
+
+test('시스템별 미리보기 테마 — payload.systemId 에 따라 --hs-primary 등이 바뀐다', () => {
+  const themes = readJson('config/preview-themes.json');
+  const payloadFor = (systemId) => ({
+    screenName: '조회', systemId, canvas: { w: 960, h: 600 },
+    shapes: [{ type: 'button', x: 10, y: 10, w: 80, h: 28, label: '조회' }],
+  });
+  const portal = compileDeterministic(payloadFor('portal')).previewHtml;
+  const sales = compileDeterministic(payloadFor('salesportal')).previewHtml;
+  const homepage = compileDeterministic(payloadFor('homepage')).previewHtml;
+  const custom = compileDeterministic(payloadFor('sys_방금만든시스템')).previewHtml;
+  const none = compileDeterministic(payloadFor(undefined)).previewHtml;
+
+  assert.match(portal, new RegExp(`--hs-primary:${themes.portal.primary}`));
+  assert.match(sales, new RegExp(`--hs-primary:${themes.salesportal.primary}`));
+  assert.match(homepage, new RegExp(`--hs-primary:${themes.homepage.primary}`));
+  // 고정 3개가 아닌 시스템·시스템 미지정은 default 테마로 떨어진다
+  assert.match(custom, new RegExp(`--hs-primary:${themes.default.primary}`));
+  assert.match(none, new RegExp(`--hs-primary:${themes.default.primary}`));
+  // 세 고정 시스템은 서로 다른 primary 색을 쓴다(테마가 실제로 갈린다)
+  assert.notEqual(themes.portal.primary, themes.salesportal.primary);
+  assert.notEqual(themes.salesportal.primary, themes.homepage.primary);
+});
+
+test('시스템별 테마는 XML 코드에는 반영되지 않는다(색상 정보 없음)', () => {
+  const out = compileDeterministic({
+    screenName: '조회', systemId: 'portal', canvas: { w: 960, h: 600 },
+    shapes: [{ type: 'button', x: 10, y: 10, w: 80, h: 28, label: '조회' }],
+  });
+  assert.doesNotMatch(out.websquareXml, /#[0-9a-fA-F]{6}/);
+});

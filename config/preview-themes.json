@@ -1,0 +1,50 @@
+{
+  "$comment": "화면 생성 결과의 미리보기(Preview) 화면에만 적용되는 시스템별 색상/모양 테마. WebSquare XML 코드에는 반영되지 않는다(사내 표준 색상 클래스 체계가 아직 확정 안 됨, 개발지시서 OI-3). 'default'는 고정 3개 시스템(salesportal/portal/homepage) 외의 모든 시스템(사용자가 직접 추가한 시스템)에 쓰인다. 참고 이미지: 영업포탈=사내 업무 그리드 시스템 캡처, 하이포탈=WebSquare 팝업·조회 화면 캡처, 대표홈페이지=hi.co.kr(현대해상) 공개 홈페이지+인터넷창구 화면.",
+  "default": {
+    "primary": "#F5821F", "primaryText": "#fff",
+    "solid": "#0F3B7C", "solidText": "#fff",
+    "outlineBorder": "#9fb3d1", "outlineText": "#0F3B7C",
+    "radius": "3px",
+    "inputBorder": "#d3d8e0",
+    "areaBorder": "#e3e6ec", "areaText": "#1a2942",
+    "gridHeaderBg": "#EEF3FB",
+    "tabActiveBg": "#0F3B7C", "tabActiveText": "#fff",
+    "tabInactiveBg": "#eef1f5", "tabInactiveText": "#5a6472"
+  },
+  "portal": {
+    "$comment": "하이포탈 — 남색 단일 강조, 각진 버튼, 얇은 라인 구분(WebSquare 팝업·조회 화면 기준)",
+    "primary": "#1B3A6B", "primaryText": "#fff",
+    "solid": "#142C52", "solidText": "#fff",
+    "outlineBorder": "#c7cdd6", "outlineText": "#1B3A6B",
+    "radius": "2px",
+    "inputBorder": "#c7cdd6",
+    "areaBorder": "#dfe3e8", "areaText": "#1B3A6B",
+    "gridHeaderBg": "#F1F3F6",
+    "tabActiveBg": "#1B3A6B", "tabActiveText": "#fff",
+    "tabInactiveBg": "#eef1f5", "tabInactiveText": "#5a6472"
+  },
+  "salesportal": {
+    "$comment": "영업포탈 — 빨강 핵심 액션 + 주황 보조, 각진 버튼, 회색 그리드(사내 업무 시스템 캡처 기준)",
+    "primary": "#D6303B", "primaryText": "#fff",
+    "solid": "#F5821F", "solidText": "#fff",
+    "outlineBorder": "#9aa5b1", "outlineText": "#333333",
+    "radius": "2px",
+    "inputBorder": "#c7cdd6",
+    "areaBorder": "#e0e0e0", "areaText": "#333333",
+    "gridHeaderBg": "#F0F0F0",
+    "tabActiveBg": "#D6303B", "tabActiveText": "#fff",
+    "tabInactiveBg": "#eef1f5", "tabInactiveText": "#5a6472"
+  },
+  "homepage": {
+    "$comment": "대표홈페이지 — 주황 핵심 + 남색 보조, 둥근(pill) 버튼(hi.co.kr 공개 홈페이지·인터넷창구 화면 기준)",
+    "primary": "#F5821F", "primaryText": "#fff",
+    "solid": "#14315C", "solidText": "#fff",
+    "outlineBorder": "#cfd8e3", "outlineText": "#14315C",
+    "radius": "18px",
+    "inputBorder": "#dcdfe4",
+    "areaBorder": "#eeeeee", "areaText": "#1a2942",
+    "gridHeaderBg": "#F5F5F5",
+    "tabActiveBg": "#F5821F", "tabActiveText": "#fff",
+    "tabInactiveBg": "#f3f0ec", "tabInactiveText": "#8a8a8a"
+  }
+}

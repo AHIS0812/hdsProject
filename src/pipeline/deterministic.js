@@ -14,6 +14,19 @@ export { readingOrder };
 const MAPPING = (readJson('catalog/websquare/mapping.json', { default: {} }).default) || {};
 const BUTTON_ROLE_HINTS = readJson('config/policy.json', { buttonRoleHints: {} }).buttonRoleHints || {};
 
+// 시스템별 미리보기(Preview) 색상·모양 테마 — WebSquare XML 코드에는 반영되지 않는다(§7, 사내 표준
+// 색상 클래스 체계 미확정). "default" 는 고정 3개 시스템(salesportal/portal/homepage) 외의
+// 모든 시스템(사용자가 홈에서 직접 추가한 시스템)에 쓰인다.
+const PREVIEW_THEMES = readJson('config/preview-themes.json', {});
+const FALLBACK_THEME = {
+  primary: '#F5821F', primaryText: '#fff', solid: '#0F3B7C', solidText: '#fff',
+  outlineBorder: '#9fb3d1', outlineText: '#0F3B7C', radius: '3px', inputBorder: '#d3d8e0',
+  areaBorder: '#e3e6ec', areaText: '#1a2942', gridHeaderBg: '#EEF3FB',
+  tabActiveBg: '#0F3B7C', tabActiveText: '#fff', tabInactiveBg: '#eef1f5', tabInactiveText: '#5a6472',
+};
+const DEFAULT_THEME = PREVIEW_THEMES.default || FALLBACK_THEME;
+const getTheme = (systemId) => (systemId && PREVIEW_THEMES[systemId]) || DEFAULT_THEME;
+
 /** 버튼 문구가 힌트와 정확히 일치할 때만 역할을 부여한다(부분 포함 금지 — "고객통합조회"가
  * "조회"에 걸려 함께 강조되는 것을 막기 위함). 못 찾으면 기본(아웃라인, 보조 액션). */
 function buttonRole(label) {
@@ -157,12 +170,13 @@ export function shapeToXml(shape, n) {
 
 const STATIC_STYLE = {
   // "▸ 주소" 처럼 섹션 제목 앞에 작은 삼각형을 붙이고 밑줄로 구획한다(실제 화면의 section header 톤).
-  title: 'border:none;border-bottom:1px solid #e3e6ec;background:none;font-weight:700;color:#1a2942;' +
-    'font-size:11.5px;justify-content:flex-start;padding-bottom:3px',
+  // 색은 시스템별 테마(--hs-area-border/--hs-area-text, buildPreviewHtml 이 <style> 에 선언)를 따른다.
+  title: 'border:none;border-bottom:1px solid var(--hs-area-border);background:none;font-weight:700;' +
+    'color:var(--hs-area-text);font-size:11.5px;justify-content:flex-start;padding-bottom:3px',
   label: 'border:none;background:none;font-weight:600;font-size:11px;color:#333;justify-content:flex-start',
   // 실제 화면은 점선 박스가 아니라 옅은 테두리의 흰 카드 — 라벨은 title 과 같은 섹션 헤더 톤으로.
-  area: 'border:1px solid #e3e6ec;background:#fff;align-items:flex-start;justify-content:flex-start;' +
-    'color:#1a2942;font-size:11.5px;font-weight:700',
+  area: 'border:1px solid var(--hs-area-border);background:#fff;align-items:flex-start;justify-content:flex-start;' +
+    'color:var(--hs-area-text);font-size:11.5px;font-weight:700',
   divider: 'border:none;background:none;border-top:1px solid #d3d8e0;border-radius:0',
   image: 'border:1px dashed #b9b7b2;background:#fafaf8;color:#9a9a9a;font-size:10px',
   pager: 'border:none;background:none;color:#9a9a9a;justify-content:center',
@@ -195,9 +209,10 @@ const wrapAbs = (shape, inner, extra = '') =>
   `<div${elId(shape)}${annoAttrs(shape)} style="position:absolute;box-sizing:border-box;left:${shape.x}px;top:${shape.y}px;` +
   `width:${shape.w}px;height:${shape.h}px;display:flex;align-items:center;gap:3px;${extra}">${inner}</div>`;
 
-/** 필수 입력은 실제 화면처럼 옅은 크림색 배경으로 강조한다(별표 하나만으로는 눈에 잘 안 띔). */
+/** 필수 입력은 실제 화면처럼 옅은 크림색 배경으로 강조한다(별표 하나만으로는 눈에 잘 안 띔) —
+ * 이건 시스템과 무관한 공통 규칙이라 테마 대상이 아니다. 테두리·모서리만 시스템별 테마를 따른다. */
 const control = (shape) => 'flex:1;height:100%;min-width:0;font-size:11px;font-family:inherit;' +
-  `border:1px solid #d3d8e0;border-radius:3px;box-sizing:border-box;color:#333;` +
+  `border:1px solid var(--hs-input-border);border-radius:var(--hs-radius);box-sizing:border-box;color:#333;` +
   `padding:0 5px 0 ${shape.required ? 13 : 5}px;` + // 필수면 ＊ 오버레이가 안 겹치게 왼쪽 여백만 더
   `background:${shape.required ? '#FFFAE6' : '#fff'}`;
 
@@ -242,26 +257,30 @@ function shapeToHtml(shape, n) {
     const ths = items.length ? items.map((c) => `<th style="padding:4px 6px;text-align:left;white-space:nowrap">${esc(c)}</th>`).join('') : '<th>(컬럼 없음)</th>';
     return wrapAbs(
       shape,
-      `<div style="width:100%;height:100%;overflow:auto;border:1px solid #d3d8e0;background:#fff">` +
-        `<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="background:#EEF3FB">${ths}</tr></thead>` +
+      `<div style="width:100%;height:100%;overflow:auto;border:1px solid var(--hs-input-border);background:#fff">` +
+        `<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="background:var(--hs-grid-header)">${ths}</tr></thead>` +
         `<tbody><tr><td colspan="${items.length || 1}" style="text-align:center;color:#9a9a9a;padding:12px">데이터 없음 (미리보기)</td></tr></tbody></table></div>`,
       'align-items:stretch',
     );
   }
   if (t === 'tab') {
+    // 활성/비활성 배경·글자색은 CSS(.hs-tab/.hs-tab.on, 시스템별 --hs-tab-* 변수)가 담당한다 —
+    // 클릭 시 INTERACTION_SCRIPT 가 클래스만 토글해도 테마가 그대로 반영된다.
     const btns = items.length
       ? items.map((label, i) => `<button type="button" class="hs-tab${i === 0 ? ' on' : ''}" ` +
-          `style="font-size:10px;letter-spacing:1px;border:none;background:${i === 0 ? '#0F3B7C' : '#eef1f5'};` +
-          `color:${i === 0 ? '#fff' : '#5a6472'};border-radius:5px;padding:0 10px;height:100%;cursor:pointer;font-family:inherit">${esc(label)}</button>`).join('')
+          `style="font-size:10px;letter-spacing:1px;border:none;border-radius:5px;padding:0 10px;height:100%;` +
+          `cursor:pointer;font-family:inherit">${esc(label)}</button>`).join('')
       : '<span style="color:#9a9a9a;font-size:10px">(탭 없음)</span>';
     return wrapAbs(shape, btns, 'gap:4px;justify-content:flex-start');
   }
   if (t === 'button') {
     const role = buttonRole(shape.label);
+    // 색은 시스템별 테마(--hs-primary 등)를 따른다 — 버튼 역할(주 액션/보조/기본) 판정 자체는
+    // 문구 기반이라 시스템과 무관하고, buttonRole() 로직은 그대로 유지된다.
     const roleStyle = {
-      primary: 'background:#F5821F;border-color:#F5821F;color:#fff',
-      solid: 'background:#0F3B7C;border-color:#0F3B7C;color:#fff',
-      default: 'background:#fff;border-color:#9fb3d1;color:#0F3B7C',
+      primary: 'background:var(--hs-primary);border-color:var(--hs-primary);color:var(--hs-primary-text)',
+      solid: 'background:var(--hs-solid);border-color:var(--hs-solid);color:var(--hs-solid-text)',
+      default: 'background:#fff;border-color:var(--hs-outline-border);color:var(--hs-outline-text)',
     }[role];
     // linksTo(스케치에서 "연결할 요소"로 지정한 대상들)가 있으면 클릭 시 그 요소들로 화살표를 그린다.
     // 문구가 길면 한 줄로 잘리는 대신 줄바꿈된다 — 스케치 쪽에서 이미 그만큼 shape.h 를
@@ -466,11 +485,10 @@ document.addEventListener('click', function (e) {
   }
   var tab = e.target.closest('.hs-tab');
   if (tab) {
+    // 배경·글자색은 CSS(.hs-tab/.hs-tab.on)가 시스템별 테마 변수로 담당 — 여기선 클래스만 토글한다.
     var bar = tab.parentElement;
-    [].forEach.call(bar.querySelectorAll('.hs-tab'), function (b) {
-      b.classList.remove('on'); b.style.background = '#eef1f5'; b.style.color = '#5a6472';
-    });
-    tab.classList.add('on'); tab.style.background = '#0F3B7C'; tab.style.color = '#fff';
+    [].forEach.call(bar.querySelectorAll('.hs-tab'), function (b) { b.classList.remove('on'); });
+    tab.classList.add('on');
     return;
   }
   var noted = e.target.closest('.hs-btn, .hs-note');
@@ -488,6 +506,15 @@ document.addEventListener('click', function (e) {
 
 function buildPreviewHtml(title, payload) {
   const { w = 960, h = 600 } = payload.canvas || {};
+  const theme = getTheme(payload.systemId);
+  const themeVars = `--hs-primary:${theme.primary};--hs-primary-text:${theme.primaryText};` +
+    `--hs-solid:${theme.solid};--hs-solid-text:${theme.solidText};` +
+    `--hs-outline-border:${theme.outlineBorder};--hs-outline-text:${theme.outlineText};` +
+    `--hs-radius:${theme.radius};--hs-input-border:${theme.inputBorder};` +
+    `--hs-area-border:${theme.areaBorder};--hs-area-text:${theme.areaText};` +
+    `--hs-grid-header:${theme.gridHeaderBg};` +
+    `--hs-tab-active-bg:${theme.tabActiveBg};--hs-tab-active-text:${theme.tabActiveText};` +
+    `--hs-tab-inactive-bg:${theme.tabInactiveBg};--hs-tab-inactive-text:${theme.tabInactiveText};`;
   const els = readingOrder(payload.shapes)
     .map((s, i) => shapeToHtml(s, i + 1))
     .join('');
@@ -502,7 +529,9 @@ function buildPreviewHtml(title, payload) {
   const toggleHtml = hasAnno ? `<button type="button" id="hsToggle" class="hs-toggle">📍 설명 붙은 요소 보기</button>` : '';
   return (
     `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title>` +
-    `<style>body{margin:0;font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f5f4f1}` +
+    `<style>body{margin:0;font-family:'맑은 고딕','Malgun Gothic',sans-serif;background:#f5f4f1;${themeVars}}` +
+    `.hs-tab{background:var(--hs-tab-inactive-bg);color:var(--hs-tab-inactive-text)}` +
+    `.hs-tab.on{background:var(--hs-tab-active-bg);color:var(--hs-tab-active-text)}` +
     `.d-note{font-size:11px;color:#8a8a8a;text-align:center;padding:7px}` +
     // 토글 버튼이 안내 줄 오른쪽 끝에 들어가므로(캔버스를 가리지 않게) 안내 문구가 그 밑으로 안 들어가게 비운다.
     `.d-note.tg{padding-right:168px}` +
