@@ -11,8 +11,15 @@ const $ = (id) => document.getElementById(id);
 
 const STEPS = ['배치된 요소 읽기', '읽기 순서로 정렬', '사내 표준 컴포넌트로 치환', 'WebSquare XML · 미리보기 생성'];
 
-// last.payload = 생성 payload, last.result = /api/generate 결과
-// last.sketch = 생성 요청 시점의 캔버스 스냅샷 { html, w, h } — "내 스케치" 비교용
+// deck = 이 프로젝트의 화면들 [{ title, payload, sketch, result }] — "화면 생성"을 누르면 모든 화면을
+// 한 묶음으로 받아 두고, 지금 작업하던 화면부터 보여 준다. 좌우 화살표로 다른 화면 결과도 볼 수 있고,
+// 결과는 그 화면을 처음 열 때 만든다(필요할 때만 변환 요청).
+// last 는 그중 "지금 보고 있는 화면" — 아래 함수들이 그대로 쓴다.
+//   payload = 생성 payload, result = /api/generate 결과,
+//   sketch  = 생성 요청 시점의 캔버스 스냅샷 { html, w, h } — "내 스케치" 비교용(지금 편집 중인 화면만)
+let deck = [];
+let cur = 0;
+let projectName = '';
 let last = { payload: null, result: null, sketch: null };
 // 생성 요청 번호 — 결과를 기다리는 중에 창을 닫고 다시 "화면 생성"을 누르면, 늦게 도착한 이전 응답이
 // 새 결과를 덮어쓰거나 닫힌 창에 그려지던 문제를 막는다(가장 최근 요청의 응답만 반영).
@@ -48,6 +55,13 @@ function trapTab(e) {
 
 function onModalKeydown(e) {
   if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
+  // ←/→ 로 이전·다음 화면 (입력칸에 있을 땐 커서 이동이 먼저다)
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && deck.length > 1
+    && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) {
+    e.preventDefault();
+    showScreen(cur + (e.key === 'ArrowRight' ? 1 : -1));
+    return;
+  }
   trapTab(e);
 }
 
@@ -280,6 +294,61 @@ function setActiveTab(p) {
   });
 }
 
+/** 좌우 화살표 줄 — 화면이 둘 이상일 때만 보인다 */
+function renderNav() {
+  const many = deck.length > 1;
+  $('mNav').hidden = !many;
+  $('mTitle').textContent = deck[cur]?.title || '생성 결과';
+  if (!many) return;
+  $('mNavLabel').textContent = `${cur + 1} / ${deck.length}`;
+  $('mPrev').disabled = cur <= 0;
+  $('mNext').disabled = cur >= deck.length - 1;
+}
+
+/** 이 화면의 변환 결과를 준비한다(이미 있으면 그대로). 실패하면 error 를 담아 둔다 */
+async function ensureResult(i) {
+  const scr = deck[i];
+  if (!scr || scr.result || scr.error) return;
+  const seq = buildSeq;
+  const stop = showProgress();
+  try {
+    const result = await generate(scr.payload);
+    if (seq !== buildSeq) { stop(); return; }
+    scr.result = result;
+  } catch (e) {
+    if (seq !== buildSeq) { stop(); return; }
+    scr.error = e.message;
+  }
+  stop();
+}
+
+/** i 번째 화면을 보여 준다(필요하면 먼저 변환) */
+async function showScreen(i) {
+  if (i < 0 || i >= deck.length) return;
+  cur = i;
+  last = deck[i];
+  viewMode = last.sketch ? viewMode : 'after'; // 스케치가 없는 화면은 동시 보기를 쓸 수 없다
+  renderNav();
+  resetModalSize();
+  if (!last.result && !last.error) {
+    mfoot().hidden = true;
+    $('mCopy').hidden = true; $('mSaveImg').hidden = true; $('mExportDoc').hidden = true; $('mDownload').hidden = true;
+    await ensureResult(i);
+    if (cur !== i || !mask().classList.contains('on')) return;
+  }
+  if (last.error) {
+    const pre = document.createElement('pre');
+    pre.className = 'err';
+    pre.textContent = last.error;
+    mbody().replaceChildren(pre);
+    mfoot().hidden = true;
+    $('mCopy').hidden = true; $('mSaveImg').hidden = true; $('mExportDoc').hidden = true; $('mDownload').hidden = true;
+    return;
+  }
+  refreshFoot();
+  setTab(currentTab);
+}
+
 function setTab(p) {
   currentTab = p;
   setActiveTab(p);
@@ -358,8 +427,7 @@ async function copyText(text) {
  *   캡처 직전에 iframe 문서에 재현해 둘 상태(말풍선·화살표 등) — 이미지 복사/저장에서만 쓴다.
  * @returns {Promise<HTMLCanvasElement>}
  */
-async function captureScreenCanvas(applyState) {
-  const html = last.result?.preview?.html;
+async function captureScreenCanvas(applyState, html = last.result?.preview?.html) {
   if (!html || !window.html2canvas) throw new Error('미리보기가 준비되지 않았습니다');
 
   const cap = document.createElement('iframe');
@@ -501,36 +569,56 @@ async function saveScreenImage() {
 // ── 산출물 추출 (PPT: 화면 이미지 + 요소 설명) ──────────────
 /** "설명(desc)" 또는 "연결(linksTo)" 이 달린 요소만 — 결과 화면의 "📍 설명 붙은 요소 보기" 와
  * 같은 기준이다. 이 목록에 번호를 매겨 이미지 위 배지·오른쪽 설명 목록에 그대로 쓴다. */
-function annotatedShapes() {
-  const shapes = last.payload?.shapes || [];
+function annotatedShapes(payload = last.payload) {
+  const shapes = payload?.shapes || [];
   return readingOrder(shapes.filter((s) =>
     (s.desc && String(s.desc).trim()) || (Array.isArray(s.linksTo) && s.linksTo.length)));
 }
 
 const deliverableFileName = () =>
-  `${(last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_')}_화면설명서.pptx`;
+  `${(projectName || last.payload?.screenName || 'screen').replace(/[\\/:*?"<>|]/g, '_')}_화면설명서.pptx`;
 
 /**
  * 화면 산출물(PPT) 슬라이드 1장을 만들어 바로 내려받는다 — 왼쪽엔 생성된 화면 이미지,
  * 오른쪽엔 그 위에 매긴 번호에 대응하는 설명 목록("Description"). 새로 입력할 게 없다 —
  * 캔버스에서 요소에 붙여 둔 "설명"·"연결"이 곧 이 문서의 내용이 된다.
  */
-async function buildDeliverablePptx() {
+async function buildDeliverablePptx(onProgress) {
   if (!window.PptxGenJS) throw new Error('PPT 라이브러리를 불러오지 못했습니다');
-  const canvas = await captureScreenCanvas(); // 말풍선·하이라이트 없는 깨끗한 화면 — 번호는 직접 매긴다
-  const imgData = canvas.toDataURL('image/png');
-
-  const shapes = last.payload?.shapes || [];
-  const { w: boardW, h: boardH } = last.payload?.canvas || { w: 960, h: 600 };
-  const items = annotatedShapes();
-  const findShape = (id) => shapes.find((s) => s.id === id);
-
   const pptx = new window.PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE'; // 13.33 × 7.5in
-  const slide = pptx.addSlide();
   const FONT = '맑은 고딕';
 
-  const title = last.payload?.screenName || $('mTitle').textContent || '화면';
+  // 프로젝트의 화면을 순서대로 한 파일에 담는다 — 아직 변환하지 않은 화면은 여기서 만든다
+  let made = 0;
+  for (let i = 0; i < deck.length; i++) {
+    onProgress?.(i + 1, deck.length);
+    if (!deck[i].result && !deck[i].error) {
+      try { deck[i].result = await generate(deck[i].payload); } catch (e) { deck[i].error = e.message; }
+    }
+    const html = deck[i].result?.preview?.html;
+    if (!html) continue; // 변환에 실패한 화면은 건너뛴다
+    await addScreenSlide(pptx, FONT, deck[i], html);
+    made += 1;
+  }
+  if (!made) throw new Error('산출물로 만들 수 있는 화면이 없습니다');
+
+  await pptx.writeFile({ fileName: deliverableFileName() });
+  return made;
+}
+
+/** 화면 한 장 = 슬라이드 한 장 — 왼쪽 화면 이미지(번호 배지), 오른쪽 설명 목록 */
+async function addScreenSlide(pptx, FONT, screen, html) {
+  const canvas = await captureScreenCanvas(undefined, html); // 말풍선·하이라이트 없는 깨끗한 화면 — 번호는 직접 매긴다
+  const imgData = canvas.toDataURL('image/png');
+
+  const shapes = screen.payload?.shapes || [];
+  const { w: boardW, h: boardH } = screen.payload?.canvas || { w: 960, h: 600 };
+  const items = annotatedShapes(screen.payload);
+  const findShape = (id) => shapes.find((s) => s.id === id);
+
+  const slide = pptx.addSlide();
+  const title = screen.payload?.screenName || screen.title || '화면';
   slide.addText(title, { x: 0.4, y: 0.28, w: 12.5, h: 0.5, fontSize: 20, bold: true, color: '1A2942', fontFace: FONT });
 
   // 왼쪽: 화면 이미지 — 보드 비율을 유지한 채 영역 안에 맞춘다("contain").
@@ -591,8 +679,6 @@ async function buildDeliverablePptx() {
   slide.addText('하이스케치 — 규칙 기반 자동 생성', {
     x: 0.4, y: 7.18, w: 6, h: 0.25, fontSize: 8, color: '9AA3B0', fontFace: FONT,
   });
-
-  await pptx.writeFile({ fileName: deliverableFileName() });
 }
 
 async function exportDeliverable() {
@@ -602,8 +688,10 @@ async function exportDeliverable() {
   const restore = btn.textContent;
   btn.textContent = '만드는 중…';
   try {
-    await buildDeliverablePptx();
-    btn.textContent = '✓ 생성됨';
+    const n = await buildDeliverablePptx((i, total) => {
+      btn.textContent = total > 1 ? `${i}/${total} 만드는 중…` : '만드는 중…';
+    });
+    btn.textContent = deck.length > 1 ? `✓ ${n}개 화면` : '✓ 생성됨';
     setTimeout(() => { btn.textContent = restore; }, 1400);
   } catch (e) {
     toast('산출물을 만들지 못했습니다: ' + e.message);
@@ -672,8 +760,15 @@ function download() {
  * @param {string} title    모달 제목
  * @param {{html:string,w:number,h:number}} [sketch]  생성 요청 시점 캔버스 스냅샷
  */
-export async function runBuild(payload, title, sketch = null) {
-  $('mTitle').textContent = title;
+/**
+ * @param {{title:string, payload:object, sketch?:object|null}[]} screens  이 프로젝트의 화면들(순서대로)
+ * @param {number} startIndex  처음 보여 줄 화면(보통 지금 편집 중이던 화면)
+ * @param {{ projectName?: string }} [opts]
+ */
+export async function runBuild(screens, startIndex = 0, { projectName: pname = '' } = {}) {
+  deck = (screens || []).map((s) => ({ ...s, result: null, error: null }));
+  cur = Math.max(0, Math.min(deck.length - 1, startIndex));
+  projectName = pname;
   viewMode = 'after';
   resetModalSize(); // 이전 결과 크기에 맞춰졌던 창을 로딩 화면용 기본 크기로
   openModal();
@@ -686,28 +781,8 @@ export async function runBuild(payload, title, sketch = null) {
   $('mDownload').hidden = true;
   setActiveTab('v');
   currentTab = 'v';
-  const seq = ++buildSeq;
-  const stop = showProgress();
-  try {
-    const result = await generate(payload);
-    if (seq !== buildSeq || !mask().classList.contains('on')) { stop(); return; }
-    last = { payload, result, sketch };
-    stop();
-    refreshFoot();
-    setTab('v');
-  } catch (e) {
-    stop();
-    if (seq !== buildSeq || !mask().classList.contains('on')) return;
-    last = { payload, result: null, sketch };
-    const pre = document.createElement('pre');
-    pre.className = 'err';
-    pre.textContent = e.message;
-    mbody().replaceChildren(pre);
-    $('mCopy').hidden = true;
-    $('mSaveImg').hidden = true;
-    $('mExportDoc').hidden = true;
-    $('mDownload').hidden = true;
-  }
+  buildSeq += 1;
+  await showScreen(cur);
 }
 
 export function initResultModal() {
@@ -723,5 +798,7 @@ export function initResultModal() {
     viewMode = v;
     setTab('v');
   });
+  $('mPrev').addEventListener('click', () => showScreen(cur - 1));
+  $('mNext').addEventListener('click', () => showScreen(cur + 1));
   mask().addEventListener('mousedown', (e) => { if (e.target === mask()) closeModal(); });
 }

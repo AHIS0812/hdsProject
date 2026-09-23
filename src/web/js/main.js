@@ -910,7 +910,8 @@ async function applyDoc(doc, { project: p, savedTs = null, message = null, fresh
 }
 
 // ── payload / 생성 ────────────────────────────────────────
-function payload() {
+/** 화면(페이지) 하나 → 생성 payload */
+function payloadFor(page) {
   const sys = sysCombo.get();
   const p = {
     systemId: sys?.id,
@@ -918,12 +919,12 @@ function payload() {
     // "신규/변경" 구분은 이제 프론트 개념이 아니다 — 백엔드 계약(screen-draft 스키마)은
     // 그대로 mode 필드를 요구하므로 항상 'new' 로 채운다.
     mode: 'new',
-    template: currentTpl,
-    screenName: scrNm.value,
-    canvas: editor.getBoardSize(),
-    shapes: editor.toPayloadShapes(),
+    template: page.template || 'blank',
+    screenName: page.screenName || '새 화면',
+    canvas: page.canvas,
+    shapes: page.shapes || [],
   };
-  if (editor.hasBoardBackground()) p.background = editor.getBoardBackground();
+  if (page.background) p.background = page.background;
   return p;
 }
 
@@ -941,7 +942,22 @@ function snapshotSketch() {
 function build() {
   if (!editor.count()) { toast('먼저 화면 요소를 배치해주세요'); return; }
   if (!sysCombo.get()) { toast('시스템을 선택해주세요'); return; }
-  runBuild(payload(), scrNm.value || '생성 결과', snapshotSketch());
+  // 프로젝트의 화면을 모두 넘긴다 — 결과 창에서 좌우 화살표로 넘겨 볼 수 있고, PPT 산출물도 한 파일로 나온다.
+  // 아직 아무것도 그리지 않은 빈 화면은 뺀다(지금 편집 중인 화면은 위에서 이미 요소가 있는지 확인했다).
+  const list = livePages();
+  const screens = [];
+  let start = 0;
+  list.forEach((pg, i) => {
+    if (i !== activePage && !(pg.shapes || []).length) return;
+    if (i === activePage) start = screens.length;
+    screens.push({
+      title: pg.screenName || '생성 결과',
+      payload: payloadFor(pg),
+      // "내 스케치" 비교는 지금 캔버스에 열려 있는 화면만 가능하다(다른 화면은 화면에 그려져 있지 않다)
+      sketch: i === activePage ? snapshotSketch() : null,
+    });
+  });
+  runBuild(screens, start, { projectName: project.name });
 }
 
 // ── 온보딩 코치 / 단축키 도움말 ──────────────────────────

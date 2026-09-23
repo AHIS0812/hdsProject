@@ -272,6 +272,11 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <div class="mhd">
       <b style="font-size:14px" id="mTitle">생성 결과</b>
+      <div class="mnav" id="mNav" hidden>
+        <button type="button" id="mPrev" title="이전 화면 (←)" aria-label="이전 화면">‹</button>
+        <span id="mNavLabel">1 / 1</span>
+        <button type="button" id="mNext" title="다음 화면 (→)" aria-label="다음 화면">›</button>
+      </div>
       <div class="mtabs" id="mtabs" role="tablist" aria-label="결과 보기">
         <button class="mtab on" data-p="v" role="tab" aria-selected="true">화면</button>
         <button class="mtab" data-p="x" role="tab" aria-selected="false">WebSquare XML</button>
@@ -279,7 +284,7 @@
       <div class="r">
         <button class="btn sm" id="mCopy" title="현재 탭 내용을 클립보드로 복사">복사</button>
         <button class="btn sm" id="mSaveImg" title="현재 화면 이미지를 PNG 파일로 저장" hidden>이미지 저장</button>
-        <button class="btn sm" id="mExportDoc" title="화면 이미지 + 요소 설명을 PPT 산출물로 만들기" hidden>산출물 추출</button>
+        <button class="btn sm" id="mExportDoc" title="모든 화면을 하나의 PPT 산출물로 만들기 (화면마다 이미지 + 요소 설명)" hidden>산출물 추출</button>
         <button class="btn sm" id="mDownload">내려받기</button>
         <button class="btn sm" id="mClose">닫기</button>
       </div>
