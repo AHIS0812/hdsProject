@@ -2,8 +2,8 @@
 // 프로젝트 저장소(projects.js)는 에디터와 공유하고, 이 화면은 목록·검색·정리·새로 만들기를 맡는다.
 // 프로젝트를 열면 editor.html?p=<id> 로 이동한다(에디터가 그 프로젝트에 자동 저장).
 
-import * as api from './api.js';
 import { createProjectStore, browserStorage, cleanName, UNTITLED, NAME_MAX } from './projects.js';
+import { createSystemStore, isLocked as isLockedSystem, NAME_MAX as SYS_NAME_MAX } from './systems.js';
 import { thumbnailSvg, svgDataUrl, makeBgThumb } from './thumbnail.js';
 import {
   filterProjects, sortProjects, countViews, countSystems, relTime, daysLeft, metaLine, fmtSize, safeFileName, SORTS,
@@ -16,6 +16,7 @@ import { docPages, isProjectDoc } from './doc-model.js';
 
 const $ = (id) => document.getElementById(id);
 const store = createProjectStore(browserStorage());
+const sysStore = createSystemStore(browserStorage());
 
 // ── 아이콘(인라인 SVG) ────────────────────────────────────
 const ICONS = {
@@ -36,6 +37,10 @@ const ICONS = {
   open: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   restore: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>',
+  up: '<path d="M12 19V5M5 12l7-7 7 7"/>',
+  down: '<path d="M12 5v14M5 12l7 7 7-7"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 const fillIcons = (root = document) => root.querySelectorAll('.ico[data-i]').forEach((el) => { el.innerHTML = icon(el.dataset.i); });
@@ -58,7 +63,8 @@ const state = {
   selected: new Set(),
   anchor: null,                // shift 범위 선택의 시작점
 };
-let systems = [];              // [{ id, name, sub }] — API 가 안 떠 있으면 빈 배열
+let systems = sysStore.list();  // [{ id, name, createdAt }] — hds:systems (사용자가 시스템 관리에서 편집)
+const refreshSystems = () => { systems = sysStore.list(); };
 const sysName = (id) => systems.find((s) => s.id === id)?.name || null;
 let visibleIds = [];
 
@@ -690,6 +696,109 @@ function openWizard({ template = 'blank' } = {}) {
   q('#wName').focus();
 }
 
+// ── 시스템 관리 ──────────────────────────────────────────
+function openSystemManager() {
+  closeMenu();
+  if (document.querySelector('.sysmgr')) return;
+  const prevFocus = document.activeElement;
+
+  const mask = document.createElement('div');
+  mask.className = 'dlg-mask';
+  mask.innerHTML =
+    '<div class="dlg sysmgr" role="dialog" aria-modal="true" aria-labelledby="sysmgrTitle">'
+    + '<div class="wiz-hd"><b id="sysmgrTitle">시스템 관리</b><button type="button" class="x" aria-label="닫기"><span class="ico" data-i="x"></span></button></div>'
+    + '<p class="sysmgr-hint">영업포탈·하이포탈·대표홈페이지는 고정 시스템이라 이름 변경·삭제가 안 돼요. 그 외 시스템은 자유롭게 추가·이름변경·삭제·순서 변경할 수 있어요.</p>'
+    + '<div class="sysmgr-list" id="sysmgrList" role="list" aria-label="시스템 목록"></div>'
+    + '<div class="sysmgr-add"><input id="sysmgrName" type="text" maxlength="' + SYS_NAME_MAX + '" placeholder="새 시스템 이름" autocomplete="off" aria-label="새 시스템 이름"><button type="button" class="btn sm pri" id="sysmgrAdd">추가</button></div>'
+    + '<div class="wiz-ft"><button type="button" class="btn" id="sysmgrClose">닫기</button></div>'
+    + '</div>';
+  document.body.append(mask);
+  fillIcons(mask);
+  const q = (sel) => mask.querySelector(sel);
+
+  const close = () => {
+    document.removeEventListener('keydown', onKey, true);
+    mask.remove();
+    try { prevFocus?.focus?.(); } catch { /* 무시 */ }
+    refreshSystems();
+    render();
+  };
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
+    if (e.key === 'Tab') {
+      const f = [...mask.querySelectorAll('input,button')].filter((el) => el.offsetParent !== null && !el.disabled);
+      if (!f.length) return;
+      const first = f[0]; const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  document.addEventListener('keydown', onKey, true);
+  mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
+  q('.wiz-hd .x').addEventListener('click', close);
+  q('#sysmgrClose').addEventListener('click', close);
+
+  function paintList() {
+    const list = sysStore.list();
+    const rows = list.map((s, i) => {
+      const locked = isLockedSystem(s.id);
+      const row = document.createElement('div');
+      row.className = 'sysmgr-row' + (locked ? ' locked' : '');
+      row.dataset.id = s.id;
+      row.setAttribute('role', 'listitem');
+      row.innerHTML =
+        `<div class="mv"><button type="button" class="mv-up" aria-label="위로" title="위로"${i === 0 ? ' disabled' : ''}><span class="ico" data-i="up"></span></button>`
+        + `<button type="button" class="mv-dn" aria-label="아래로" title="아래로"${i === list.length - 1 ? ' disabled' : ''}><span class="ico" data-i="down"></span></button></div>`
+        + (locked
+          ? `<span class="nm">${esc(s.name)}</span><span class="lockbadge" title="고정 시스템 — 이름변경·삭제 불가"><span class="ico" data-i="lock"></span></span>`
+          : `<input class="nm-input" type="text" value="${esc(s.name)}" maxlength="${SYS_NAME_MAX}" aria-label="${esc(s.name)} 이름">`)
+        + (locked ? '' : '<button type="button" class="del" aria-label="삭제" title="삭제"><span class="ico" data-i="trash"></span></button>');
+      return row;
+    });
+    q('#sysmgrList').replaceChildren(...rows);
+    if (!list.length) q('#sysmgrList').innerHTML = '<div class="sysmgr-empty">시스템이 없어요.</div>';
+    fillIcons(q('#sysmgrList'));
+  }
+
+  q('#sysmgrList').addEventListener('click', (e) => {
+    const row = e.target.closest('.sysmgr-row');
+    if (!row) return;
+    const id = row.dataset.id;
+    if (e.target.closest('.mv-up')) { sysStore.move(id, -1); paintList(); return; }
+    if (e.target.closest('.mv-dn')) { sysStore.move(id, 1); paintList(); return; }
+    if (e.target.closest('.del')) {
+      const s = sysStore.get(id);
+      if (sysStore.remove(id)) { toast(`"${s?.name}" 시스템을 삭제했어요`); paintList(); }
+      return;
+    }
+  });
+  q('#sysmgrList').addEventListener('change', (e) => {
+    const row = e.target.closest('.sysmgr-row');
+    const input = e.target.closest('.nm-input');
+    if (!row || !input) return;
+    const res = sysStore.rename(row.dataset.id, input.value);
+    if (!res) toast('이름을 확인해 주세요 (비어 있거나 이미 있는 이름이에요)');
+    paintList();
+  });
+  q('#sysmgrList').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.classList.contains('nm-input')) { e.preventDefault(); e.target.blur(); }
+  });
+
+  function addSystem() {
+    const input = q('#sysmgrName');
+    const s = sysStore.create(input.value);
+    if (!s) { toast('이름을 확인해 주세요 (비어 있거나 이미 있는 이름이에요)'); input.focus(); return; }
+    input.value = '';
+    paintList();
+    input.focus();
+  }
+  q('#sysmgrAdd').addEventListener('click', addSystem);
+  q('#sysmgrName').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addSystem(); } });
+
+  paintList();
+  q('#sysmgrName').focus();
+}
+
 // ── 이전 버전의 자동 저장 초안 → 프로젝트로 옮기기 ────────
 /** 예전 에디터는 "작업 중 화면 1개" 를 hds:autosave 에 뒀다. 프로젝트 방식으로 바뀌었으므로 한 번 옮기고 지운다. */
 function migrateLegacyDraft() {
@@ -724,6 +833,7 @@ function initEvents() {
   // 새 프로젝트
   $('btnNew').addEventListener('click', () => openWizard());
   $('btnNew2').addEventListener('click', () => openWizard());
+  $('btnSysManage').addEventListener('click', () => openSystemManager());
   $('btnImport').addEventListener('click', () => fileInput.click());
 
   // 빠른 시작 타일
@@ -896,14 +1006,9 @@ store.purgeExpired();
 migrateLegacyDraft();
 render();
 
-const systemsReady = api.getSystems().then((list) => {
-  systems = list;
-  render();
-}).catch((e) => console.warn('시스템 목록을 불러오지 못했습니다(API 서버 미기동?)', e));
-
 const params = new URLSearchParams(location.search);
 if (params.has('missing')) toast('열려던 프로젝트를 찾지 못했어요. 삭제되었을 수 있어요.');
 if (params.has('new') || params.has('missing') || params.has('q')) {
-  if (params.has('new')) systemsReady.finally(() => openWizard());
+  if (params.has('new')) openWizard();
   history.replaceState(null, '', location.pathname);
 }

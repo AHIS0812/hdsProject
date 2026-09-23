@@ -2,8 +2,8 @@
 // 예시 프로토타입(samples/화면스케치스튜디오_예시_v1.html)을 src/web 모듈 구조로 이전.
 
 import { COMPS, DEFAULT_BOARD, boardSizeFor } from './constants.js';
-import * as api from './api.js';
 import * as editor from './editor.js';
+import { createSystemStore } from './systems.js';
 import { makeCombo } from './combobox.js';
 import { templateShapes } from './templates.js';
 import { initResultModal, runBuild } from './result-modal.js';
@@ -383,6 +383,7 @@ document.addEventListener('paste', (e) => {
 //   · 탭을 닫거나 홈으로 나갈 때(pagehide) 대기 중인 변경을 즉시 저장
 //   · 다른 탭이 같은 프로젝트를 먼저 고쳤으면(수정 시각이 다름) 덮어쓰기 전에 물어본다
 const store = createProjectStore(browserStorage());
+const sysStore = createSystemStore(browserStorage());
 let project = { id: null, name: '' };
 let savedSig = null;   // 마지막으로 저장(또는 열었을 때)한 내용의 서명
 let savedAtTs = null;  // 마지막 저장 시각
@@ -1007,14 +1008,8 @@ async function boot() {
   store.touchOpened(pid);
   const opened = store.meta(pid) || meta;
 
-  let systems = [];
-  try {
-    systems = await api.getSystems();
-    sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name })));
-  } catch (e) {
-    toast('API 서버에 연결하지 못했습니다 — npm run dev 로 실행했는지 확인하세요');
-    console.error(e);
-  }
+  const systems = sysStore.list();
+  sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name })));
 
   await applyDoc(doc, { project: { id: pid, name: opened.name }, savedTs: meta.updatedAt, fresh });
   // 이번에 고치기 전의 상태를 버전으로 남겨 둔다(버전이 없거나 마지막 버전이 10분 넘게 지났을 때만)

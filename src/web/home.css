@@ -292,6 +292,30 @@ a{color:inherit;}
 .wiz-ft{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--line2);background:#fff;}
 .wiz-ft .btn{height:38px;}
 
+/* ── 시스템 관리 모달 ─────────────────────────────────── */
+.dlg.sysmgr{width:min(440px,96vw);max-height:min(88vh,640px);padding:0;gap:0;overflow:hidden;flex-direction:column;}
+.sysmgr-hint{margin:0;padding:14px 22px 0;font-size:12.5px;color:var(--mut);line-height:1.5;}
+.sysmgr-list{padding:14px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;}
+.sysmgr-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line2);border-radius:10px;}
+.sysmgr-row.locked{background:var(--bg2);}
+.sysmgr-row .mv{display:flex;flex-direction:column;gap:1px;}
+.sysmgr-row .mv button{width:22px;height:16px;border:none;background:none;color:var(--mut);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+.sysmgr-row .mv button .ico{width:13px;height:13px;}
+.sysmgr-row .mv button:disabled{opacity:.3;cursor:default;}
+.sysmgr-row .mv button:not(:disabled):hover{color:var(--ink);}
+.sysmgr-row .nm{flex:1;font-size:13.5px;font-weight:600;color:var(--ink);}
+.sysmgr-row .nm-input{flex:1;height:32px;border:1px solid var(--line2);border-radius:8px;padding:0 10px;font-size:13.5px;font-family:inherit;color:var(--ink);}
+.sysmgr-row .nm-input:focus{outline:none;border-color:var(--or);}
+.sysmgr-row .lockbadge{display:flex;align-items:center;color:var(--mut);}
+.sysmgr-row .lockbadge .ico{width:14px;height:14px;}
+.sysmgr-row .del{width:28px;height:28px;border:none;background:none;border-radius:8px;color:var(--mut);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.sysmgr-row .del .ico{width:15px;height:15px;}
+.sysmgr-row .del:hover{background:#FDEDEC;color:#D64545;}
+.sysmgr-empty{padding:20px 0;text-align:center;color:var(--mut);font-size:13px;}
+.sysmgr-add{display:flex;gap:8px;padding:0 22px 16px;}
+.sysmgr-add input{flex:1;height:36px;border:1px solid var(--line2);border-radius:8px;padding:0 12px;font-size:13.5px;font-family:inherit;}
+.sysmgr-add input:focus{outline:none;border-color:var(--or);}
+
 /* ── 파일 끌어놓기 ────────────────────────────────────── */
 .drop-mask{position:fixed;inset:0;z-index:90;background:rgba(15,59,124,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:30px;}
 .drop-box{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;color:#fff;border:3px dashed rgba(255,255,255,.75);
