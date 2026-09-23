@@ -18,7 +18,6 @@ import {
   docPages, activeIndex, makeDoc, normalizePage, clonePage, movePage, newPageId, docSignature, MAX_PAGES,
 } from './doc-model.js';
 import { createPageBar, pageThumbSvg } from './pagebar.js';
-import { buildItemSpec, toCsv } from './item-spec.js';
 
 const $ = (id) => document.getElementById(id);
 /** 결과 모달이나 확인 대화상자가 떠 있는지 — 떠 있으면 뒤의 캔버스 단축키·붙여넣기를 멈춘다 */
@@ -631,21 +630,6 @@ async function duplicateProject() {
   location.href = `editor.html?p=${encodeURIComponent(copy.id)}`;
 }
 
-/** 항목정의서 — 모든 화면의 요소를 화면설계서 항목 표(엑셀에서 열리는 CSV)로 내보낸다 */
-function exportItemSpec() {
-  const list = livePages();
-  const rows = buildItemSpec(list);
-  if (!rows.length) { toast('내보낼 항목이 없습니다 — 화면에 요소를 먼저 배치해주세요'); return; }
-  const name = safeFileName(project.name || scrNm.value, 'screen');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
-  a.download = `${name}_항목정의서.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  toast(`항목 ${rows.length}개를 항목정의서로 내보냈습니다 (화면 ${list.length}개)`);
-  closeProjPop();
-}
-
 function exportFile() {
   const name = safeFileName(project.name || scrNm.value, 'screen');
   const a = document.createElement('a');
@@ -697,7 +681,6 @@ $('pNew').addEventListener('click', () => { location.href = '/?new=1'; });
 $('pSave').addEventListener('click', () => { closeProjPop(); saveNow(); });
 $('pDup').addEventListener('click', duplicateProject);
 $('btnExport').addEventListener('click', exportFile);
-$('pItemSpec').addEventListener('click', exportItemSpec);
 $('pVersions').addEventListener('click', () => { closeProjPop(); openVersions(); });
 
 // ── 버전 기록 ─────────────────────────────────────────────
