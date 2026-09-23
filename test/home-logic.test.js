@@ -38,18 +38,16 @@ test('matchesQuery — 이름·화면·시스템, 여러 단어는 모두 포함
   assert.ok(matchesQuery(P({ id: 'b', name: 'ABC Test' }), 'abc test'));
 });
 
-test('filterProjects — 보기(전체/즐겨찾기/휴지통)·작업구분·시스템·검색', () => {
+test('filterProjects — 보기(전체/즐겨찾기/휴지통)·시스템·검색', () => {
   const all = [
-    P({ id: 'a', name: '목록', mode: 'new', systemId: 's1', favorite: true }),
-    P({ id: 'b', name: '상세', mode: 'edit', systemId: 's2' }),
+    P({ id: 'a', name: '목록', systemId: 's1', favorite: true }),
+    P({ id: 'b', name: '상세', systemId: 's2' }),
     P({ id: 'c', name: '삭제됨', trashedAt: NOW, favorite: true }),
   ];
   const ids = (f) => filterProjects(all, f).map((m) => m.id);
   assert.deepEqual(ids({}), ['a', 'b']);
   assert.deepEqual(ids({ view: 'fav' }), ['a']);
   assert.deepEqual(ids({ view: 'trash' }), ['c']);
-  assert.deepEqual(ids({ mode: 'edit' }), ['b']);
-  assert.deepEqual(ids({ mode: 'new' }), ['a']);
   assert.deepEqual(ids({ systemId: 's2' }), ['b']);
   assert.deepEqual(ids({ q: '상세' }), ['b']);
   assert.deepEqual(ids({ view: 'trash', q: '삭제' }), ['c']);
@@ -86,9 +84,9 @@ test('countViews / countSystems', () => {
 });
 
 test('metaLine / fmtSize / safeFileName', () => {
-  assert.equal(metaLine(P({ id: 'a', mode: 'edit', systemName: '영업포탈', shapes: 12 })), '변경 · 영업포탈 · 요소 12개');
-  assert.equal(metaLine(P({ id: 'a' })), '신규 · 요소 3개');
-  assert.equal(metaLine(P({ id: 'a' }), '하이콜'), '신규 · 하이콜 · 요소 3개');
+  assert.equal(metaLine(P({ id: 'a', systemName: '영업포탈', shapes: 12 })), '영업포탈 · 요소 12개');
+  assert.equal(metaLine(P({ id: 'a' })), '요소 3개');
+  assert.equal(metaLine(P({ id: 'a' }), '하이콜'), '하이콜 · 요소 3개');
   assert.equal(fmtSize(100_000), '100 KB');
   assert.equal(fmtSize(300), '1 KB');
   assert.equal(fmtSize(1_250_000), '1.3 MB');

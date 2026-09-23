@@ -141,10 +141,6 @@ a{color:inherit;}
 .list-head h2{font-size:18px;font-weight:800;letter-spacing:-.3px;}
 .count{font-size:12px;font-weight:700;color:var(--mut);background:#E9EDF3;border-radius:10px;padding:2px 9px;}
 .tools{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.chips{display:flex;gap:4px;background:#E9EDF3;padding:3px;border-radius:10px;}
-.chip-btn{border:none;background:none;height:28px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--sub);cursor:pointer;}
-.chip-btn:hover{color:var(--ink);}
-.chip-btn.on{background:#fff;color:var(--nv);box-shadow:0 1px 3px rgba(16,24,40,.12);font-weight:700;}
 .sel select{height:34px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 28px 0 11px;font-family:inherit;font-size:12px;
             font-weight:600;color:#3C4655;cursor:pointer;outline:none;appearance:none;
             background-image:linear-gradient(45deg,transparent 50%,#8E98A6 50%),linear-gradient(135deg,#8E98A6 50%,transparent 50%);

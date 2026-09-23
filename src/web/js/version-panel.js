@@ -122,7 +122,7 @@ export function openVersionPanel({ versions, projectId, onSaveNamed, onRestore, 
       img.alt = '';
       img.src = svgDataUrl(pageThumbSvg(p, () => { if (selected === m.id) renderPreview(); }));
       const cap = document.createElement('figcaption');
-      cap.textContent = `${pages.length > 1 ? `${i + 1}. ` : ''}${p.screenName || '제목 없음'}${p.mode === 'edit' ? ' · 변경' : ''}`;
+      cap.textContent = `${pages.length > 1 ? `${i + 1}. ` : ''}${p.screenName || '제목 없음'}`;
       fig.append(img, cap);
       grid.append(fig);
     });

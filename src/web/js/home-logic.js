@@ -46,13 +46,12 @@ export function matchesQuery(meta, q) {
 
 /**
  * @param {object[]} all 휴지통 포함 전체 메타
- * @param {{ view?: 'all'|'fav'|'trash', q?: string, mode?: 'all'|'new'|'edit', systemId?: string|null }} f
+ * @param {{ view?: 'all'|'fav'|'trash', q?: string, systemId?: string|null }} f
  */
-export function filterProjects(all, { view = 'all', q = '', mode = 'all', systemId = null } = {}) {
+export function filterProjects(all, { view = 'all', q = '', systemId = null } = {}) {
   return all.filter((m) => {
     if (view === 'trash') { if (!m.trashedAt) return false; } else if (m.trashedAt) return false;
     if (view === 'fav' && !m.favorite) return false;
-    if (mode !== 'all' && (m.mode === 'edit' ? 'edit' : 'new') !== mode) return false;
     if (systemId && m.systemId !== systemId) return false;
     return matchesQuery(m, q);
   });
@@ -92,9 +91,9 @@ export function countSystems(all, nameOf = () => null) {
   return [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ko'));
 }
 
-/** 카드 아래 한 줄 설명: "신규 · 영업포탈 · 요소 12개" */
+/** 카드 아래 한 줄 설명: "영업포탈 · 요소 12개" */
 export function metaLine(m, systemName) {
-  const parts = [m.mode === 'edit' ? '변경' : '신규'];
+  const parts = [];
   const sys = systemName || m.systemName;
   if (sys) parts.push(sys);
   if (m.pages > 1) parts.push(`화면 ${m.pages}개`);

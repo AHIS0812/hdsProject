@@ -46,13 +46,12 @@ const PREF_KEY = 'hds:home';
 const LAST_SYS_KEY = 'hds:lastSystem';
 const readPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}') || {}; } catch { return {}; } };
 const savePrefs = () => {
-  try { localStorage.setItem(PREF_KEY, JSON.stringify({ sort: state.sort, layout: state.layout, mode: state.mode })); } catch { /* 무시 */ }
+  try { localStorage.setItem(PREF_KEY, JSON.stringify({ sort: state.sort, layout: state.layout })); } catch { /* 무시 */ }
 };
 const p0 = readPrefs();
 const state = {
   view: 'all',                 // all | fav | trash
   q: '',
-  mode: ['new', 'edit'].includes(p0.mode) ? p0.mode : 'all',
   systemId: null,
   sort: SORTS.some((s) => s.key === p0.sort) ? p0.sort : 'updated',
   layout: p0.layout === 'list' ? 'list' : 'grid',
@@ -74,6 +73,9 @@ const TPL_INFO = [
 const tplThumb = (key) => svgDataUrl(thumbnailSvg(templateShapes(key), boardSizeFor(key)));
 const editorUrl = (id) => `editor.html?p=${encodeURIComponent(id)}`;
 const goEditor = (id) => { store.touchOpened(id); location.href = editorUrl(id); };
+// 방금 만든 프로젝트를 처음 여는 경우에만 — 에디터가 "어떤 화면인가요?"(화면 유형)를 보여줄지
+// 판단하는 신호. 기존 프로젝트를 다시 열 때는 이미 화면이 있으니 유형 선택이 필요 없다.
+const goEditorFresh = (id) => { store.touchOpened(id); location.href = `${editorUrl(id)}&fresh=1`; };
 
 // ── 렌더링 ───────────────────────────────────────────────
 const grid = $('grid');
@@ -81,7 +83,7 @@ let renderTimer = null;
 const scheduleRender = () => { clearTimeout(renderTimer); renderTimer = setTimeout(render, 60); };
 
 function currentList() {
-  const list = filterProjects(store.all(), { view: state.view, q: state.q, mode: state.view === 'trash' ? 'all' : state.mode, systemId: state.systemId });
+  const list = filterProjects(store.all(), { view: state.view, q: state.q, systemId: state.systemId });
   return state.view === 'trash' ? list.sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0)) : sortProjects(list, state.sort);
 }
 
@@ -137,12 +139,6 @@ function render() {
   $('listCount').textContent = `${list.length}개`;
   $('trashNote').hidden = state.view !== 'trash';
   $('btnEmptyTrash').hidden = !(state.view === 'trash' && counts.trash > 0);
-  $('modeChips').hidden = state.view === 'trash';
-  document.querySelectorAll('#modeChips .chip-btn').forEach((b) => {
-    const on = b.dataset.mode === state.mode;
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', String(on));
-  });
   document.querySelectorAll('#layoutSeg button').forEach((b) => {
     const on = b.dataset.layout === state.layout;
     b.classList.toggle('on', on);
@@ -174,10 +170,8 @@ function buildCard(m, missing) {
   el.setAttribute('aria-label', `${m.name}${trashed ? ' (휴지통)' : ''}`);
   const svg = store.thumb(m.id);
   // 썸네일이 없거나, 캡처 배경이 있는 프로젝트인데 썸네일에 배경이 빠져 있으면(예전 저장분) 다시 만든다.
-  // hasBg 를 아직 모르는 변경 화면 프로젝트는 한 번 열어 보고 채운다.
-  if (!svg || (m.hasBg && !svg.includes('<image')) || (m.hasBg === undefined && m.mode === 'edit')) missing.push(m.id);
+  if (!svg || (m.hasBg && !svg.includes('<image'))) missing.push(m.id);
   const sysNm = sysName(m.systemId) || m.systemName || '';
-  const kind = m.mode === 'edit' ? '변경' : '신규';
   const when = trashed ? `${daysLeft(m.trashedAt)}일 후 영구 삭제` : `${relTime(m.updatedAt)} 수정`;
   el.innerHTML =
     `<button type="button" class="chk${picked ? ' on' : ''}" role="checkbox" aria-checked="${picked}" aria-label="${esc(m.name)} 선택"><span class="ico">${icon('check')}</span></button>`
@@ -186,9 +180,9 @@ function buildCard(m, missing) {
     + '<div class="info">'
     + `<div class="ttl"><b class="name" title="${esc(m.name)}">${esc(m.name)}</b></div>`
     + `<button type="button" class="more" aria-haspopup="menu" aria-label="${esc(m.name)} 메뉴" title="더보기"><span class="ico">${icon('more')}</span></button>`
-    + `<div class="sub"><span class="tag${m.mode === 'edit' ? ' edit' : ''}">${kind}</span><span class="txt">${esc(sysNm ? `${sysNm} · ` : '')}${m.pages > 1 ? `화면 ${m.pages}개 · ` : ''}요소 ${m.shapes ?? 0}개</span></div>`
+    + `<div class="sub"><span class="txt">${esc(sysNm ? `${sysNm} · ` : '')}${m.pages > 1 ? `화면 ${m.pages}개 · ` : ''}요소 ${m.shapes ?? 0}개</span></div>`
     + `<div class="when">${esc(when)}</div>`
-    + `<span class="tag lst-tag${m.mode === 'edit' ? ' edit' : ''}">${kind}</span><span class="lst-sys">${esc(sysNm)}</span><span class="lst-when">${esc(trashed ? when : relTime(m.updatedAt))}</span>`
+    + `<span class="lst-sys">${esc(sysNm)}</span><span class="lst-when">${esc(trashed ? when : relTime(m.updatedAt))}</span>`
     + '</div>';
   return el;
 }
@@ -545,7 +539,7 @@ function newDoc({ name, template, size, systemId }) {
     app: 'hds', version: 1, savedAt: new Date().toISOString(),
     projectName: name, screenName: '새 화면',
     systemId: systemId || null, systemName: sysName(systemId),
-    mode: 'new', template, baseScreenId: null,
+    template,
     canvas: size || boardSizeFor(template),
     shapes: templateShapes(template),
   };
@@ -557,7 +551,7 @@ function quickCreate(template) {
   const doc = newDoc({ name: UNTITLED, template, systemId });
   try {
     const meta = store.create({ name: UNTITLED, doc, thumb: thumbnailSvg(doc.shapes, doc.canvas) });
-    goEditor(meta.id);
+    goEditorFresh(meta.id);
   } catch (e) {
     console.error(e);
     toast('브라우저 저장 공간이 부족해요 · 안 쓰는 프로젝트를 정리해 주세요');
@@ -571,13 +565,13 @@ const SIZE_OPTS = [
   { key: 'custom', label: '직접 입력', sub: '가로 × 세로' },
 ];
 
-function openWizard({ template = 'blank', mode = 'new' } = {}) {
+function openWizard({ template = 'blank' } = {}) {
   closeMenu();
   if (document.querySelector('.wiz')) return;
   const prevFocus = document.activeElement;
   const st = {
-    mode, template, sizeKey: 'default', cw: 960, ch: 600,
-    systemId: lastSystem(), screens: [], screenId: '', screenDef: null, screensErr: '', busy: false,
+    template, sizeKey: 'default', cw: 960, ch: 600,
+    systemId: lastSystem(),
   };
 
   const mask = document.createElement('div');
@@ -587,14 +581,10 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     + '<div class="wiz-hd"><b id="wizTitle">새 프로젝트 만들기</b><button type="button" class="x" aria-label="닫기"><span class="ico" data-i="x"></span></button></div>'
     + '<div class="wiz-bd"><div class="wiz-form">'
     + '<div class="fld"><label for="wName">프로젝트 이름</label><input id="wName" type="text" maxlength="' + NAME_MAX + '" placeholder="' + esc(UNTITLED) + '" autocomplete="off"></div>'
-    + '<div class="fld"><span class="lbl" id="wModeLbl">작업 구분</span><div class="seg3" id="wMode" role="radiogroup" aria-labelledby="wModeLbl">'
-    + '<button type="button" role="radio" data-m="new">신규 화면</button><button type="button" role="radio" data-m="edit">변경 화면</button></div>'
-    + '<p class="hint" id="wModeHint"></p></div>'
     + '<div class="fld"><label for="wSys">시스템</label><select id="wSys"></select></div>'
-    + '<div id="wNew"><div class="fld"><span class="lbl">화면 유형</span><div class="tpl-grid" id="wTpls"></div></div>'
+    + '<div class="fld"><span class="lbl">화면 유형</span><div class="tpl-grid" id="wTpls"></div></div>'
     + '<div class="fld" style="margin-top:16px"><span class="lbl">화면 크기</span><div class="size-row" id="wSizes"></div>'
-    + '<div class="size-custom" id="wCustom" hidden><input id="wCw" type="number" min="320" max="3000" aria-label="가로"><span>×</span><input id="wCh" type="number" min="240" max="4000" aria-label="세로"><span class="hint">px (가로 320~3000 · 세로 240~4000)</span></div></div></div>'
-    + '<div id="wEdit" hidden><div class="fld"><label for="wScr">변경할 화면</label><select id="wScr"></select><p class="hint" id="wScrHint"></p></div></div>'
+    + '<div class="size-custom" id="wCustom" hidden><input id="wCw" type="number" min="320" max="3000" aria-label="가로"><span>×</span><input id="wCh" type="number" min="240" max="4000" aria-label="세로"><span class="hint">px (가로 320~3000 · 세로 240~4000)</span></div></div>'
     + '</div><div class="wiz-pv"><div class="pvbox" id="wPv"></div><div class="cap" id="wCap"></div></div></div>'
     + '<div class="wiz-ft"><button type="button" class="btn" id="wCancel">취소</button><button type="button" class="btn pri" id="wOk">만들기</button></div>'
     + '</div>';
@@ -631,36 +621,12 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
   function paintPreview() {
     const box = q('#wPv');
     const cap = q('#wCap');
-    if (st.mode === 'new') {
-      const sz = curSize();
-      box.innerHTML = `<img alt="선택한 화면 유형 미리보기" src="${tplThumb2(st.template, sz)}">`;
-      const nm = TPL_INFO.find((t) => t.key === st.template)?.name || '';
-      cap.innerHTML = `${esc(nm)}<small>${sz.w} × ${sz.h}</small>`;
-    } else if (st.screenDef) {
-      const d = st.screenDef;
-      box.innerHTML = `<img alt="선택한 화면 미리보기" src="${svgDataUrl(thumbnailSvg(d.shapes, d.canvas))}">`;
-      cap.innerHTML = `${esc(d.name || '')}<small>${d.canvas?.w || 960} × ${d.canvas?.h || 600} · 요소 ${(d.shapes || []).length}개</small>`;
-    } else {
-      box.innerHTML = '<div class="hint" style="text-align:center">변경할 화면을 고르면<br>여기에 미리 보여줘요</div>';
-      cap.textContent = '';
-    }
+    const sz = curSize();
+    box.innerHTML = `<img alt="선택한 화면 유형 미리보기" src="${tplThumb2(st.template, sz)}">`;
+    const nm = TPL_INFO.find((t) => t.key === st.template)?.name || '';
+    cap.innerHTML = `${esc(nm)}<small>${sz.w} × ${sz.h}</small>`;
   }
   const tplThumb2 = (key, sz) => svgDataUrl(thumbnailSvg(templateShapes(key), sz));
-
-  function paintMode() {
-    mask.querySelectorAll('#wMode button').forEach((b) => {
-      const on = b.dataset.m === st.mode;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-checked', String(on));
-    });
-    q('#wNew').hidden = st.mode !== 'new';
-    q('#wEdit').hidden = st.mode !== 'edit';
-    q('#wModeHint').textContent = st.mode === 'new'
-      ? '새로 그리는 화면이에요. 유형을 고르면 기본 배치가 깔려요.'
-      : '이미 있는 화면을 불러와 고치는 작업이에요. 원본은 바뀌지 않아요.';
-    q('#wOk').disabled = false;
-    paintPreview();
-  }
 
   function paintTpls() {
     q('#wTpls').replaceChildren(...TPL_INFO.map((t) => {
@@ -695,90 +661,20 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
     selSys.value = st.systemId || '';
   }
 
-  async function loadScreens() {
-    const scr = q('#wScr');
-    const hint = q('#wScrHint');
-    st.screens = []; st.screenId = ''; st.screenDef = null; st.screensErr = '';
-    if (!st.systemId) { scr.innerHTML = '<option value="">시스템을 먼저 골라 주세요</option>'; hint.textContent = ''; paintPreview(); return; }
-    scr.innerHTML = '<option value="">불러오는 중…</option>';
-    try {
-      const list = await api.getScreens(st.systemId);
-      if (!document.body.contains(mask) || st.systemId !== selSys.value) return;
-      st.screens = list;
-      scr.innerHTML = list.length
-        ? '<option value="">화면을 선택하세요</option>' + list.map((s) => `<option value="${esc(s.id)}">${esc(s.name)}${s.template ? ` (${esc(s.template)})` : ''}</option>`).join('')
-        : '<option value="">등록된 화면이 없어요</option>';
-      hint.textContent = list.length ? `${list.length}개의 화면이 있어요.` : '이 시스템에는 변경할 수 있는 화면이 아직 없어요.';
-      hint.className = 'hint';
-    } catch (e) {
-      console.error(e);
-      st.screensErr = '화면 목록을 불러오지 못했어요';
-      scr.innerHTML = '<option value="">불러오지 못했어요</option>';
-      hint.textContent = '서버가 켜져 있는지 확인해 주세요(npm run dev).';
-      hint.className = 'hint err';
-    }
-    paintPreview();
-  }
-
-  selSys.addEventListener('change', () => {
-    st.systemId = selSys.value || null;
-    // 신규 모드에서 시스템을 바꾼 뒤 변경 모드로 넘어가면 이전 시스템의 화면 목록이 그대로 남아 있었다 — 항상 비운다
-    st.screens = []; st.screenId = ''; st.screenDef = null; st.screensErr = '';
-    if (st.mode === 'edit') loadScreens();
-  });
-  q('#wScr').addEventListener('change', async (e) => {
-    st.screenId = e.target.value;
-    st.screenDef = null;
-    paintPreview();
-    if (!st.screenId) return;
-    try {
-      const def = await api.getScreen(st.screenId);
-      if (st.screenId === e.target.value) { st.screenDef = def; paintPreview(); }
-    } catch (err) { console.error(err); q('#wScrHint').textContent = '화면 내용을 불러오지 못했어요'; q('#wScrHint').className = 'hint err'; }
-  });
-  mask.querySelectorAll('#wMode button').forEach((b) => b.addEventListener('click', () => {
-    st.mode = b.dataset.m;
-    paintMode();
-    if (st.mode === 'edit' && !st.screens.length && !st.screensErr) loadScreens();
-  }));
+  selSys.addEventListener('change', () => { st.systemId = selSys.value || null; });
   q('#wCw').value = st.cw;
   q('#wCh').value = st.ch;
   q('#wCw').addEventListener('input', (e) => { st.cw = parseInt(e.target.value, 10) || 0; paintPreview(); });
   q('#wCh').addEventListener('input', (e) => { st.ch = parseInt(e.target.value, 10) || 0; paintPreview(); });
 
-  async function create() {
-    if (st.busy) return;
+  function create() {
     const name = cleanName(q('#wName').value) || UNTITLED;
-    let doc;
-    if (st.mode === 'new') {
-      doc = newDoc({ name, template: st.template, size: curSize(), systemId: st.systemId });
-    } else {
-      if (!st.screenId) { q('#wScrHint').textContent = '변경할 화면을 먼저 골라 주세요'; q('#wScrHint').className = 'hint err'; q('#wScr').focus(); return; }
-      st.busy = true;
-      q('#wOk').disabled = true;
-      try {
-        const def = st.screenDef || await api.getScreen(st.screenId);
-        doc = {
-          app: 'hds', version: 1, savedAt: new Date().toISOString(),
-          projectName: name, screenName: def.name || '변경 화면',
-          systemId: st.systemId, systemName: sysName(st.systemId),
-          mode: 'edit', template: def.template || 'blank', baseScreenId: st.screenId,
-          canvas: def.canvas || boardSizeFor('blank'), shapes: def.shapes || [],
-        };
-      } catch (e) {
-        console.error(e);
-        toast('화면 내용을 불러오지 못했어요');
-        st.busy = false;
-        q('#wOk').disabled = false;
-        return;
-      }
-      st.busy = false;
-    }
+    const doc = newDoc({ name, template: st.template, size: curSize(), systemId: st.systemId });
     try {
       const meta = store.create({ name, doc, thumb: thumbnailSvg(doc.shapes, doc.canvas) });
       rememberSystem(st.systemId);
       close();
-      goEditor(meta.id);
+      goEditorFresh(meta.id);
     } catch (e) {
       console.error(e);
       q('#wOk').disabled = false;
@@ -790,8 +686,7 @@ function openWizard({ template = 'blank', mode = 'new' } = {}) {
 
   paintTpls();
   paintSizes();
-  paintMode();
-  if (st.mode === 'edit') loadScreens();
+  paintPreview();
   q('#wName').focus();
 }
 
@@ -808,8 +703,7 @@ function migrateLegacyDraft() {
   const doc = {
     app: 'hds', version: 1, savedAt: new Date().toISOString(),
     screenName: snap.scrName || '새 화면', systemId: snap.systemId || null,
-    mode: snap.workMode === 'edit' ? 'edit' : 'new', template: snap.currentTpl || 'blank',
-    baseScreenId: snap.workMode === 'edit' ? (snap.loadedScreenId || null) : null,
+    template: snap.currentTpl || 'blank',
     canvas: snap.canvas || { w: 960, h: 600 }, shapes: snap.shapes,
     ...(snap.background ? { background: snap.background } : {}),
   };
@@ -845,16 +739,6 @@ function initEvents() {
       b.addEventListener('click', () => quickCreate(t.key));
       return b;
     }),
-    (() => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'tile';
-      b.setAttribute('role', 'listitem');
-      b.setAttribute('aria-label', '변경 화면 — 기존 화면을 불러와 수정');
-      b.innerHTML = `<div class="pv change"><span class="ico">${icon('edit')}</span></div><b>변경 화면</b><small>기존 화면 불러와 수정</small>`;
-      b.addEventListener('click', () => openWizard({ mode: 'edit' }));
-      return b;
-    })(),
   );
 
   // 보기 전환
@@ -883,13 +767,6 @@ function initEvents() {
   $('q').addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { if ($('q').value) { $('q').value = ''; state.q = ''; render(); } else $('q').blur(); }
   });
-  $('modeChips').addEventListener('click', (e) => {
-    const b = e.target.closest('.chip-btn');
-    if (!b) return;
-    state.mode = b.dataset.mode;
-    savePrefs();
-    render();
-  });
   $('sort').innerHTML = SORTS.map((s) => `<option value="${s.key}">${s.label}</option>`).join('');
   $('sort').addEventListener('change', (e) => { state.sort = e.target.value; savePrefs(); render(); });
   $('layoutSeg').addEventListener('click', (e) => {
@@ -907,7 +784,7 @@ function initEvents() {
     if (a === 'new') openWizard();
     else if (a === 'import') fileInput.click();
     else if (a === 'clear-q') { $('q').value = ''; state.q = ''; render(); }
-    else if (a === 'reset-filter') { state.mode = 'all'; state.systemId = null; savePrefs(); render(); }
+    else if (a === 'reset-filter') { state.systemId = null; render(); }
   });
 
   // 카드: 열기 / 선택 / 즐겨찾기 / 메뉴
