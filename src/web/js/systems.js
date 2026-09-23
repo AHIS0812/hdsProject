@@ -33,10 +33,19 @@ export function createSystemStore(storage) {
   const write = (list) => storage.setItem(KEY, JSON.stringify(list));
 
   const store = {
-    /** 저장된 적이 없으면(최초 실행) 고정 시스템으로 한 번 채워 넣는다 — list()/앱 시작 시 호출 */
+    /**
+     * 저장된 적이 없으면(최초 실행) 고정 시스템으로 한 번 채워 넣는다.
+     * 이미 저장된 목록이 있어도, 나중에 새로 추가된 고정 시스템(예: 대표홈페이지)이 빠져 있으면
+     * 사용자가 추가·정리해 둔 목록은 그대로 두고 그 항목만 뒤에 보충한다 — list()/앱 시작 시 호출
+     */
     seedIfEmpty() {
-      if (read() != null) return;
-      write(LOCKED_SYSTEMS.map((s) => ({ ...s, createdAt: Date.now() })));
+      const cur = read();
+      if (cur == null) {
+        write(LOCKED_SYSTEMS.map((s) => ({ ...s, createdAt: Date.now() })));
+        return;
+      }
+      const missing = LOCKED_SYSTEMS.filter((s) => !cur.some((x) => x.id === s.id));
+      if (missing.length) write([...cur, ...missing.map((s) => ({ ...s, createdAt: Date.now() }))]);
     },
     /** 저장 순서(= 사용자가 정한 노출 순서) */
     list() {

@@ -19,6 +19,20 @@ test('list — 최초 실행 시 고정 시스템(영업포탈·하이포탈·�
   assert.deepEqual(list.map((x) => x.name), LOCKED_SYSTEMS.map((x) => x.name));
 });
 
+test('list — 예전에 저장된 목록(대표홈페이지 도입 전)에는 그 항목만 보충된다', () => {
+  const st = memStorage();
+  // 대표홈페이지가 고정 시스템으로 추가되기 전, 사용자가 이미 시스템을 만들어 둔 상태를 흉내낸다
+  st.setItem('hds:systems', JSON.stringify([
+    { id: 'salesportal', name: '영업포탈', createdAt: 1 },
+    { id: 'portal', name: '하이포탈', createdAt: 1 },
+    { id: 'my-sys', name: '내가 만든 시스템', createdAt: 2 },
+  ]));
+  const s = createSystemStore(st);
+  const list = s.list();
+  assert.deepEqual(list.map((x) => x.id), ['salesportal', 'portal', 'my-sys', 'homepage']);
+  assert.ok(isLocked('homepage'));
+});
+
 test('isLocked — 고정 시스템 3개만 true', () => {
   assert.equal(isLocked('salesportal'), true);
   assert.equal(isLocked('portal'), true);
