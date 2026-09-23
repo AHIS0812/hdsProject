@@ -116,6 +116,7 @@ export function createPageBar(root, cb) {
   toggle.type = 'button';
   toggle.className = 'pg-toggle';
   toggle.setAttribute('aria-controls', root.id || 'pageBar');
+  // 엿보기로 펼쳐져 있는 동안 눌러도 "펼친 상태로 고정"이 되도록, 지금 접혀 있으면 항상 펼친다
   toggle.addEventListener('click', () => setCollapsed(!collapsed));
 
   root.replaceChildren(toggle, mini, list, add, count);
@@ -130,12 +131,18 @@ export function createPageBar(root, cb) {
     document.body.classList.toggle('pgbar-peek', on);
     if (on) paintList(); // 접혀 있는 동안 밀린 썸네일 갱신
   };
-  root.addEventListener('mouseenter', () => {
+  // 손잡이 위에서는 엿보기를 켜지 않는다 — 손잡이를 누르려고 커서를 가져가는 순간 띠가 펼쳐지면
+  // 손잡이가 위로 올라가 버려서(움직이는 표적) 누르기 어려웠다.
+  const overHandle = (el) => !!(el && el.closest && el.closest('.pg-toggle'));
+  root.addEventListener('mouseover', (e) => {
     if (!collapsed) return;
     clearTimeout(peekTimer);
-    peekTimer = setTimeout(() => setPeek(true), 180); // 지나가다 살짝 스친 것으로는 안 열리게
+    if (overHandle(e.target)) return; // 손잡이에 올린 것 — 지금 상태 그대로 둔다
+    peekTimer = setTimeout(() => setPeek(true), 220); // 지나가다 살짝 스친 것으로는 안 열리게
   });
-  root.addEventListener('mouseleave', () => {
+  root.addEventListener('mouseout', (e) => {
+    // 띠 안(손잡이 포함)에서 자식끼리 옮겨 다니는 건 나가는 게 아니다
+    if (e.relatedTarget && root.contains(e.relatedTarget)) return;
     clearTimeout(peekTimer);
     peekTimer = setTimeout(() => setPeek(false), 260);
   });
