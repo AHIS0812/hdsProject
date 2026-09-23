@@ -166,6 +166,7 @@ clist.replaceChildren(
 
 // ── 하단 툴바 (되돌리기 / 줌) ─────────────────────────────
 const TOOL = {
+  hand: () => editor.setHandTool(!editor.isHandTool()),
   undo: editor.undo, redo: editor.redo,
   zoomIn: () => editor.zoomBy(10), zoomOut: () => editor.zoomBy(-10), zoomReset: editor.zoomReset,
 };
@@ -315,7 +316,7 @@ async function addImages(list) {
   }
 }
 
-// ── 배경 이미지 추가: 소스 연동이 안 되는 화면은 캡처 이미지를 캔버스 배경으로 ──
+// ── 배경 이미지 추가: 기존 화면을 일부만 고칠 때, 그 화면 캡처를 캔버스 배경으로 깔고 위에 그린다 ──
 // shapes 와 무관한 순수 트레이싱 참고용(화면 전환 시 loadCanvas 가 자동으로 지운다).
 function syncBgButtons() {
   const has = editor.hasBoardBackground();
@@ -1000,6 +1001,11 @@ async function boot() {
   editor.initEditor({
     onChange: () => { if (!canvasDirty && shapesSig() !== canvasBaseline) canvasDirty = true; scheduleAutosave(); },
     isBlocked: isModalOpen,
+    onHandTool: (on) => {
+      const b = $('btnHand');
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    },
   });
   initResultModal();
   initHelp();

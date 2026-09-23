@@ -1280,6 +1280,7 @@ export function initEditor(opts = {}) {
   bGroup = document.getElementById('bGroup');
   bUngroup = document.getElementById('bUngroup');
   notify = opts.onChange || (() => {});
+  onHandToolChange = opts.onHandTool || (() => {});
   if (opts.isBlocked) isBlocked = opts.isBlocked;
 
   marqEl = document.createElement('div');
@@ -1436,7 +1437,8 @@ export function initEditor(opts = {}) {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable) return;
     const c = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
-    if (c && (k === '0' || k === '1')) { e.preventDefault(); if (k === '0') zoomReset(); else zoomTo(100); }
+    if (!c && k === 'h') { e.preventDefault(); setHandTool(!handTool); }
+    else if (c && (k === '0' || k === '1')) { e.preventDefault(); if (k === '0') zoomReset(); else zoomTo(100); }
     else if (c && (k === '=' || k === '+' || k === '-' || k === '_')) {
       e.preventDefault();
       zoomBy(k === '-' || k === '_' ? -10 : 10);
@@ -1452,7 +1454,7 @@ export function initEditor(opts = {}) {
     // 이미지 요소로, 아니면 pasteShapes() 로 복사해 둔 요소를 붙여넣는다.
     else if (c && k === 'd') { e.preventDefault(); dup(); }
     else if (e.key === 'Delete' || e.key === 'Backspace') { if (selIds.length) { e.preventDefault(); delSel(); } }
-    else if (e.key === 'Escape') setSel([]);
+    else if (e.key === 'Escape') { if (handTool) setHandTool(false); else setSel([]); }
     else if (e.key.indexOf('Arrow') === 0 && selIds.length) {
       e.preventDefault();
       const ss = selShapes();
@@ -1552,11 +1554,23 @@ export function initEditor(opts = {}) {
 // 스페이스를 누른 채 드래그하거나 가운데 버튼으로 드래그 = 캔버스 끌어서 이동(손바닥 도구).
 let panning = null;
 let spaceHeld = false;
+let handTool = false; // 손 도구(하단 ✋ 버튼·H 키) — 켜 두면 스페이스 없이 드래그만으로 캔버스를 옮긴다
+let onHandToolChange = () => {};
+
+const panMode = () => handTool || spaceHeld;
 
 function setPanCursor() {
   cv.classList.toggle('panning', !!panning);
-  cv.classList.toggle('pan-ready', spaceHeld && !panning);
+  cv.classList.toggle('pan-ready', panMode() && !panning);
 }
+
+/** 손 도구 켜기/끄기 — main.js 가 버튼 상태를 맞출 수 있게 콜백으로 알려 준다 */
+export function setHandTool(on) {
+  handTool = !!on;
+  setPanCursor();
+  onHandToolChange(handTool);
+}
+export const isHandTool = () => handTool;
 
 function initCanvasNavigation() {
   cv.addEventListener('wheel', (e) => {
@@ -1566,14 +1580,17 @@ function initCanvasNavigation() {
     zoomAtPoint(zm * Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
   }, { passive: false });
 
-  // 스페이스: 누르고 있는 동안만 손바닥 도구 (입력칸에 타이핑 중이거나 모달이 떠 있으면 제외)
+  // 스페이스: 누르고 있는 동안만 손바닥 도구 (입력칸에 타이핑 중이거나 모달이 떠 있으면 제외).
+  // 누르고 있으면 키 반복(repeat)이 계속 들어오는데, 그때도 기본 동작을 막아야 캔버스가 스페이스로
+  // 스크롤되지 않는다 — 예전엔 첫 입력만 막아서 끌고 있는 동안 화면이 같이 내려갔다.
   document.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space' || e.repeat || spaceHeld) return;
+    if (e.code !== 'Space') return;
     if (isBlocked() || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')
       || document.activeElement?.isContentEditable) return;
+    e.preventDefault(); // 스페이스로 스크롤되거나 포커스된 버튼이 눌리지 않게(반복 입력 포함)
+    if (e.repeat || spaceHeld) return;
     spaceHeld = true;
     setPanCursor();
-    e.preventDefault(); // 스페이스로 페이지가 스크롤되거나 포커스된 버튼이 눌리지 않게
   });
   document.addEventListener('keyup', (e) => {
     if (e.code !== 'Space') return;
@@ -1583,8 +1600,8 @@ function initCanvasNavigation() {
   window.addEventListener('blur', () => { spaceHeld = false; panning = null; setPanCursor(); });
 
   cv.addEventListener('mousedown', (e) => {
-    // 가운데 버튼은 언제나, 왼쪽 버튼은 스페이스를 누르고 있을 때만 이동으로 쓴다
-    if (!(e.button === 1 || (e.button === 0 && spaceHeld))) return;
+    // 가운데 버튼은 언제나, 왼쪽 버튼은 손 도구가 켜져 있거나 스페이스를 누르고 있을 때만 이동으로 쓴다
+    if (!(e.button === 1 || (e.button === 0 && panMode()))) return;
     e.preventDefault();
     e.stopPropagation(); // 요소 선택·드래그 선택으로 새지 않게
     panning = { x: e.clientX, y: e.clientY, left: cv.scrollLeft, top: cv.scrollTop };

@@ -636,3 +636,6 @@ body.pgbar-mini{--pagebar-h:38px;}
   border-radius:7px;color:var(--mut);font-size:10px;line-height:1;cursor:pointer;font-family:inherit;display:grid;place-items:center;}
 .pagebar.mini .pg-toggle{top:6px;}
 .pg-toggle:hover{border-color:#C2C9D4;color:var(--ink);background:#F7F8FA;}
+
+.tools button.on{background:var(--or);color:#fff;}
+.tools button.on:hover{background:var(--or-d);color:#fff;}

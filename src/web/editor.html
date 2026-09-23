@@ -81,7 +81,7 @@
         <button type="button" class="btn sm" id="btnBgUp">배경 이미지 추가</button>
         <input type="file" id="bgFile" accept="image/*" hidden>
         <button type="button" class="btn sm" id="btnBgClear" hidden>배경 이미지 제거</button>
-        <p class="bgUp-hint">소스가 연동 안 되는 화면은, 캡처본을 캔버스 배경에 깔고 그 위에 요소를 그려서 만드세요.</p>
+        <p class="bgUp-hint">기존 화면을 일부만 바꾸는 작업이라면, 그 화면을 캡처해 캔버스 배경으로 깔고 위에 바뀌는 부분만 그리세요.</p>
       </div>
 
       <h4>요소 추가 <span style="font-weight:400;color:var(--mut);font-size:11px">클릭하면 놓입니다</span></h4>
@@ -124,6 +124,8 @@
   <div class="tools" role="toolbar" aria-label="캔버스 도구">
     <button id="bU" data-act="undo" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶</button>
     <button id="bR" data-act="redo" title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">↷</button>
+    <div class="dv" aria-hidden="true"></div>
+    <button id="btnHand" data-act="hand" title="손 도구 — 드래그로 캔버스 이동 (H · Space 를 눌러도 잠깐 켜짐)" aria-label="손 도구" aria-pressed="false">✋</button>
     <div class="dv" aria-hidden="true"></div>
     <button data-act="zoomOut" title="축소 (Ctrl+−, Ctrl+휠)" aria-label="축소">−</button>
     <button class="zz" id="zv" data-act="zoomReset" title="화면에 맞춤 (Ctrl+0)" aria-label="화면 전체가 보이는 배율로">100%</button>
@@ -175,7 +177,7 @@
         <dt>우클릭 메뉴</dt><dd>캔버스·요소에서 오른쪽 클릭</dd>
         <dt>확대 · 축소</dt><dd><kbd>Ctrl</kbd>+마우스휠(커서 기준) · <kbd>Ctrl</kbd>+<kbd>+</kbd>/<kbd>−</kbd> · 하단 <b>−</b>/<b>＋</b> 버튼 (10~400%)</dd>
         <dt>화면 맞춤 · 실제 크기</dt><dd><kbd>Ctrl</kbd>+<kbd>0</kbd> 화면에 맞춤 · <kbd>Ctrl</kbd>+<kbd>1</kbd> 100%</dd>
-        <dt>캔버스 이동</dt><dd><kbd>Space</kbd>를 누른 채 드래그 · 마우스 가운데 버튼 드래그 · 휠(세로) / <kbd>Shift</kbd>+휠(가로)</dd>
+        <dt>캔버스 이동</dt><dd>하단 <b>✋ 손 도구</b>(<kbd>H</kbd>, 끄기는 <kbd>H</kbd>·<kbd>Esc</kbd>) 켜고 드래그 · <kbd>Space</kbd>를 누른 채 드래그 · 마우스 가운데 버튼 드래그 · 휠(세로) / <kbd>Shift</kbd>+휠(가로)</dd>
       </dl>
     </div>
   </div>
