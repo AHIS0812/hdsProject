@@ -6,6 +6,7 @@ import { toast } from './toast.js';
 import { highlightXml } from './highlight.js';
 import { NAME } from './constants.js';
 import { readingOrder } from './reading-order.js';
+import { pageRows, COLUMNS } from './item-spec.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -592,7 +593,36 @@ async function buildDeliverablePptx() {
     x: 0.4, y: 7.18, w: 6, h: 0.25, fontSize: 8, color: '9AA3B0', fontFace: FONT,
   });
 
+  addItemSpecSlides(pptx, title, FONT);
   await pptx.writeFile({ fileName: deliverableFileName() });
+}
+
+/** 항목정의서 슬라이드 — 화면의 요소를 표로. 한 장에 다 안 들어가면 이어지는 장으로 나눈다. */
+const SPEC_COLS = COLUMNS.filter((c) => c !== '화면'); // 화면 이름은 제목에 있다
+const SPEC_WIDTHS = [0.5, 1.6, 2.1, 1.1, 0.7, 2.3, 2.5, 1.6]; // No·영역·항목명·유형·필수·선택 항목·설명·연결
+const ROWS_PER_SLIDE = 16;
+
+function addItemSpecSlides(pptx, title, FONT) {
+  const rows = pageRows({ shapes: last.payload?.shapes || [] }, { screenName: title });
+  if (!rows.length) return;
+  const head = SPEC_COLS.map((c) => ({ text: c, options: { bold: true, color: 'FFFFFF', fill: { color: '0F3B7C' } } }));
+  for (let i = 0; i < rows.length; i += ROWS_PER_SLIDE) {
+    const chunk = rows.slice(i, i + ROWS_PER_SLIDE);
+    const slide = pptx.addSlide();
+    const part = rows.length > ROWS_PER_SLIDE ? ` (${Math.floor(i / ROWS_PER_SLIDE) + 1}/${Math.ceil(rows.length / ROWS_PER_SLIDE)})` : '';
+    slide.addText(`${title} — 항목정의서${part}`, {
+      x: 0.4, y: 0.28, w: 12.5, h: 0.5, fontSize: 20, bold: true, color: '1A2942', fontFace: FONT,
+    });
+    slide.addTable([head, ...chunk.map((r) => SPEC_COLS.map((c) => String(r[c] ?? '')))], {
+      x: 0.4, y: 1.0, w: 12.53, colW: SPEC_WIDTHS,
+      fontSize: 10, fontFace: FONT, color: '333333', valign: 'middle',
+      border: { type: 'solid', color: 'D8DDE5', pt: 0.5 },
+      rowH: 0.32, autoPage: false,
+    });
+    slide.addText('하이스케치 — 규칙 기반 자동 생성', {
+      x: 0.4, y: 7.18, w: 6, h: 0.25, fontSize: 8, color: '9AA3B0', fontFace: FONT,
+    });
+  }
 }
 
 async function exportDeliverable() {

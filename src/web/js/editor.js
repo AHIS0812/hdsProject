@@ -1436,7 +1436,12 @@ export function initEditor(opts = {}) {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable) return;
     const c = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
-    if (c && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+    if (c && (k === '0' || k === '1')) { e.preventDefault(); if (k === '0') zoomReset(); else zoomTo(100); }
+    else if (c && (k === '=' || k === '+' || k === '-' || k === '_')) {
+      e.preventDefault();
+      zoomBy(k === '-' || k === '_' ? -10 : 10);
+    }
+    else if (c && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if (c && k === 'y') { e.preventDefault(); redo(); }
     else if (c && k === 'a') { e.preventDefault(); setSel(shapes.map((s) => s.id)); }
     else if (c && k === 'g') { e.preventDefault(); e.shiftKey ? ungroupSel() : groupSel(); }
@@ -1537,8 +1542,65 @@ export function initEditor(opts = {}) {
     else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
   });
 
+  initCanvasNavigation();
   applyBoardSize();
   render();
+}
+
+// ── 확대·이동(패닝) ─────────────────────────────────────────
+// Ctrl(⌘)+휠 = 커서 기준 확대·축소, 트랙패드 핀치도 같은 이벤트로 들어온다.
+// 스페이스를 누른 채 드래그하거나 가운데 버튼으로 드래그 = 캔버스 끌어서 이동(손바닥 도구).
+let panning = null;
+let spaceHeld = false;
+
+function setPanCursor() {
+  cv.classList.toggle('panning', !!panning);
+  cv.classList.toggle('pan-ready', spaceHeld && !panning);
+}
+
+function initCanvasNavigation() {
+  cv.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return; // 평소 휠은 그대로 스크롤
+    e.preventDefault();
+    // 휠 한 칸(deltaY ≈ ±100)에 약 1.1배 — 트랙패드의 잘게 쪼개진 값도 자연스럽게 누적된다
+    zoomAtPoint(zm * Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
+  }, { passive: false });
+
+  // 스페이스: 누르고 있는 동안만 손바닥 도구 (입력칸에 타이핑 중이거나 모달이 떠 있으면 제외)
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || e.repeat || spaceHeld) return;
+    if (isBlocked() || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')
+      || document.activeElement?.isContentEditable) return;
+    spaceHeld = true;
+    setPanCursor();
+    e.preventDefault(); // 스페이스로 페이지가 스크롤되거나 포커스된 버튼이 눌리지 않게
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.code !== 'Space') return;
+    spaceHeld = false;
+    setPanCursor();
+  });
+  window.addEventListener('blur', () => { spaceHeld = false; panning = null; setPanCursor(); });
+
+  cv.addEventListener('mousedown', (e) => {
+    // 가운데 버튼은 언제나, 왼쪽 버튼은 스페이스를 누르고 있을 때만 이동으로 쓴다
+    if (!(e.button === 1 || (e.button === 0 && spaceHeld))) return;
+    e.preventDefault();
+    e.stopPropagation(); // 요소 선택·드래그 선택으로 새지 않게
+    panning = { x: e.clientX, y: e.clientY, left: cv.scrollLeft, top: cv.scrollTop };
+    setPanCursor();
+  }, true);
+  document.addEventListener('mousemove', (e) => {
+    if (!panning) return;
+    cv.scrollLeft = panning.left - (e.clientX - panning.x);
+    cv.scrollTop = panning.top - (e.clientY - panning.y);
+  });
+  document.addEventListener('mouseup', () => {
+    if (!panning) return;
+    panning = null;
+    setPanCursor();
+  });
+  cv.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
 }
 
 // ── 우클릭 메뉴 구성 ──────────────────────────────────────
@@ -1723,10 +1785,33 @@ export function clearShapes() {
   setSel([]);
 }
 
+/** 되돌리기로 예전 상태를 불러오면 그 안의 id 가 지금 카운터보다 클 수 있다(다른 화면을 다녀오며
+ * 번호를 다시 매긴 경우 등) — 새로 만드는 요소가 기존 id 와 겹치지 않게 카운터를 끌어올린다. */
+function syncCounters() {
+  uid = Math.max(uid, ...shapes.map((s) => (Number(s.id) || 0) + 1));
+  gid = Math.max(gid, ...shapes.map((s) => (parseInt(String(s.g || '').replace(/D/g, ''), 10) || 0) + 1));
+}
+
+/** 화면(페이지)을 오갈 때 화면마다 편집 상태(요소·되돌리기 기록·id 카운터)를 그대로 보관한다(main.js).
+ * payload 로 내보냈다 다시 읽으면 id 가 새로 매겨져 되돌리기 기록과 어긋나므로, 내부 형식 그대로 둔다. */
+export function exportState() {
+  return { shapes: JSON.stringify(shapes), hist: hist.slice(), future: future.slice(), uid, gid };
+}
+export function importState(st) {
+  shapes = JSON.parse(st.shapes);
+  hist = st.hist.slice();
+  future = st.future.slice();
+  uid = st.uid;
+  gid = st.gid;
+  syncCounters();
+  setSel([]);
+}
+
 export function undo() {
   if (!hist.length) return;
   future.push(JSON.stringify(shapes));
   shapes = JSON.parse(hist.pop());
+  syncCounters();
   setSel(selIds); // 되돌린 뒤에도 남아 있는 요소는 선택을 유지한다(PPT·캔바 방식)
 }
 
@@ -1734,14 +1819,54 @@ export function redo() {
   if (!future.length) return;
   hist.push(JSON.stringify(shapes));
   shapes = JSON.parse(future.pop());
+  syncCounters();
   setSel(selIds);
 }
 
-export function zoomBy(d) {
-  zm = Math.min(200, Math.max(25, zm + d));
+/** 확대율 한계 — 세로로 긴 화면(960×1400)도 한눈에 보이도록 아래를, 작은 요소를 다듬을 수 있도록 위를 넓혔다 */
+export const ZOOM_MIN = 10;
+export const ZOOM_MAX = 400;
+const clampZoom = (v) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v));
+
+/** 지금 배율을 화면에 적용한다(확대는 좌상단 기준 — 커서 위치 유지 계산이 단순해진다) */
+function applyZoom() {
+  board.style.transformOrigin = '0 0';
   board.style.transform = 'scale(' + zm / 100 + ')';
-  zv.textContent = zm + '%';
+  zv.textContent = Math.round(zm) + '%';
   applyZoomSize();
+}
+
+export function zoomBy(d) {
+  setZoomAtCenter(clampZoom(zm + d));
+}
+
+/** 배율을 바꾸되 지금 보고 있는 화면 중앙이 그대로 가운데에 남도록 스크롤을 맞춘다 */
+function setZoomAtCenter(next) {
+  if (!cv) { zm = clampZoom(next); applyZoom(); return; }
+  const r = cv.getBoundingClientRect();
+  zoomAtPoint(next, r.left + cv.clientWidth / 2, r.top + cv.clientHeight / 2);
+}
+
+/**
+ * 배율을 바꾸면서, 화면 좌표 (clientX, clientY) 아래에 있던 캔버스 지점이 계속 그 자리에 있도록
+ * 스크롤을 보정한다 — Ctrl+휠 확대가 "커서 기준"으로 동작하게 하는 핵심.
+ */
+function zoomAtPoint(next, clientX, clientY) {
+  const v = clampZoom(next);
+  if (Math.abs(v - zm) < 0.01) return;
+  const before = board.getBoundingClientRect();
+  const bx = (clientX - before.left) / (zm / 100); // 캔버스(보드) 좌표
+  const by = (clientY - before.top) / (zm / 100);
+  zm = v;
+  applyZoom();
+  const after = board.getBoundingClientRect(); // 배율 적용 뒤 실제 위치를 다시 잰다
+  cv.scrollLeft += after.left + bx * (zm / 100) - clientX;
+  cv.scrollTop += after.top + by * (zm / 100) - clientY;
+}
+
+/** 화면 전체가 보이는 배율(zoomReset)과 100% 를 오가는 단축키용 */
+export function zoomTo(percent) {
+  setZoomAtCenter(percent);
 }
 
 /** 지금 보이는 캔버스 뷰포트에 맞춰 확대율을 계산한다(5% 단위, 25~200%) — "화면 필드가
@@ -1753,13 +1878,11 @@ export function zoomReset() {
     const availW = Math.max(160, cv.clientWidth - 60);
     const availH = Math.max(160, cv.clientHeight - 60);
     const scale = Math.min(availW / BOARD_W, availH / BOARD_H, 2);
-    zm = Math.max(25, Math.min(200, Math.round((scale * 100) / 5) * 5));
+    zm = clampZoom(Math.round((scale * 100) / 5) * 5);
   } else {
     zm = 100;
   }
-  board.style.transform = 'scale(' + zm / 100 + ')';
-  zv.textContent = zm + '%';
-  applyZoomSize();
+  applyZoom();
 }
 
 export const count = () => shapes.length;

@@ -32,6 +32,7 @@
           <button class="pop-cmd" id="pSave" type="button"><span>지금 저장</span><kbd>Ctrl+S</kbd></button>
           <button class="pop-cmd" id="pDup" type="button"><span>사본 만들기…</span><kbd>Ctrl+Shift+S</kbd></button>
           <button class="pop-cmd" id="pVersions" type="button"><span>버전 기록…</span></button>
+          <button class="pop-cmd" id="pItemSpec" type="button"><span>항목정의서 내보내기 (.csv)</span></button>
           <button class="pop-cmd" id="btnExport" type="button"><span>파일로 내보내기 (.hds.json)</span></button>
         </div>
         <div class="pop-title">최근 프로젝트</div>
@@ -124,9 +125,9 @@
     <button id="bU" data-act="undo" title="되돌리기 (Ctrl+Z)" aria-label="되돌리기">↶</button>
     <button id="bR" data-act="redo" title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">↷</button>
     <div class="dv" aria-hidden="true"></div>
-    <button data-act="zoomOut" title="축소" aria-label="축소">−</button>
-    <button class="zz" id="zv" data-act="zoomReset" aria-label="화면 전체가 보이는 배율로">100%</button>
-    <button data-act="zoomIn" title="확대" aria-label="확대">＋</button>
+    <button data-act="zoomOut" title="축소 (Ctrl+−, Ctrl+휠)" aria-label="축소">−</button>
+    <button class="zz" id="zv" data-act="zoomReset" title="화면에 맞춤 (Ctrl+0)" aria-label="화면 전체가 보이는 배율로">100%</button>
+    <button data-act="zoomIn" title="확대 (Ctrl++, Ctrl+휠)" aria-label="확대">＋</button>
     <div class="dv" aria-hidden="true"></div>
     <span class="pop-wrap">
       <button id="btnRatio" type="button" title="화면 비율" aria-haspopup="dialog" aria-expanded="false" aria-controls="ratioPop">PC ▾</button>
@@ -146,12 +147,16 @@
     <button id="btnHelp" data-act="help" title="단축키 도움말 (?)" aria-label="단축키 도움말" aria-haspopup="dialog" aria-expanded="false">?</button>
   </div>
 
+  <nav class="pagebar" id="pageBar" aria-label="화면 목록"></nav>
+
   <div class="help" id="helpPop" role="dialog" aria-label="단축키 · 사용법" hidden>
     <div class="help-hd"><b>단축키 · 사용법</b><button class="cb" id="helpClose" title="닫기" aria-label="도움말 닫기">✕</button></div>
     <div class="help-bd">
       <dl>
         <dt>프로젝트 저장</dt><dd><kbd>Ctrl</kbd>+<kbd>S</kbd> 지금 프로젝트에 덮어쓰기 · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> 다른 이름으로 저장 (상단 <b>프로젝트 ▾</b>에서 새 프로젝트·열기)</dd>
         <dt>버전 기록</dt><dd>상단 <b>프로젝트 ▾ → 버전 기록</b> — 10분마다 자동으로 남고, 이름 붙여 저장·미리보기·복원·새 프로젝트로 열기</dd>
+        <dt>화면 여러 개</dt><dd>하단 띠에서 <b>＋ 화면 추가</b> · 클릭해서 전환 · 끌어서 순서 바꾸기 · 우클릭/⋯ 메뉴로 복제·삭제 · <kbd>PgUp</kbd>/<kbd>PgDn</kbd> 이전·다음 화면 · 띠에서 <kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> 순서 이동</dd>
+        <dt>항목정의서</dt><dd>상단 <b>프로젝트 ▾ → 항목정의서 내보내기</b> — 모든 화면의 항목(영역·항목명·유형·필수·선택지·설명·연결)을 엑셀에서 열리는 표로</dd>
         <dt>요소 추가</dt><dd>왼쪽 팔레트에서 클릭</dd>
         <dt>선택</dt><dd>클릭 · <kbd>Shift</kbd>/<kbd>Ctrl</kbd>+클릭(여러 개) · 빈 곳 드래그(범위 안에 완전히 들어온 것만)</dd>
         <dt>전체 선택</dt><dd><kbd>Ctrl</kbd>+<kbd>A</kbd></dd>
@@ -168,7 +173,9 @@
         <dt>정렬 · 분배</dt><dd>2개 이상 선택 시 상단 툴바 (분배는 3개 이상)</dd>
         <dt>여러 개 한꺼번에 수정</dt><dd>2개 이상 선택 시 글자크기·필수 표시도 상단 툴바에서 같이 바뀜</dd>
         <dt>우클릭 메뉴</dt><dd>캔버스·요소에서 오른쪽 클릭</dd>
-        <dt>확대 · 축소</dt><dd>하단 <b>−</b> / <b>＋</b> 버튼</dd>
+        <dt>확대 · 축소</dt><dd><kbd>Ctrl</kbd>+마우스휠(커서 기준) · <kbd>Ctrl</kbd>+<kbd>+</kbd>/<kbd>−</kbd> · 하단 <b>−</b>/<b>＋</b> 버튼 (10~400%)</dd>
+        <dt>화면 맞춤 · 실제 크기</dt><dd><kbd>Ctrl</kbd>+<kbd>0</kbd> 화면에 맞춤 · <kbd>Ctrl</kbd>+<kbd>1</kbd> 100%</dd>
+        <dt>캔버스 이동</dt><dd><kbd>Space</kbd>를 누른 채 드래그 · 마우스 가운데 버튼 드래그 · 휠(세로) / <kbd>Shift</kbd>+휠(가로)</dd>
       </dl>
     </div>
   </div>
@@ -270,7 +277,7 @@
       <div class="r">
         <button class="btn sm" id="mCopy" title="현재 탭 내용을 클립보드로 복사">복사</button>
         <button class="btn sm" id="mSaveImg" title="현재 화면 이미지를 PNG 파일로 저장" hidden>이미지 저장</button>
-        <button class="btn sm" id="mExportDoc" title="화면 이미지 + 요소 설명을 PPT 산출물로 만들기" hidden>산출물 추출</button>
+        <button class="btn sm" id="mExportDoc" title="화면 이미지 + 요소 설명 + 항목정의서를 PPT 산출물로 만들기" hidden>산출물 추출</button>
         <button class="btn sm" id="mDownload">내려받기</button>
         <button class="btn sm" id="mClose">닫기</button>
       </div>

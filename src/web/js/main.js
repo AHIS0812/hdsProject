@@ -14,7 +14,11 @@ import { sortProjects, relTime, metaLine, safeFileName } from './home-logic.js';
 import { showDialog } from './dialog.js';
 import { openVersionPanel } from './version-panel.js';
 import { AUTO_INTERVAL_MS } from './versions.js';
-import { docPages, activeIndex, makeDoc } from './doc-model.js';
+import {
+  docPages, activeIndex, makeDoc, normalizePage, clonePage, movePage, newPageId, docSignature, MAX_PAGES,
+} from './doc-model.js';
+import { createPageBar, pageThumbSvg } from './pagebar.js';
+import { buildItemSpec, toCsv } from './item-spec.js';
 
 const $ = (id) => document.getElementById(id);
 /** 결과 모달이나 확인 대화상자가 떠 있는지 — 떠 있으면 뒤의 캔버스 단축키·붙여넣기를 멈춘다 */
@@ -26,6 +30,8 @@ let currentTpl = 'blank'; // 처음 열면 빈 화면에서 시작
 // 사용자가 캔버스를 직접 수정했는지. 템플릿을 "프로그램으로" 로드한 직후엔 false.
 // true 일 때만 다른 템플릿으로 전환 시 확인을 묻는다.
 let canvasDirty = false;
+let pageBar = null;       // 하단 화면 띠(pagebar.js) — "화면(페이지)" 절에서 만든다
+let pageBarTimer = null;
 // 마지막으로 "프로그램으로" 불러온 캔버스 내용 — 요소를 클릭해 선택만 해도 onChange 가 불려서 예전엔
 // 아무것도 안 고쳤는데도 dirty 가 되어, 템플릿을 바꿀 때 괜한 "초기화되었습니다 · 되돌리기" 토스트가 떴다.
 let canvasBaseline = '[]';
@@ -58,6 +64,7 @@ function loadCanvas(shapes, name, size) {
 /** 지금 캔버스 상태 스냅샷(되돌리기 토스트용) — 화면 전환류(guardedRun) 직전에만 호출 */
 function snapshotForUndo() {
   return {
+    pageId: pages[activePage]?.id,
     currentTpl, baseBoardSize,
     scrName: scrNm.value,
     canvas: editor.getBoardSize(),
@@ -69,6 +76,10 @@ function snapshotForUndo() {
 
 /** snapshotForUndo() 로 찍어둔 상태로 복원 */
 function restoreSnapshot(snap) {
+  // 토스트를 누르기 전에 다른 화면으로 옮겨 갔으면 그 화면으로 돌아가서 되돌린다
+  const idx = pages.findIndex((pg) => pg.id === snap.pageId);
+  if (idx < 0) { toast('그 화면이 삭제되어 되돌릴 수 없습니다'); return; }
+  if (idx !== activePage) switchPage(idx);
   currentTpl = snap.currentTpl;
   highlightTpl(currentTpl);
   baseBoardSize = snap.baseBoardSize;
@@ -90,6 +101,7 @@ function scheduleAutosave() {
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(() => { persist(); }, 800);
   scheduleStatus();
+  schedulePageBar(); // 하단 화면 띠의 썸네일·이름도 곧 따라오게
 }
 
 /**
@@ -380,52 +392,45 @@ let conflictOpen = false;
 const projNm = $('projNm');
 const saveStat = $('saveStat');
 
-// 여러 화면(v2) 형식으로 저장된 프로젝트 — 여러 화면 편집 UI 는 아직 준비 중이라 저장된 화면 하나만
-// 캔버스에 열고, 나머지 화면은 손대지 않은 채 그대로 들고 있다가 저장할 때 다시 합친다(데이터 보존).
-let heldPages = null;  // docPages(doc) 결과 — v1 문서면 null
-let heldIndex = 0;     // 그중 지금 캔버스에 열린 화면 번호
+// ── 화면(페이지) ────────────────────────────────────────────
+// 한 프로젝트에 화면이 여러 개(doc-model.js). 지금 캔버스에 열린 화면(activePage)의 정본은 에디터고,
+// 나머지 화면은 pages[] 의 값이 정본이다 — 저장하거나 화면을 옮길 때 capturePage() 로 합친다.
+// 예전 v1(화면 하나) 저장본도 docPages() 가 1페이지짜리로 읽어 그대로 열린다.
+let pages = [normalizePage()];
+let activePage = 0;
+/** 화면별 에디터 상태(요소·되돌리기 기록) — 화면을 오가도 Ctrl+Z 가 그 화면 기준으로 이어진다 */
+const pageStates = new Map();
 
-function currentDoc() {
-  const one = singleDoc();
-  if (!heldPages) return one;
-  const cur = {
-    ...heldPages[heldIndex],
-    screenName: one.screenName, template: one.template,
-    canvas: one.canvas, shapes: one.shapes,
-  };
-  if (one.background) cur.background = one.background; else delete cur.background;
-  return makeDoc({
-    projectName: one.projectName, systemId: one.systemId, systemName: one.systemName,
-    pages: heldPages.map((pg, i) => (i === heldIndex ? cur : pg)), activePage: heldIndex,
-  });
-}
-
-/** 지금 캔버스의 화면 하나를 v1 문서 형식으로 */
-function singleDoc() {
-  const sys = sysCombo.get();
-  return {
-    app: 'hds',
-    version: 1,
-    savedAt: new Date().toISOString(),
-    projectName: project.name,
+/** 지금 캔버스에 열린 화면을 페이지 객체로 */
+function capturePage() {
+  const page = {
+    id: pages[activePage]?.id || newPageId(),
     screenName: scrNm.value,
-    systemId: sys?.id || null,
-    systemName: sys?.name || null,
     template: currentTpl,
+    baseBoard: baseBoardSize,
     canvas: editor.getBoardSize(),
     shapes: editor.toPayloadShapes(),
-    // 캡처 이미지로 시작한 경우의 배경(트레이싱) — 빠지면 다시 열었을 때 배경이 사라진다
-    ...(editor.hasBoardBackground() ? { background: editor.getBoardBackground() } : {}),
   };
+  // 캡처 이미지로 시작한 경우의 배경(트레이싱) — 빠지면 다시 열었을 때 배경이 사라진다
+  if (editor.hasBoardBackground()) page.background = editor.getBoardBackground();
+  return page;
+}
+const livePages = () => pages.map((pg, i) => (i === activePage ? capturePage() : pg));
+
+function currentDoc() {
+  const sys = sysCombo.get();
+  return makeDoc({
+    projectName: project.name,
+    systemId: sys?.id || null,
+    systemName: sys?.name || null,
+    pages: livePages(),
+    activePage,
+  });
 }
 
 /** 저장 대상 내용의 서명 — currentDoc 과 같은 항목(프로젝트 이름·저장 시각 제외). 큰 배경 이미지는 지문만 비교한다. */
 function contentSig() {
-  const bg = editor.hasBoardBackground() ? editor.getBoardBackground() : '';
-  return JSON.stringify([
-    scrNm.value, sysCombo.get()?.id || null, currentTpl,
-    editor.getBoardSize(), editor.toPayloadShapes(), bg.length, bg.slice(-48),
-  ]);
+  return docSignature([sysCombo.get()?.id || null, activePage, livePages()]);
 }
 const isDirty = () => savedSig === null || contentSig() !== savedSig;
 
@@ -478,9 +483,9 @@ function ensureBgThumb() {
     bgThumbPending = '';
     // 줄인 이미지가 준비되면, 방금 저장된 프로젝트의 썸네일만 배경을 넣어 다시 써 둔다
     if (url && project.id && store.has(project.id) && bgKey() === k) {
-      if (heldPages && heldIndex !== 0) return; // 표지(첫 화면)가 아닌 화면의 배경이다
-      const doc = singleDoc();
-      store.setThumb(project.id, thumbnailSvg(doc.shapes, doc.canvas, { background: url }));
+      if (activePage !== 0) return; // 표지(첫 화면)가 아닌 화면의 배경이다
+      const cover = livePages()[0];
+      store.setThumb(project.id, thumbnailSvg(cover.shapes, cover.canvas, { background: url }));
     }
   });
 }
@@ -508,8 +513,7 @@ function autoVersion(doc) {
 /** 홈 카드 썸네일 — 첫 화면(표지). 캡처 배경은 지금 캔버스가 표지일 때만 줄인 이미지를 얹는다 */
 function coverThumb(doc) {
   const cover = docPages(doc)[0];
-  const isCurrent = !heldPages || heldIndex === 0;
-  return thumbnailSvg(cover.shapes, cover.canvas, { background: isCurrent ? bgThumbUrl() : null });
+  return thumbnailSvg(cover.shapes, cover.canvas, { background: activePage === 0 ? bgThumbUrl() : null });
 }
 
 /** 실제로 저장소에 쓴다(동기). 실패하면 false */
@@ -626,6 +630,21 @@ async function duplicateProject() {
   location.href = `editor.html?p=${encodeURIComponent(copy.id)}`;
 }
 
+/** 항목정의서 — 모든 화면의 요소를 화면설계서 항목 표(엑셀에서 열리는 CSV)로 내보낸다 */
+function exportItemSpec() {
+  const list = livePages();
+  const rows = buildItemSpec(list);
+  if (!rows.length) { toast('내보낼 항목이 없습니다 — 화면에 요소를 먼저 배치해주세요'); return; }
+  const name = safeFileName(project.name || scrNm.value, 'screen');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }));
+  a.download = `${name}_항목정의서.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`항목 ${rows.length}개를 항목정의서로 내보냈습니다 (화면 ${list.length}개)`);
+  closeProjPop();
+}
+
 function exportFile() {
   const name = safeFileName(project.name || scrNm.value, 'screen');
   const a = document.createElement('a');
@@ -677,6 +696,7 @@ $('pNew').addEventListener('click', () => { location.href = '/?new=1'; });
 $('pSave').addEventListener('click', () => { closeProjPop(); saveNow(); });
 $('pDup').addEventListener('click', duplicateProject);
 $('btnExport').addEventListener('click', exportFile);
+$('pItemSpec').addEventListener('click', exportItemSpec);
 $('pVersions').addEventListener('click', () => { closeProjPop(); openVersions(); });
 
 // ── 버전 기록 ─────────────────────────────────────────────
@@ -754,43 +774,139 @@ document.addEventListener('keydown', (e) => {
   if (e.shiftKey) duplicateProject(); else saveNow();
 });
 
+/** 페이지 하나를 캔버스에 연다(프로그램 로드 — 되돌리기 기록은 호출부가 정한다) */
+function loadPage(pg) {
+  if (pg.template && document.querySelector(`.tpl[data-tpl="${pg.template}"]`)) {
+    currentTpl = pg.template;
+    highlightTpl(pg.template);
+  }
+  loadCanvas(pg.shapes, pg.screenName ?? '새 화면', pg.canvas || DEFAULT_BOARD);
+  baseBoardSize = pg.baseBoard || pg.canvas || DEFAULT_BOARD;
+  if (typeof pg.background === 'string' && pg.background.startsWith('data:image/')) editor.setBoardBackground(pg.background);
+  syncBgButtons();
+  // "어떤 화면인가요?"(화면 유형)는 아직 비어 있는 화면에서만 의미가 있다 — 이미 그려 둔 화면에는 감춘다
+  $('newBlock').hidden = (pg.shapes || []).length > 0;
+}
+
+/** 지금 화면을 pages[] 에 반영하고 편집 상태를 보관한다(화면을 옮기기 직전에 호출) */
+function stashActive() {
+  if (!pages[activePage]) return;
+  pages[activePage] = capturePage();
+  pageStates.set(pages[activePage].id, editor.exportState());
+}
+
+/** i 번째 화면을 연다. 전에 열었던 화면이면 요소·되돌리기 기록을 그대로 되살린다 */
+function openPage(i) {
+  activePage = i;
+  const pg = pages[i];
+  loadPage(pg);
+  const st = pageStates.get(pg.id);
+  if (st) {
+    editor.importState(st);
+    canvasBaseline = shapesSig();
+  } else {
+    editor.resetHistory();
+  }
+  // 되돌리기로 요소가 다시 사라졌을 수도 있으니 화면 유형 패널은 지금 상태로 다시 판단한다
+  $('newBlock').hidden = editor.count() > 0;
+  renderPageBar();
+  scheduleAutosave();
+}
+
+function switchPage(i) {
+  if (i === activePage || !pages[i]) return;
+  stashActive();
+  openPage(i);
+}
+
+function addPage() {
+  if (pages.length >= MAX_PAGES) { toast(`화면은 ${MAX_PAGES}개까지 만들 수 있습니다`); return; }
+  stashActive();
+  const size = boardSizeFor('blank');
+  pages.splice(activePage + 1, 0, normalizePage({
+    screenName: `화면 ${pages.length + 1}`, template: 'blank', canvas: size, baseBoard: size, shapes: [],
+  }));
+  openPage(activePage + 1);
+  toast('새 화면을 추가했습니다');
+}
+
+function duplicatePage(i) {
+  if (pages.length >= MAX_PAGES) { toast(`화면은 ${MAX_PAGES}개까지 만들 수 있습니다`); return; }
+  stashActive();
+  const name = pages[i].screenName || '화면';
+  pages.splice(i + 1, 0, clonePage(pages[i]));
+  openPage(i + 1);
+  toast(`"${name}" 을(를) 복제했습니다`);
+}
+
+function deletePage(i) {
+  if (pages.length <= 1) { toast('화면이 하나뿐이라 삭제할 수 없습니다'); return; }
+  stashActive();
+  const [removed] = pages.splice(i, 1);
+  const removedState = pageStates.get(removed.id);
+  pageStates.delete(removed.id);
+  if (i === activePage) openPage(Math.min(i, pages.length - 1));
+  else { if (i < activePage) activePage--; renderPageBar(); scheduleAutosave(); }
+  toast(`"${removed.screenName || '화면'}" 화면을 삭제했습니다`, {
+    actionLabel: '되돌리기', ms: 6000,
+    onAction: () => {
+      stashActive();
+      pages.splice(Math.min(i, pages.length), 0, removed);
+      if (removedState) pageStates.set(removed.id, removedState);
+      openPage(pages.indexOf(removed));
+    },
+  });
+}
+
+function movePageTo(from, to) {
+  if (to < 0 || to >= pages.length || from === to) return;
+  stashActive();
+  const activeId = pages[activePage].id;
+  pages = movePage(pages, from, to);
+  activePage = pages.findIndex((pg) => pg.id === activeId);
+  renderPageBar();
+  scheduleAutosave();
+}
+
+/** 화면 띠에서 더블클릭 — 그 화면으로 옮긴 뒤 상단 이름 칸으로 보낸다 */
+function renamePage(i) {
+  if (i !== activePage) switchPage(i);
+  scrNm.focus();
+  scrNm.select();
+}
+
+pageBar = createPageBar($('pageBar'), {
+  maxPages: MAX_PAGES,
+  onSelect: switchPage, onAdd: addPage, onDuplicate: duplicatePage, onDelete: deletePage,
+  onMove: movePageTo, onRename: renamePage,
+});
+function renderPageBar() { clearTimeout(pageBarTimer); pageBar?.render(livePages(), activePage); }
+function schedulePageBar() { clearTimeout(pageBarTimer); pageBarTimer = setTimeout(renderPageBar, 400); }
+
+// PageUp/PageDown — 이전/다음 화면
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'PageUp' && e.key !== 'PageDown') return;
+  if (isModalOpen() || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+  const j = activePage + (e.key === 'PageDown' ? 1 : -1);
+  if (j < 0 || j >= pages.length) return;
+  e.preventDefault();
+  switchPage(j);
+});
+
 /**
  * 저장된 내용(doc)으로 캔버스·시스템을 통째로 바꾼다(프로젝트를 열 때).
  * @param {{ project: {id:string,name:string}, savedTs?: number|null, message?: string|null }} opts
  */
 async function applyDoc(doc, { project: p, savedTs = null, message = null, fresh = false }) {
-  if (Array.isArray(doc.pages) && doc.pages.length) {
-    heldPages = docPages(doc);
-    heldIndex = activeIndex(doc, heldPages);
-    const pg = heldPages[heldIndex];
-    doc = {
-      ...doc, screenName: pg.screenName, template: pg.template,
-      canvas: pg.canvas, shapes: pg.shapes, background: pg.background,
-    };
-    if (heldPages.length > 1) {
-      message = `이 프로젝트에는 화면이 ${heldPages.length}개 있습니다 — 여러 화면 편집은 준비 중이라 ${heldIndex + 1}번째 화면만 표시합니다(다른 화면은 그대로 보존됩니다)`;
-    }
-  } else {
-    heldPages = null;
-    heldIndex = 0;
-  }
-
-  if (doc.template && document.querySelector(`.tpl[data-tpl="${doc.template}"]`)) {
-    currentTpl = doc.template;
-    highlightTpl(doc.template);
-  }
-
-  loadCanvas(doc.shapes, doc.screenName || '새 화면', doc.canvas || DEFAULT_BOARD);
-  // loadCanvas 가 배경을 지우므로 그 뒤에 복원(이미지 data URL 만 허용)
-  if (typeof doc.background === 'string' && doc.background.startsWith('data:image/')) {
-    editor.setBoardBackground(doc.background);
-    syncBgButtons();
-  }
-  // "어떤 화면인가요?"(화면 유형) 는 방금 만든 새 프로젝트를 처음 열 때만 의미가 있다 —
-  // 예전에 저장해 둔 화면을 다시 열어 고치는 중이면 이미 화면이 있으니 필요 없다.
-  $('newBlock').hidden = !fresh;
+  // v1(화면 하나)·v2(여러 화면) 어느 쪽이든 페이지 배열로 읽는다(doc-model.js)
+  pages = docPages(doc);
+  pageStates.clear();
+  activePage = activeIndex(doc, pages);
+  loadPage(pages[activePage]);
+  if (fresh) $('newBlock').hidden = false; // 막 만든 프로젝트는 화면 유형을 바꿔 볼 수 있게
   editor.resetHistory(); // 이전 내용으로 Ctrl+Z 가 되돌아가지 않게
   setProject(p.id, p.name);
+  renderPageBar();
   if (message) toast(message);
 
   if (doc.systemId) sysCombo.choose(doc.systemId, true);
