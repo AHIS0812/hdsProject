@@ -60,6 +60,21 @@ test('templateShapes — canvas 를 안 주거나 기준 크기(960×600)와 같
   assert.deepEqual(templateShapes('list'), templateShapes('list', base));
 });
 
+test('templateShapes — "PC·스크롤 고려"처럼 세로만 훨씬 큰 캔버스에서도 요소 비율이 찌그러지지 않는다', () => {
+  const base = { w: 960, h: 600 };
+  const tall = { w: 1180, h: 1400 }; // 영업포탈 기본 폭 + PC·스크롤 높이
+  const baseShapes = templateShapes('form', base);
+  const scaledShapes = templateShapes('form', tall);
+  assertValidShapes(scaledShapes, tall, 'form/tall');
+  // 가로·세로 스케일 비율이 같아야(= 원본과 같은 종횡비) 버튼·입력칸이 찌그러지지 않는다.
+  for (let i = 0; i < baseShapes.length; i++) {
+    const b = baseShapes[i]; const s = scaledShapes[i];
+    if (b.w === 0 || b.h === 0) continue;
+    // 정수 반올림 오차(특히 라벨처럼 작은 요소)는 허용 — 5% 이상 벌어지면 실제로 찌그러진 것
+    assert.ok(Math.abs((s.w / b.w) - (s.h / b.h)) < 0.05, `${b.label}: 가로/세로 스케일 비율이 달라 찌그러짐 (w비율 ${s.w / b.w}, h비율 ${s.h / b.h})`);
+  }
+});
+
 test('sampleShapes 는 유효하고 960×600 안에 들어간다(스케일 대상이 아닌 기준 크기 고정 함수)', () => {
   const shapes = sampleShapes();
   assert.ok(shapes.length > 0);

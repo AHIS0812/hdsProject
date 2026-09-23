@@ -1014,7 +1014,14 @@ async function boot() {
   const opened = store.meta(pid) || meta;
 
   const systems = sysStore.list();
-  sysCombo.setItems(systems.map((s) => ({ id: s.id, name: s.name })));
+  const sysItems = systems.map((s) => ({ id: s.id, name: s.name }));
+  // 이 프로젝트가 가리키는 시스템이 지금은 목록에 없으면(시스템이 삭제됐거나, 예전 fixtures 시절의
+  // id 등) 저장된 이름으로 임시 항목을 넣어 준다 — 그래야 콤보가 "선택 안 됨" 상태로 리셋되어
+  // 화면 생성이 막히거나, 다음 자동 저장 때 systemId 가 조용히 사라지는 일이 없다.
+  if (doc.systemId && !sysItems.some((s) => s.id === doc.systemId)) {
+    sysItems.push({ id: doc.systemId, name: doc.systemName || doc.systemId, sub: '삭제된 시스템' });
+  }
+  sysCombo.setItems(sysItems);
 
   await applyDoc(doc, { project: { id: pid, name: opened.name }, savedTs: meta.updatedAt, fresh });
   // 이번에 고치기 전의 상태를 버전으로 남겨 둔다(버전이 없거나 마지막 버전이 10분 넘게 지났을 때만)

@@ -134,12 +134,14 @@ export function templateShapes(key, canvas) {
   const shapes = (PRESETS[key] || PRESETS.list)();
   const base = key === 'popup' ? BASE_POPUP : BASE_BOARD;
   if (!canvas || (canvas.w === base.w && canvas.h === base.h)) return shapes;
-  const sx = canvas.w / base.w;
-  const sy = canvas.h / base.h;
+  // 가로·세로를 각각 다른 비율로 늘리면("PC·스크롤 고려"처럼 세로만 훨씬 큰 캔버스에서) 버튼·입력칸
+  // 같은 요소가 세로로 찌그러진다. 두 비율 중 작은 쪽 하나로만 스케일해 요소 비율은 그대로 유지하고,
+  // 남는 공간(대개 세로쪽)은 그냥 빈 캔버스로 둔다 — min 을 쓰므로 스케일된 요소는 항상 canvas 안에 들어간다.
+  const scale = Math.min(canvas.w / base.w, canvas.h / base.h);
   return shapes.map((s) => ({
     ...s,
-    x: Math.round(s.x * sx), y: Math.round(s.y * sy),
-    w: Math.round(s.w * sx), h: Math.round(s.h * sy),
+    x: Math.round(s.x * scale), y: Math.round(s.y * scale),
+    w: Math.round(s.w * scale), h: Math.round(s.h * scale),
   }));
 }
 
