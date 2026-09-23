@@ -316,8 +316,10 @@ async function addImages(list) {
   }
 }
 
-// ── 배경 이미지 추가: 기존 화면을 일부만 고칠 때, 그 화면 캡처를 캔버스 배경으로 깔고 위에 그린다 ──
-// shapes 와 무관한 순수 트레이싱 참고용(화면 전환 시 loadCanvas 가 자동으로 지운다).
+// ── 배경 이미지 추가: 화면 캡처를 캔버스 배경으로 깔고 위에(또는 이미 그려 둔 요소와 겹쳐) 그린다 ──
+// shapes 와 무관한 순수 트레이싱 참고용(화면 전환 시 loadCanvas 가 자동으로 지운다). 이미 그려 둔
+// 요소는 지우지 않는다 — 이미 작업 중인 화면에 나중에 참고 캡처를 추가로 깔아 보는 경우가 흔해서,
+// 배경을 깐다고 지금까지 작업한 내용이 사라지면 안 된다.
 function syncBgButtons() {
   const has = editor.hasBoardBackground();
   $('btnBgUp').hidden = has;
@@ -331,13 +333,10 @@ $('bgFile').addEventListener('change', async () => {
   if (file.size > IMG_MAX_BYTES) { toast('이미지가 너무 큽니다 (15MB 이하)'); return; }
   try {
     const img = await fileToImage(file);
-    const showedUndo = guardedRun(() => {
-      editor.clearShapes();
-      editor.setBoardBackground(img.src);
-      syncBgButtons();
-      canvasDirty = true;
-    }, '배경 이미지를 추가하면서 기존 요소가 초기화되었습니다');
-    if (!showedUndo) toast('배경 이미지를 추가했습니다 — 위에 요소를 그려보세요');
+    editor.setBoardBackground(img.src);
+    syncBgButtons();
+    canvasDirty = true;
+    toast('배경 이미지를 추가했습니다 — 그려 둔 요소는 그대로 있어요');
   } catch (e) {
     toast(e.message);
   }
