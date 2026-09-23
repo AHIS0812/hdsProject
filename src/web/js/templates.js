@@ -123,9 +123,24 @@ const PRESETS = {
   ]),
 };
 
-export function templateShapes(key) {
+// 위 프리셋 좌표는 전부 이 기준 캔버스(960×600, popup 은 560×420) 기준으로 그려져 있다.
+// 시스템별로 캔버스 기본 크기가 달라졌으므로(constants.js SYSTEM_BOARD_SIZES), 실제 canvas 를
+// 받으면 그 크기에 맞게 좌표·크기를 비율 스케일한다 — 레이아웃 비율은 그대로 유지된다.
+const BASE_BOARD = { w: 960, h: 600 };
+const BASE_POPUP = { w: 560, h: 420 };
+
+export function templateShapes(key, canvas) {
   if (key === 'blank') return [];
-  return (PRESETS[key] || PRESETS.list)();
+  const shapes = (PRESETS[key] || PRESETS.list)();
+  const base = key === 'popup' ? BASE_POPUP : BASE_BOARD;
+  if (!canvas || (canvas.w === base.w && canvas.h === base.h)) return shapes;
+  const sx = canvas.w / base.w;
+  const sy = canvas.h / base.h;
+  return shapes.map((s) => ({
+    ...s,
+    x: Math.round(s.x * sx), y: Math.round(s.y * sy),
+    w: Math.round(s.w * sx), h: Math.round(s.h * sy),
+  }));
 }
 
 // 예시 화면(지정대리인 등록). '샘플' 버튼 제거 후 현재는 미사용 —

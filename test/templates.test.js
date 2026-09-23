@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COMPS, boardSizeFor, DEFAULT_BOARD } from '../src/web/js/constants.js';
+import { COMPS, boardSizeFor } from '../src/web/js/constants.js';
 import { TEMPLATE_KEYS, templateShapes, sampleShapes } from '../src/web/js/templates.js';
 
 const TYPES = new Set(COMPS.map((c) => c.t));
@@ -26,27 +26,44 @@ function assertValidShapes(shapes, board, label) {
 
 for (const key of TEMPLATE_KEYS) {
   test(`템플릿 "${key}" 프리셋이 유효하고 보드 안에 들어간다`, () => {
-    const shapes = templateShapes(key);
+    const board = boardSizeFor(key); // 시스템 미지정 → DEFAULT_BOARD(900×600), popup 은 POPUP_BOARD
+    const shapes = templateShapes(key, board);
     if (key === 'blank') {
       assert.deepEqual(shapes, [], '빈 화면은 shapes 가 [] 이어야 한다');
       return;
     }
     assert.ok(shapes.length >= 5, `${key}: 프리셋이 너무 비어 있음`);
-    assertValidShapes(shapes, boardSizeFor(key), key);
+    assertValidShapes(shapes, board, key);
   });
 }
+
+test('템플릿은 시스템별 기본 캔버스 크기에도 스케일되어 그 안에 들어간다', () => {
+  for (const systemId of ['salesportal', 'portal', 'homepage']) {
+    for (const key of TEMPLATE_KEYS) {
+      if (key === 'blank') continue;
+      const board = boardSizeFor(key, systemId);
+      const shapes = templateShapes(key, board);
+      assertValidShapes(shapes, board, `${key}/${systemId}`);
+    }
+  }
+});
 
 test('템플릿마다 서로 다른 레이아웃을 만든다', () => {
   const sigs = TEMPLATE_KEYS
     .filter((k) => k !== 'blank')
-    .map((k) => JSON.stringify(templateShapes(k)));
+    .map((k) => JSON.stringify(templateShapes(k, boardSizeFor(k))));
   assert.equal(new Set(sigs).size, sigs.length, '중복된 템플릿 프리셋이 있다');
 });
 
-test('sampleShapes 는 유효하고 960×600 안에 들어간다', () => {
+test('templateShapes — canvas 를 안 주거나 기준 크기(960×600)와 같으면 스케일하지 않는다', () => {
+  const base = { w: 960, h: 600 };
+  assert.deepEqual(templateShapes('list'), templateShapes('list', base));
+});
+
+test('sampleShapes 는 유효하고 960×600 안에 들어간다(스케일 대상이 아닌 기준 크기 고정 함수)', () => {
   const shapes = sampleShapes();
   assert.ok(shapes.length > 0);
-  assertValidShapes(shapes, DEFAULT_BOARD, 'sample');
+  assertValidShapes(shapes, { w: 960, h: 600 }, 'sample');
 });
 
 test('TEMPLATE_KEYS 에 중복이 없고 blank 를 포함한다', () => {

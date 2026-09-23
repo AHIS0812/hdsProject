@@ -76,7 +76,10 @@ const TPL_INFO = [
   { key: 'popup', name: '팝업', sub: '560 × 420' },
   { key: 'main', name: '메인', sub: '요약 카드 + 바로가기' },
 ];
-const tplThumb = (key) => svgDataUrl(thumbnailSvg(templateShapes(key), boardSizeFor(key)));
+const tplThumb = (key, systemId) => {
+  const sz = boardSizeFor(key, systemId);
+  return svgDataUrl(thumbnailSvg(templateShapes(key, sz), sz));
+};
 const editorUrl = (id) => `editor.html?p=${encodeURIComponent(id)}`;
 const goEditor = (id) => { store.touchOpened(id); location.href = editorUrl(id); };
 // 방금 만든 프로젝트를 처음 여는 경우에만 — 에디터가 "어떤 화면인가요?"(화면 유형)를 보여줄지
@@ -541,13 +544,14 @@ const lastSystem = () => {
 const rememberSystem = (id) => { if (id) { try { localStorage.setItem(LAST_SYS_KEY, id); } catch { /* 무시 */ } } };
 
 function newDoc({ name, template, size, systemId }) {
+  const canvas = size || boardSizeFor(template, systemId);
   return {
     app: 'hds', version: 1, savedAt: new Date().toISOString(),
     projectName: name, screenName: '새 화면',
     systemId: systemId || null, systemName: sysName(systemId),
     template,
-    canvas: size || boardSizeFor(template),
-    shapes: templateShapes(template),
+    canvas,
+    shapes: templateShapes(template, canvas),
   };
 }
 
@@ -564,9 +568,11 @@ function quickCreate(template) {
   }
 }
 
+// pcScroll 은 폭이 시스템 기본 폭을 따르므로(paintSizes 에서 동적 계산) 여기 정적 w 는 없다 —
+// 높이만 1400 으로 고정. 모바일은 기기 표준 크기라 시스템과 무관하게 항상 390×844.
 const SIZE_OPTS = [
   { key: 'default', label: '기본', sub: '유형에 맞춤' },
-  { key: 'pcScroll', label: 'PC · 스크롤', sub: '960 × 1400', w: 960, h: 1400 },
+  { key: 'pcScroll', label: 'PC · 스크롤', sub: '· × 1400', h: 1400 },
   { key: 'mobile', label: '모바일', sub: '390 × 844', w: 390, h: 844 },
   { key: 'custom', label: '직접 입력', sub: '가로 × 세로' },
 ];
@@ -620,8 +626,10 @@ function openWizard({ template = 'blank' } = {}) {
 
   const curSize = () => {
     if (st.sizeKey === 'custom') return { w: Math.max(320, Math.min(3000, st.cw || 960)), h: Math.max(240, Math.min(4000, st.ch || 600)) };
+    // PC·스크롤 고려는 높이만 늘리고 폭은 시스템 기본 폭을 그대로 따른다.
+    if (st.sizeKey === 'pcScroll') return { w: boardSizeFor(st.template, st.systemId).w, h: 1400 };
     const o = SIZE_OPTS.find((s) => s.key === st.sizeKey);
-    return o?.w ? { w: o.w, h: o.h } : boardSizeFor(st.template);
+    return o?.w ? { w: o.w, h: o.h } : boardSizeFor(st.template, st.systemId);
   };
 
   function paintPreview() {
@@ -632,7 +640,7 @@ function openWizard({ template = 'blank' } = {}) {
     const nm = TPL_INFO.find((t) => t.key === st.template)?.name || '';
     cap.innerHTML = `${esc(nm)}<small>${sz.w} × ${sz.h}</small>`;
   }
-  const tplThumb2 = (key, sz) => svgDataUrl(thumbnailSvg(templateShapes(key), sz));
+  const tplThumb2 = (key, sz) => svgDataUrl(thumbnailSvg(templateShapes(key, sz), sz));
 
   function paintTpls() {
     q('#wTpls').replaceChildren(...TPL_INFO.map((t) => {
@@ -640,7 +648,7 @@ function openWizard({ template = 'blank' } = {}) {
       b.type = 'button';
       b.className = 'tpl-opt' + (st.template === t.key ? ' on' : '');
       b.setAttribute('aria-pressed', String(st.template === t.key));
-      b.innerHTML = `<div class="pv"><img alt="" src="${tplThumb(t.key)}"></div><span>${esc(t.name)}</span>`;
+      b.innerHTML = `<div class="pv"><img alt="" src="${tplThumb(t.key, st.systemId)}"></div><span>${esc(t.name)}</span>`;
       b.addEventListener('click', () => { st.template = t.key; paintTpls(); paintSizes(); paintPreview(); });
       return b;
     }));
@@ -651,7 +659,10 @@ function openWizard({ template = 'blank' } = {}) {
       b.type = 'button';
       b.className = 'size-opt' + (st.sizeKey === o.key ? ' on' : '');
       b.setAttribute('aria-pressed', String(st.sizeKey === o.key));
-      const sub = o.key === 'default' ? `${boardSizeFor(st.template).w} × ${boardSizeFor(st.template).h}` : o.sub;
+      const board = boardSizeFor(st.template, st.systemId);
+      const sub = o.key === 'default' ? `${board.w} × ${board.h}`
+        : o.key === 'pcScroll' ? `${board.w} × 1400`
+        : o.sub;
       b.innerHTML = `${esc(o.label)}<small>${esc(sub)}</small>`;
       b.addEventListener('click', () => { st.sizeKey = o.key; paintSizes(); paintPreview(); });
       return b;
@@ -667,7 +678,8 @@ function openWizard({ template = 'blank' } = {}) {
     selSys.value = st.systemId || '';
   }
 
-  selSys.addEventListener('change', () => { st.systemId = selSys.value || null; });
+  // 시스템이 바뀌면 화면 유형 썸네일·크기 옵션·미리보기가 전부 그 시스템 기본 크기를 따라야 한다.
+  selSys.addEventListener('change', () => { st.systemId = selSys.value || null; paintTpls(); paintSizes(); paintPreview(); });
   q('#wCw').value = st.cw;
   q('#wCh').value = st.ch;
   q('#wCw').addEventListener('input', (e) => { st.cw = parseInt(e.target.value, 10) || 0; paintPreview(); });
@@ -845,7 +857,7 @@ function initEvents() {
       b.className = 'tile';
       b.setAttribute('role', 'listitem');
       b.setAttribute('aria-label', `${t.name} — 바로 새 프로젝트 만들기`);
-      b.innerHTML = `<div class="pv"><img alt="" src="${tplThumb(t.key)}"></div><b>${esc(t.name)}</b><small>${esc(t.sub)}</small>`;
+      b.innerHTML = `<div class="pv"><img alt="" src="${tplThumb(t.key, lastSystem())}"></div><b>${esc(t.name)}</b><small>${esc(t.sub)}</small>`;
       b.addEventListener('click', () => quickCreate(t.key));
       return b;
     }),

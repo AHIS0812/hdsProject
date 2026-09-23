@@ -43,20 +43,29 @@ export const HAS_REQ = { input: 1, select: 1, radio: 1, date: 1, check: 1, text:
 
 export const SNAP = 6;
 
-/** 캔버스 기본 크기 */
-export const DEFAULT_BOARD = { w: 960, h: 600 };
+/** 캔버스 기본 크기 — 고정 3개 시스템 외(사용자가 추가한 시스템) 전부 이 크기를 쓴다 */
+export const DEFAULT_BOARD = { w: 900, h: 600 };
 
-/** 화면 유형별 캔버스 크기 (U-12) — 팝업만 별도 크기, 나머지는 전부 동일 해상도로 통일 */
-export const BOARD_SIZES = {
-  list:   { w: 960, h: 600 },
-  detail: { w: 960, h: 600 },
-  form:   { w: 960, h: 600 },
-  blank:  { w: 960, h: 600 },
-  main:   { w: 960, h: 600 },
-  popup:  { w: 560, h: 420 },
+/** 팝업 화면 유형은 시스템과 무관하게 항상 이 작은 크기 (U-12) */
+export const POPUP_BOARD = { w: 560, h: 420 };
+
+/** 고정 3개 시스템의 기본 캔버스 크기 — 실제 화면 캡처·사이트 기준(§1 참고).
+ * homepage 는 hi.co.kr 실제 레이아웃 폭(#wrap, 1240px)에 다른 두 시스템과 비슷한 높이를 맞춘 값. */
+export const SYSTEM_BOARD_SIZES = {
+  salesportal: { w: 1180, h: 755 },
+  portal: { w: 1280, h: 738 },
+  homepage: { w: 1240, h: 750 },
 };
 
-export const boardSizeFor = (key) => BOARD_SIZES[key] || DEFAULT_BOARD;
+/**
+ * 화면 유형(template)·시스템(systemId) 에 맞는 기본 캔버스 크기.
+ * 팝업은 시스템과 무관하게 항상 작은 고정 크기. 그 외 유형은 시스템 기본 크기(없으면 DEFAULT_BOARD)로
+ * 전부 통일된다 — U-12 의 "화면 유형별이 아니라 시스템별로 통일" 확장판.
+ */
+export const boardSizeFor = (key, systemId) => {
+  if (key === 'popup') return POPUP_BOARD;
+  return SYSTEM_BOARD_SIZES[systemId] || DEFAULT_BOARD;
+};
 
 export const defaultLabel = (t) =>
   ({

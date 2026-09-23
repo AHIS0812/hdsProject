@@ -178,7 +178,9 @@ document.querySelector('.tools').addEventListener('click', (e) => {
 
 // ── 화면 비율 프리셋 (PC / PC·스크롤 고려 / 모바일) ───────────
 // 화면 유형·확대율과는 별개로, 캔버스 자체를 다른 기기 폭에 맞춰 그려보고 싶을 때 쓴다.
-const RATIO_SIZES = { pcScroll: { w: 960, h: 1400 }, mobile: { w: 390, h: 844 } };
+// PC·스크롤 고려는 지금 화면의 기준 폭(baseBoardSize, 이미 시스템 기본 폭이 반영돼 있다)을 그대로
+// 두고 높이만 늘린다. 모바일은 기기 표준 크기라 시스템과 무관하게 항상 390×844.
+const ratioSizeFor = (key) => (key === 'pcScroll' ? { w: baseBoardSize.w, h: 1400 } : { w: 390, h: 844 });
 const btnRatio = $('btnRatio');
 const ratioPop = $('ratioPop');
 const ratioW = $('ratioW');
@@ -190,6 +192,9 @@ function setRatioPop(open) {
     const { w, h } = editor.getBoardSize();
     ratioW.value = w;
     ratioH.value = h;
+    // "PC·스크롤 고려" 폭은 지금 화면의 기준 폭(시스템 기본 폭)을 따르므로, 열 때마다 표시를 맞춘다.
+    const pcScrollSub = ratioPop.querySelector('[data-ratio="pcScroll"] span');
+    if (pcScrollSub) pcScrollSub.textContent = `${baseBoardSize.w} × 1400`;
   }
 }
 function applyBoardSize(w, h) {
@@ -201,7 +206,7 @@ btnRatio.addEventListener('click', () => setRatioPop(ratioPop.hidden));
 ratioPop.addEventListener('click', (e) => {
   const key = e.target.closest('button')?.dataset.ratio;
   if (!key) return;
-  const size = RATIO_SIZES[key] || baseBoardSize; // 'pc' = 원래 크기로 복귀
+  const size = key === 'pc' ? baseBoardSize : ratioSizeFor(key); // 'pc' = 원래 크기로 복귀
   applyBoardSize(size.w, size.h);
   setRatioPop(false);
 });
@@ -234,7 +239,8 @@ document.querySelectorAll('.tpl').forEach((el) => {
     guardedRun(() => {
       currentTpl = key;
       highlightTpl(key);
-      loadCanvas(templateShapes(key), undefined, boardSizeFor(key));
+      const size = boardSizeFor(key, sysCombo.get()?.id);
+      loadCanvas(templateShapes(key, size), undefined, size);
     });
   });
 });
@@ -807,7 +813,7 @@ function switchPage(i) {
 function addPage() {
   if (pages.length >= MAX_PAGES) { toast(`화면은 ${MAX_PAGES}개까지 만들 수 있습니다`); return; }
   stashActive();
-  const size = boardSizeFor('blank');
+  const size = boardSizeFor('blank', sysCombo.get()?.id);
   pages.splice(activePage + 1, 0, normalizePage({
     screenName: `화면 ${pages.length + 1}`, template: 'blank', canvas: size, baseBoard: size, shapes: [],
   }));

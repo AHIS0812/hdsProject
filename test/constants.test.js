@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   COMPS, DEF, NAME, HAS_ITEMS,
-  DEFAULT_BOARD, BOARD_SIZES, boardSizeFor,
+  DEFAULT_BOARD, POPUP_BOARD, SYSTEM_BOARD_SIZES, boardSizeFor,
   defaultLabel, defaultCols, cleanItemName, renameItemAt,
 } from '../src/web/js/constants.js';
-import { TEMPLATE_KEYS } from '../src/web/js/templates.js';
 
 const TYPES = COMPS.map((c) => c.t);
 
@@ -35,19 +34,26 @@ test('HAS_ITEMS 타입에는 defaultCols 기본값이 있다', () => {
   for (const k of Object.keys(HAS_ITEMS)) assert.ok(defaultCols(k).length > 0, `${k}: defaultCols 비어 있음`);
 });
 
-test('BOARD_SIZES 가 blank 을 제외한 모든 템플릿 키를 덮는다', () => {
-  for (const k of TEMPLATE_KEYS) {
-    if (k === 'blank') continue;
-    const s = BOARD_SIZES[k];
-    assert.ok(s && s.w > 0 && s.h > 0, `BOARD_SIZES[${k}] 없음`);
+test('SYSTEM_BOARD_SIZES 가 고정 3개 시스템을 모두 덮는다', () => {
+  for (const id of ['salesportal', 'portal', 'homepage']) {
+    const s = SYSTEM_BOARD_SIZES[id];
+    assert.ok(s && s.w > 0 && s.h > 0, `SYSTEM_BOARD_SIZES[${id}] 없음`);
   }
 });
 
-test('boardSizeFor: 알려진 키 / 미지의 키 — 팝업만 별도 해상도, 나머지는 DEFAULT_BOARD 와 동일', () => {
+test('boardSizeFor: 팝업은 시스템과 무관하게 항상 POPUP_BOARD', () => {
+  assert.deepEqual(boardSizeFor('popup'), POPUP_BOARD);
+  assert.deepEqual(boardSizeFor('popup', 'portal'), POPUP_BOARD);
+  assert.deepEqual(boardSizeFor('popup', '없는시스템'), POPUP_BOARD);
+});
+
+test('boardSizeFor: 팝업 외 유형은 시스템 기본 크기, 시스템이 없거나 고정 3개가 아니면 DEFAULT_BOARD', () => {
+  assert.deepEqual(boardSizeFor('main', 'salesportal'), SYSTEM_BOARD_SIZES.salesportal);
+  assert.deepEqual(boardSizeFor('list', 'portal'), SYSTEM_BOARD_SIZES.portal);
+  assert.deepEqual(boardSizeFor('form', 'homepage'), SYSTEM_BOARD_SIZES.homepage);
   assert.deepEqual(boardSizeFor('main'), DEFAULT_BOARD);
-  assert.deepEqual(boardSizeFor('popup'), { w: 560, h: 420 });
-  assert.deepEqual(boardSizeFor('list'), DEFAULT_BOARD);
-  assert.deepEqual(boardSizeFor('없는키'), DEFAULT_BOARD);
+  assert.deepEqual(boardSizeFor('list', '없는시스템'), DEFAULT_BOARD);
+  assert.deepEqual(boardSizeFor('없는키', 'portal'), SYSTEM_BOARD_SIZES.portal);
 });
 
 test('defaultLabel / defaultCols 는 모든 타입에서 문자열을 돌려준다', () => {

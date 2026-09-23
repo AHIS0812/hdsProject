@@ -61,7 +61,7 @@ test('editor.resetHistory 는 초기화 전에 호출해도 안전하다', async
   assert.doesNotThrow(() => editor.resetHistory());
 });
 
-test('editor.getBoardSize 기본값은 960×600', async () => {
+test('editor.getBoardSize 기본값은 900×600(DEFAULT_BOARD)', async () => {
   const editor = await import('../src/web/js/editor.js');
-  assert.deepEqual(editor.getBoardSize(), { w: 960, h: 600 });
+  assert.deepEqual(editor.getBoardSize(), { w: 900, h: 600 });
 });
