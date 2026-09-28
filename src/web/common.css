@@ -9,6 +9,13 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 [hidden]{display:none!important;}
 
+/* 브라우저 기본 이미지 드래그를 앱 전체에서 막는다 — img 는 draggable 기본값이 true 라, 개별
+   태그마다 draggable="false" 를 빠뜨리면 그 썸네일을 드래그했을 때 브라우저가 파일로 취급해
+   dataTransfer 에 실어 버리고, 전역 drop 핸들러(홈의 "파일 가져오기")가 이를 잘못된 파일로
+   오인하는 버그가 재발한다(2026-09-28 수정). 캔버스 안 이미지 요소의 이동은 mousedown 기반 커스텀
+   드래그라 이 규칙과 무관하다. */
+img{-webkit-user-drag:none;user-drag:none;}
+
 /* 키보드 포커스 링 (마우스 클릭 시에는 안 뜸). !important 로 개별 outline:none 을 이긴다 */
 :focus-visible{outline:2px solid var(--or)!important;outline-offset:2px!important;}
 

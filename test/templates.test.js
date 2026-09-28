@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { COMPS, boardSizeFor } from '../src/web/js/constants.js';
-import { TEMPLATE_KEYS, templateShapes, sampleShapes } from '../src/web/js/templates.js';
+import { TEMPLATE_KEYS, templateShapes, sampleShapes, UNIFORM_SCALE_THRESHOLD } from '../src/web/js/templates.js';
 
 const TYPES = new Set(COMPS.map((c) => c.t));
 
@@ -98,6 +98,33 @@ test('templateShapes — 고정 시스템의 기본 캔버스 크기에서는 �
     assert.ok(Math.abs(scaledFillX - baseFillX) < 0.03, `${systemId}: 가로 채움 비율이 달라짐 (기준 ${baseFillX.toFixed(3)}, 실제 ${scaledFillX.toFixed(3)})`);
     assert.ok(Math.abs(scaledFillY - baseFillY) < 0.03, `${systemId}: 세로 채움 비율이 달라짐 (기준 ${baseFillY.toFixed(3)}, 실제 ${scaledFillY.toFixed(3)})`);
   }
+});
+
+// 지금은 고정 3개 시스템(드리프트 8% 안팎)만 독립 스케일을 타는지 확인했을 뿐, UNIFORM_SCALE_THRESHOLD
+// 값 자체는 아무 테스트도 검증하지 않았다 — 코드 리뷰에서 "이 상수를 바꾸거나 리팩터해도 회귀가 안 잡힌다"고
+// 지적된 부분. 문턱 바로 아래/위로 캔버스를 만들어 분기가 실제로 거기서 갈리는지 직접 확인한다.
+test('templateShapes — UNIFORM_SCALE_THRESHOLD 경계 바로 아래/위에서 스케일 방식이 실제로 갈린다', () => {
+  const base = { w: 960, h: 600 };
+  const belowThreshold = { w: 960, h: Math.round(600 * (UNIFORM_SCALE_THRESHOLD - 0.01)) };
+  const aboveThreshold = { w: 960, h: Math.round(600 * (UNIFORM_SCALE_THRESHOLD + 0.01)) };
+
+  const bottomEdge = (arr) => Math.max(...arr.map((s) => s.y + s.h));
+  const fillY = (canvas) => bottomEdge(templateShapes('list', canvas)) / canvas.h;
+
+  const baseFillY = fillY(base);
+  const belowFillY = fillY(belowThreshold);
+  const aboveFillY = fillY(aboveThreshold);
+
+  // 문턱 미만: 독립 스케일이라 세로도 기준과 비슷한 비율로 캔버스를 채운다
+  assert.ok(
+    Math.abs(belowFillY - baseFillY) < 0.03,
+    `threshold(${UNIFORM_SCALE_THRESHOLD}) 미만인데 세로를 못 채움 (기준 ${baseFillY.toFixed(3)}, 실제 ${belowFillY.toFixed(3)})`,
+  );
+  // 문턱 초과: 통일(min) 스케일로 폴백해 세로에 뚜렷한 여백이 남는다
+  assert.ok(
+    aboveFillY < baseFillY - 0.05,
+    `threshold(${UNIFORM_SCALE_THRESHOLD}) 초과인데도 여백이 안 생김 (기준 ${baseFillY.toFixed(3)}, 실제 ${aboveFillY.toFixed(3)})`,
+  );
 });
 
 test('sampleShapes 는 유효하고 960×600 안에 들어간다(스케일 대상이 아닌 기준 크기 고정 함수)', () => {

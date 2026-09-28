@@ -11,6 +11,7 @@ import path from 'node:path';
 import { ROOT, readJson } from '../src/shared/paths.js';
 import { validateScreenDraft, validateGenerationResult } from '../src/shared/validate.js';
 import { deterministicResult } from '../src/pipeline/deterministic.js';
+import { runArtifactFiles } from '../src/shared/run-artifacts.js';
 import { NAME } from '../src/web/js/constants.js';
 
 // templates.js 의 build() 와 동일 규칙으로 preset 정의를 payload shape 로 변환
@@ -173,10 +174,9 @@ function runCase(id, payload) {
   const result = deterministicResult(payload);
   const resultErrors = validateGenerationResult(result);
 
-  writeFileSync(path.join(dir, 'payload.json'), JSON.stringify(payload, null, 2));
-  writeFileSync(path.join(dir, 'screen.xml'), result.code.websquareXml);
-  writeFileSync(path.join(dir, 'preview.html'), result.preview.html);
-  writeFileSync(path.join(dir, 'report.json'), JSON.stringify(result.report, null, 2));
+  for (const { name, content } of runArtifactFiles({ payload, result })) {
+    writeFileSync(path.join(dir, name), content);
+  }
 
   // 간단 지표
   const xml = result.code.websquareXml;

@@ -14,7 +14,7 @@ test('runDirName — 같은 시각이어도 랜덤 접미사 때문에 서로 �
   const a = runDirName(now);
   const b = runDirName(now);
   assert.notEqual(a, b);
-  assert.match(a, /^2026-09-28T01-02-03-456Z-[0-9a-f]{6}$/);
+  assert.match(a, /^2026-09-28T01-02-03-456Z-[0-9a-f]{12}$/);
 });
 
 test('writeAuditLog — 성공 결과는 payload·screen.xml·preview.html·report.json 4개를 남긴다', async () => {

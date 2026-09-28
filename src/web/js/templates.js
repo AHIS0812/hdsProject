@@ -137,7 +137,7 @@ const BASE_POPUP = { w: 560, h: 420 };
 // 원본 종횡비와 캔버스 종횡비가 크게 다르다고 보고 찌그러짐 방지를 우선한다. 고정 3개 시스템의
 // 기본 캔버스 크기(예: 하이포탈 1280×738)는 원본(960×600)과 종횡비가 비슷(8% 안팎)하므로 이 아래에
 // 걸러져 독립 스케일 쪽을 탄다.
-const UNIFORM_SCALE_THRESHOLD = 1.3;
+export const UNIFORM_SCALE_THRESHOLD = 1.3;
 
 export function templateShapes(key, canvas) {
   if (key === 'blank') return [];
