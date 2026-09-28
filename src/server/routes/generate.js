@@ -17,23 +17,26 @@ router.post('/generate', (req, res) => {
       status: 'error',
       error: { message: 'payload 가 screen-draft 스키마를 위반했습니다.', details: errors },
     };
-    writeAuditLog({ payload: req.body, result });
-    return res.status(400).json(result);
+    res.status(400).json(result);
+    writeAuditLog({ payload: req.body, result }); // 응답 전송 후 fire-and-forget — 감사 로그가 응답을 지연시키면 안 된다
+    return;
   }
 
   try {
     const t0 = Date.now();
     const result = deterministicResult(req.body);
     result.report.elapsedMs = Date.now() - t0;
+    res.json(result);
     writeAuditLog({ payload: req.body, result });
-    return res.json(result);
+    return;
   } catch (err) {
     const result = {
       status: 'error',
       error: { message: '변환 중 오류가 발생했습니다.', log: String(err?.stack || err) },
     };
+    res.status(500).json(result);
     writeAuditLog({ payload: req.body, result });
-    return res.status(500).json(result);
+    return;
   }
 });
 
