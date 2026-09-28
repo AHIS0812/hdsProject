@@ -142,3 +142,16 @@ test('시스템별 테마는 XML 코드에는 반영되지 않는다(색상 정�
   });
   assert.doesNotMatch(out.websquareXml, /#[0-9a-fA-F]{6}/);
 });
+
+test('systemId 로 "constructor" 같은 Object.prototype 이름을 보내도 default 테마로 안전하게 떨어진다', () => {
+  const themes = readJson('config/preview-themes.json');
+  const payloadFor = (systemId) => ({
+    screenName: '조회', systemId, canvas: { w: 960, h: 600 },
+    shapes: [{ type: 'button', x: 10, y: 10, w: 80, h: 28, label: '조회' }],
+  });
+  for (const evil of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+    const html = compileDeterministic(payloadFor(evil)).previewHtml;
+    assert.match(html, new RegExp(`--hs-primary:${themes.default.primary}`), `systemId="${evil}"`);
+    assert.doesNotMatch(html, /--hs-primary:undefined/, `systemId="${evil}"`);
+  }
+});

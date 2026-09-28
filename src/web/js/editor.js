@@ -1806,7 +1806,7 @@ export function clearShapes() {
  * 번호를 다시 매긴 경우 등) — 새로 만드는 요소가 기존 id 와 겹치지 않게 카운터를 끌어올린다. */
 function syncCounters() {
   uid = Math.max(uid, ...shapes.map((s) => (Number(s.id) || 0) + 1));
-  gid = Math.max(gid, ...shapes.map((s) => (parseInt(String(s.g || '').replace(/D/g, ''), 10) || 0) + 1));
+  gid = Math.max(gid, ...shapes.map((s) => (parseInt(String(s.g || '').replace(/\D/g, ''), 10) || 0) + 1));
 }
 
 /** 화면(페이지)을 오갈 때 화면마다 편집 상태(요소·되돌리기 기록·id 카운터)를 그대로 보관한다(main.js).

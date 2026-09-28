@@ -17,7 +17,10 @@ const BUTTON_ROLE_HINTS = readJson('config/policy.json', { buttonRoleHints: {} }
 // 시스템별 미리보기(Preview) 색상·모양 테마 — WebSquare XML 코드에는 반영되지 않는다(§7, 사내 표준
 // 색상 클래스 체계 미확정). "default" 는 고정 3개 시스템(salesportal/portal/homepage) 외의
 // 모든 시스템(사용자가 홈에서 직접 추가한 시스템)에 쓰인다.
-const PREVIEW_THEMES = readJson('config/preview-themes.json', {});
+// Object.create(null) 로 프로토타입 체인을 끊는다 — 그냥 리터럴 객체라면 systemId 로
+// "constructor"/"toString"/"hasOwnProperty" 같은 Object.prototype 이름을 보내면 그 값(함수)이
+// 조회돼 getTheme() 의 DEFAULT_THEME 폴백을 건너뛰어 미리보기 스타일이 깨진다.
+const PREVIEW_THEMES = Object.assign(Object.create(null), readJson('config/preview-themes.json', {}));
 const FALLBACK_THEME = {
   primary: '#F5821F', primaryText: '#fff', solid: '#0F3B7C', solidText: '#fff',
   outlineBorder: '#9fb3d1', outlineText: '#0F3B7C', radius: '3px', inputBorder: '#d3d8e0',

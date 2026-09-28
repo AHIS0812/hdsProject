@@ -30,7 +30,12 @@ export function createSystemStore(storage) {
       return Array.isArray(a) ? a.filter((s) => s && typeof s.id === 'string' && typeof s.name === 'string') : null;
     } catch { return null; }
   };
-  const write = (list) => storage.setItem(KEY, JSON.stringify(list));
+  // 저장 공간이 가득 찼거나(quota) 접근이 막힌 환경에서도 throw 없이 false 를 돌려준다 —
+  // list() 는 화면을 그릴 때마다 seedIfEmpty() 를 통해 조용히 쓰기를 시도하므로, 여기서 막지
+  // 않으면 홈/에디터 부팅이 그 예외 하나로 통째로 멈춘다.
+  const write = (list) => {
+    try { storage.setItem(KEY, JSON.stringify(list)); return true; } catch { return false; }
+  };
 
   const store = {
     /**
@@ -50,7 +55,11 @@ export function createSystemStore(storage) {
     /** 저장 순서(= 사용자가 정한 노출 순서) */
     list() {
       store.seedIfEmpty();
-      return read() || [];
+      const cur = read();
+      // 정상 상황이면 seedIfEmpty() 가 이미 써 둔 값이 그대로 읽힌다. 저장 공간이 가득 차는 등
+      // 쓰기 자체가 실패했을 때도, 화면엔 최소한 고정 시스템 3개는 보여야 해서 메모리로만 돌려준다
+      // (다음 list() 호출 때 다시 쓰기를 시도한다 — 새로고침해도 저장이 안 된 것뿐 앱이 죽진 않는다).
+      return cur ?? LOCKED_SYSTEMS.map((s) => ({ ...s, createdAt: Date.now() }));
     },
     get(id) {
       return store.list().find((s) => s.id === id) || null;
@@ -63,16 +72,16 @@ export function createSystemStore(storage) {
     newId() {
       return 'sys' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     },
-    /** 새 시스템 추가(맨 뒤). 이름이 비었거나 이미 있으면 null */
+    /** 새 시스템 추가(맨 뒤). 이름이 비었거나 이미 있거나 저장에 실패하면 null */
     create(name) {
       const n = cleanName(name);
       if (!n || store.isNameTaken(n)) return null;
       const list = store.list();
       const s = { id: store.newId(), name: n, createdAt: Date.now() };
-      write([...list, s]);
+      if (!write([...list, s])) return null;
       return s;
     },
-    /** 이름 바꾸기 — 고정 시스템이거나, 없거나, 이름이 비었거나, 다른 시스템과 겹치면 null */
+    /** 이름 바꾸기 — 고정 시스템이거나, 없거나, 이름이 비었거나, 다른 시스템과 겹치거나, 저장에 실패하면 null */
     rename(id, name) {
       if (isLocked(id)) return null;
       const n = cleanName(name);
@@ -81,18 +90,17 @@ export function createSystemStore(storage) {
       if (!list.some((s) => s.id === id)) return null;
       if (store.isNameTaken(n, id)) return null;
       const next = list.map((s) => (s.id === id ? { ...s, name: n } : s));
-      write(next);
+      if (!write(next)) return null;
       return next.find((s) => s.id === id);
     },
-    /** 삭제 — 고정 시스템이면 false. 이 시스템을 쓰던 프로젝트는 그대로 남는다(카드에는 마지막 시스템명이 캐시돼 있어 계속 보인다) */
+    /** 삭제 — 고정 시스템이거나 저장에 실패하면 false. 이 시스템을 쓰던 프로젝트는 그대로 남는다(카드에는 마지막 시스템명이 캐시돼 있어 계속 보인다) */
     remove(id) {
       if (isLocked(id)) return false;
       const list = store.list();
       if (!list.some((s) => s.id === id)) return false;
-      write(list.filter((s) => s.id !== id));
-      return true;
+      return write(list.filter((s) => s.id !== id));
     },
-    /** id 를 목록에서 dir(-1=위로/1=아래로) 만큼 옮긴다. 고정 시스템도 순서는 옮길 수 있다 */
+    /** id 를 목록에서 dir(-1=위로/1=아래로) 만큼 옮긴다. 고정 시스템도 순서는 옮길 수 있다. 저장 실패 시 false */
     move(id, dir) {
       const list = store.list();
       const i = list.findIndex((s) => s.id === id);
@@ -100,8 +108,7 @@ export function createSystemStore(storage) {
       if (i < 0 || j < 0 || j >= list.length) return false;
       const next = list.slice();
       [next[i], next[j]] = [next[j], next[i]];
-      write(next);
-      return true;
+      return write(next);
     },
   };
   return store;

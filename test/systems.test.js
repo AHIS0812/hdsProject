@@ -123,3 +123,24 @@ test('깨진 저장 데이터는 고정 시스템으로 안전하게 복구된�
   const s = createSystemStore(st);
   assert.deepEqual(s.list().map((x) => x.id), LOCKED_SYSTEMS.map((x) => x.id));
 });
+
+test('저장 공간이 가득 차 setItem 이 항상 throw 해도 list() 는 안 죽고 값을 돌려준다', () => {
+  const st = memStorage();
+  st.setItem = () => { throw new Error('QuotaExceededError'); };
+  const s = createSystemStore(st);
+  assert.doesNotThrow(() => s.list());
+  assert.deepEqual(s.list().map((x) => x.id), LOCKED_SYSTEMS.map((x) => x.id));
+});
+
+test('setItem 이 항상 throw 하면 create/rename/remove/move 는 예외 없이 실패값(null/false)을 돌려준다', () => {
+  const st = memStorage();
+  const s = createSystemStore(st);
+  const sys = s.create('나중에 저장 막힐 시스템'); // 정상 저장으로 하나 만들어 둔다
+  st.setItem = () => { throw new Error('QuotaExceededError'); };
+  assert.doesNotThrow(() => {
+    assert.equal(s.create('새 시스템'), null);
+    assert.equal(s.rename(sys.id, '바뀐 이름'), null);
+    assert.equal(s.remove(sys.id), false);
+    assert.equal(s.move(sys.id, -1), false);
+  });
+});
