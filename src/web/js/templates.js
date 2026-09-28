@@ -133,19 +133,30 @@ const PRESETS = {
 const BASE_BOARD = { w: 960, h: 600 };
 const BASE_POPUP = { w: 560, h: 420 };
 
+// 가로·세로 스케일 비율이 이 배수 이상 벌어지면("PC·스크롤 고려"의 세로 확장, 모바일의 좁은 폭처럼)
+// 원본 종횡비와 캔버스 종횡비가 크게 다르다고 보고 찌그러짐 방지를 우선한다. 고정 3개 시스템의
+// 기본 캔버스 크기(예: 하이포탈 1280×738)는 원본(960×600)과 종횡비가 비슷(8% 안팎)하므로 이 아래에
+// 걸러져 독립 스케일 쪽을 탄다.
+const UNIFORM_SCALE_THRESHOLD = 1.3;
+
 export function templateShapes(key, canvas) {
   if (key === 'blank') return [];
   const shapes = (PRESETS[key] || PRESETS.list)();
   const base = key === 'popup' ? BASE_POPUP : BASE_BOARD;
   if (!canvas || (canvas.w === base.w && canvas.h === base.h)) return shapes;
-  // 가로·세로를 각각 다른 비율로 늘리면("PC·스크롤 고려"처럼 세로만 훨씬 큰 캔버스에서) 버튼·입력칸
-  // 같은 요소가 세로로 찌그러진다. 두 비율 중 작은 쪽 하나로만 스케일해 요소 비율은 그대로 유지하고,
-  // 남는 공간(대개 세로쪽)은 그냥 빈 캔버스로 둔다 — min 을 쓰므로 스케일된 요소는 항상 canvas 안에 들어간다.
-  const scale = Math.min(canvas.w / base.w, canvas.h / base.h);
+  const sx = canvas.w / base.w;
+  const sy = canvas.h / base.h;
+  // 캔버스 종횡비가 원본과 비슷하면(고정 시스템의 기본 크기처럼) 가로·세로를 각각 그 비율대로 늘려
+  // 요소가 새 캔버스를 꽉 채우게 한다 — 8% 안팎의 차이는 버튼·입력칸이 살짝 넓적해지는 정도라
+  // 눈에 띄지 않는다. 반대로 비율이 크게 벌어지면(PC·스크롤 고려의 세로 확장, 모바일의 좁은 폭) 그대로
+  // 늘렸다간 요소가 심하게 찌그러지므로, 작은 배율 하나로만 통일 스케일하고 남는 공간은 빈 캔버스로 둔다.
+  const uniform = Math.max(sx, sy) / Math.min(sx, sy) > UNIFORM_SCALE_THRESHOLD;
+  const scaleX = uniform ? Math.min(sx, sy) : sx;
+  const scaleY = uniform ? Math.min(sx, sy) : sy;
   return shapes.map((s) => ({
     ...s,
-    x: Math.round(s.x * scale), y: Math.round(s.y * scale),
-    w: Math.round(s.w * scale), h: Math.round(s.h * scale),
+    x: Math.round(s.x * scaleX), y: Math.round(s.y * scaleY),
+    w: Math.round(s.w * scaleX), h: Math.round(s.h * scaleY),
   }));
 }
 

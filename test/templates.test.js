@@ -75,6 +75,31 @@ test('templateShapes — "PC·스크롤 고려"처럼 세로만 훨씬 큰 캔�
   }
 });
 
+// 고정 3개 시스템의 기본 캔버스는 원본(960×600)과 종횡비가 비슷(8% 안팎)하므로, "PC·스크롤 고려"와
+// 달리 요소가 가로·세로 각각 독립 스케일되어 화면을 꽉 채워야 한다(찌그러짐 방지용 min 스케일을 그대로
+// 쓰면 오른쪽·아래쪽에 불필요한 여백이 남는 문제가 있었다).
+test('templateShapes — 고정 시스템의 기본 캔버스 크기에서는 요소가 화면을 꽉 채운다(여백이 남지 않는다)', () => {
+  const base = { w: 960, h: 600 };
+  for (const [systemId, board] of Object.entries({
+    salesportal: { w: 1180, h: 755 },
+    portal: { w: 1280, h: 738 },
+    homepage: { w: 1240, h: 750 },
+  })) {
+    const baseShapes = templateShapes('list', base);
+    const scaledShapes = templateShapes('list', board);
+    const rightEdge = (arr) => Math.max(...arr.map((s) => s.x + s.w));
+    const bottomEdge = (arr) => Math.max(...arr.map((s) => s.y + s.h));
+    // 기준 캔버스에서 오른쪽·아래쪽 끝까지 채우던 비율이, 새 캔버스에서도 거의 그대로 유지돼야 한다
+    // (min 스케일이었다면 이 비율이 눈에 띄게 줄어든다 — 세로 배율이 가로 배율보다 작기 때문).
+    const baseFillX = rightEdge(baseShapes) / base.w;
+    const scaledFillX = rightEdge(scaledShapes) / board.w;
+    const baseFillY = bottomEdge(baseShapes) / base.h;
+    const scaledFillY = bottomEdge(scaledShapes) / board.h;
+    assert.ok(Math.abs(scaledFillX - baseFillX) < 0.03, `${systemId}: 가로 채움 비율이 달라짐 (기준 ${baseFillX.toFixed(3)}, 실제 ${scaledFillX.toFixed(3)})`);
+    assert.ok(Math.abs(scaledFillY - baseFillY) < 0.03, `${systemId}: 세로 채움 비율이 달라짐 (기준 ${baseFillY.toFixed(3)}, 실제 ${scaledFillY.toFixed(3)})`);
+  }
+});
+
 test('sampleShapes 는 유효하고 960×600 안에 들어간다(스케일 대상이 아닌 기준 크기 고정 함수)', () => {
   const shapes = sampleShapes();
   assert.ok(shapes.length > 0);
