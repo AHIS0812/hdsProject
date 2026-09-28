@@ -1,5 +1,5 @@
 {
-  "$comment": "화면 생성 결과의 미리보기(Preview) 화면에만 적용되는 시스템별 색상/모양 테마. WebSquare XML 코드에는 반영되지 않는다(사내 표준 색상 클래스 체계가 아직 확정 안 됨, 개발지시서 OI-3). 'default'는 고정 3개 시스템(salesportal/portal/homepage) 외의 모든 시스템(사용자가 직접 추가한 시스템)에 쓰인다. 참고 이미지: 영업포탈=사내 업무 그리드 시스템 캡처, 하이포탈=WebSquare 팝업·조회 화면 캡처, 대표홈페이지=hi.co.kr(현대해상) 공개 홈페이지+인터넷창구 화면.",
+  "$comment": "화면 생성 결과의 미리보기(Preview) 화면에만 적용되는 시스템별 색상/모양 테마. WebSquare XML 코드에는 반영되지 않는다(사내 표준 색상 클래스 체계가 아직 확정 안 됨, 개발지시서 OI-3). 'default'는 고정 3개 시스템(salesportal/portal/homepage) 외의 모든 시스템(사용자가 직접 추가한 시스템)에 쓰인다. 참고 이미지: 영업포탈=사내 업무 그리드 시스템 캡처, 하이포탈=WebSquare 팝업·조회 화면 캡처, 대표홈페이지=hi.co.kr(현대해상) 공개 홈페이지+인터넷창구 화면. 고정 3개 시스템의 정본은 src/web/js/systems.js 의 LOCKED_SYSTEMS — 그 목록을 고치면 여기도 같이 고쳐야 하고, test/deterministic.test.js 의 커버리지 테스트가 둘이 어긋나면 잡아 준다.",
   "default": {
     "primary": "#F5821F", "primaryText": "#fff",
     "solid": "#0F3B7C", "solidText": "#fff",

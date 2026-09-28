@@ -21,11 +21,16 @@ const BUTTON_ROLE_HINTS = readJson('config/policy.json', { buttonRoleHints: {} }
 // "constructor"/"toString"/"hasOwnProperty" 같은 Object.prototype 이름을 보내면 그 값(함수)이
 // 조회돼 getTheme() 의 DEFAULT_THEME 폴백을 건너뛰어 미리보기 스타일이 깨진다.
 const PREVIEW_THEMES = Object.assign(Object.create(null), readJson('config/preview-themes.json', {}));
+// config/preview-themes.json 자체를 못 읽는 극단적 상황(파일 누락·손상)에서만 쓰는 최후의
+// 안전망 — 그 파일의 "default" 팔레트 값을 여기 그대로 베끼면, 나중에 그 파일만 고치고 이 값은
+// 안 고쳐도 아무도 못 알아챈다(파일이 정상일 땐 절대 안 쓰이는 코드라 드리프트가 안 보인다).
+// 그래서 일부러 preview-themes.json 의 default 와는 다른, 눈에 띄는 중립 회색조로 둔다 —
+// 화면이 이 색으로 뜨면 "설정 파일을 못 읽었구나"를 바로 알아챌 수 있다.
 const FALLBACK_THEME = {
-  primary: '#F5821F', primaryText: '#fff', solid: '#0F3B7C', solidText: '#fff',
-  outlineBorder: '#9fb3d1', outlineText: '#0F3B7C', radius: '3px', inputBorder: '#d3d8e0',
-  areaBorder: '#e3e6ec', areaText: '#1a2942', gridHeaderBg: '#EEF3FB',
-  tabActiveBg: '#0F3B7C', tabActiveText: '#fff', tabInactiveBg: '#eef1f5', tabInactiveText: '#5a6472',
+  primary: '#888888', primaryText: '#fff', solid: '#555555', solidText: '#fff',
+  outlineBorder: '#cccccc', outlineText: '#555555', radius: '3px', inputBorder: '#cccccc',
+  areaBorder: '#dddddd', areaText: '#333333', gridHeaderBg: '#eeeeee',
+  tabActiveBg: '#555555', tabActiveText: '#fff', tabInactiveBg: '#eeeeee', tabInactiveText: '#888888',
 };
 const DEFAULT_THEME = PREVIEW_THEMES.default || FALLBACK_THEME;
 const getTheme = (systemId) => (systemId && PREVIEW_THEMES[systemId]) || DEFAULT_THEME;

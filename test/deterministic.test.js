@@ -11,6 +11,7 @@ import {
 } from '../src/pipeline/deterministic.js';
 import { validateGenerationResult } from '../src/shared/validate.js';
 import { readJson } from '../src/shared/paths.js';
+import { LOCKED_SYSTEMS } from '../src/web/js/systems.js';
 
 const listPayload = readJson('fixtures/payloads/list.json');
 
@@ -133,6 +134,16 @@ test('시스템별 미리보기 테마 — payload.systemId 에 따라 --hs-prim
   // 세 고정 시스템은 서로 다른 primary 색을 쓴다(테마가 실제로 갈린다)
   assert.notEqual(themes.portal.primary, themes.salesportal.primary);
   assert.notEqual(themes.salesportal.primary, themes.homepage.primary);
+});
+
+// systems.js 의 LOCKED_SYSTEMS 를 정본으로 삼아 순회한다 — 나중에 고정 시스템을 추가/변경하면서
+// config/preview-themes.json 쪽을 빠뜨려도(그 시스템만 조용히 default 테마로 폴백) 이 테스트가
+// 계속 통과해 버리는 걸 막는다(constants.test.js 의 SYSTEM_BOARD_SIZES 커버리지 테스트와 짝).
+test('config/preview-themes.json 이 고정 시스템(systems.js LOCKED_SYSTEMS)을 전부 덮는다', () => {
+  const themes = readJson('config/preview-themes.json');
+  for (const { id, name } of LOCKED_SYSTEMS) {
+    assert.ok(themes[id], `preview-themes.json 에 "${id}"(${name}) 테마 없음`);
+  }
 });
 
 test('시스템별 테마는 XML 코드에는 반영되지 않는다(색상 정보 없음)', () => {

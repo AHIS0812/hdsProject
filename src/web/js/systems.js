@@ -9,7 +9,12 @@
 const KEY = 'hds:systems';
 export const NAME_MAX = 30;
 
-/** 고정 시스템 — 삭제·이름변경 불가. 목록 저장 순서의 기본값이기도 하다 */
+/**
+ * 고정 시스템 — 삭제·이름변경 불가. 목록 저장 순서의 기본값이기도 하다.
+ * 이 id 세트가 정본이다 — constants.js 의 SYSTEM_BOARD_SIZES, config/preview-themes.json 도
+ * 같은 id 를 써야 하고(각각 test/constants.test.js, test/deterministic.test.js 가 커버리지를
+ * 검증한다), 여기에 시스템을 추가·변경하면 그 두 곳도 같이 고쳐야 한다.
+ */
 export const LOCKED_SYSTEMS = [
   { id: 'salesportal', name: '영업포탈' },
   { id: 'portal', name: '하이포탈' },

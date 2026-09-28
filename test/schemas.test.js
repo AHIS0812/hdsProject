@@ -21,14 +21,19 @@ const toPayloadShape = (s) => ({
 // ── 템플릿 → 신규 payload 스키마 통과 ──────────────────────
 for (const key of TEMPLATE_KEYS) {
   test(`템플릿 "${key}" 로 만든 신규 payload 가 screen-draft 스키마를 통과한다`, () => {
+    // canvas 는 시스템 기본 크기로 먼저 정하고, templateShapes 에도 그 canvas 를 그대로 넘겨야
+    // 요소가 스케일되어 캔버스 안에 들어간다 — 실제 앱(home.js/main.js)이 쓰는 것과 같은 순서.
+    // 각각 인자 없이 독립 호출하면(boardSizeFor(key) 는 900×600, templateShapes(key) 는
+    // 960×600 기준 미스케일 좌표) 서로 어긋난 payload 가 만들어진다.
+    const canvas = boardSizeFor(key, 'portal');
     const payload = {
       systemId: 'portal',
       systemName: '하이포탈',
       mode: 'new',
       template: key,
       screenName: '테스트 화면',
-      canvas: boardSizeFor(key),
-      shapes: templateShapes(key).map(toPayloadShape),
+      canvas,
+      shapes: templateShapes(key, canvas).map(toPayloadShape),
     };
     assert.equal(validateScreenDraft(payload), null);
   });

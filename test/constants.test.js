@@ -6,6 +6,7 @@ import {
   DEFAULT_BOARD, POPUP_BOARD, SYSTEM_BOARD_SIZES, boardSizeFor,
   defaultLabel, defaultCols, cleanItemName, renameItemAt,
 } from '../src/web/js/constants.js';
+import { LOCKED_SYSTEMS } from '../src/web/js/systems.js';
 
 const TYPES = COMPS.map((c) => c.t);
 
@@ -34,8 +35,10 @@ test('HAS_ITEMS 타입에는 defaultCols 기본값이 있다', () => {
   for (const k of Object.keys(HAS_ITEMS)) assert.ok(defaultCols(k).length > 0, `${k}: defaultCols 비어 있음`);
 });
 
-test('SYSTEM_BOARD_SIZES 가 고정 3개 시스템을 모두 덮는다', () => {
-  for (const id of ['salesportal', 'portal', 'homepage']) {
+// systems.js 의 LOCKED_SYSTEMS 를 정본으로 삼아 순회한다 — 리터럴로 다시 나열하면, 나중에
+// 고정 시스템을 추가/변경하면서 SYSTEM_BOARD_SIZES 쪽만 빠뜨려도 이 테스트가 계속 통과해 버린다.
+test('SYSTEM_BOARD_SIZES 가 고정 시스템(systems.js LOCKED_SYSTEMS)을 전부 덮는다', () => {
+  for (const { id } of LOCKED_SYSTEMS) {
     const s = SYSTEM_BOARD_SIZES[id];
     assert.ok(s && s.w > 0 && s.h > 0, `SYSTEM_BOARD_SIZES[${id}] 없음`);
   }

@@ -50,7 +50,10 @@ export const DEFAULT_BOARD = { w: 900, h: 600 };
 export const POPUP_BOARD = { w: 560, h: 420 };
 
 /** 고정 3개 시스템의 기본 캔버스 크기 — 실제 화면 캡처·사이트 기준(§1 참고).
- * homepage 는 hi.co.kr 실제 레이아웃 폭(#wrap, 1240px)에 다른 두 시스템과 비슷한 높이를 맞춘 값. */
+ * homepage 는 hi.co.kr 실제 레이아웃 폭(#wrap, 1240px)에 다른 두 시스템과 비슷한 높이를 맞춘 값.
+ * 키는 systems.js 의 LOCKED_SYSTEMS 와 같은 id 세트를 써야 한다(고정 시스템을 추가·변경할 때 여기도
+ * 같이 고쳐야 함 — test/constants.test.js 의 커버리지 테스트가 둘이 어긋나면 잡아 준다).
+ * config/preview-themes.json 도 같은 id 세트를 쓴다(test/deterministic.test.js 가 커버리지 검증). */
 export const SYSTEM_BOARD_SIZES = {
   salesportal: { w: 1180, h: 755 },
   portal: { w: 1280, h: 738 },

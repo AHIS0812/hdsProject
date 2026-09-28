@@ -126,6 +126,10 @@ const PRESETS = {
 // 위 프리셋 좌표는 전부 이 기준 캔버스(960×600, popup 은 560×420) 기준으로 그려져 있다.
 // 시스템별로 캔버스 기본 크기가 달라졌으므로(constants.js SYSTEM_BOARD_SIZES), 실제 canvas 를
 // 받으면 그 크기에 맞게 좌표·크기를 비율 스케일한다 — 레이아웃 비율은 그대로 유지된다.
+// 주의: constants.js 의 DEFAULT_BOARD(900×600, "시스템 미지정일 때 새 프로젝트 기본 크기")와는
+// 완전히 다른 개념이다 — 이 값은 항상 960×600 이어야 프리셋 좌표가 안 깨진다. 이 함수를 호출할 땐
+// canvas 인자를 반드시 넘겨야(예: templateShapes(key, boardSizeFor(key, systemId))) 요소가
+// 스케일되어 캔버스 안에 들어간다 — canvas 없이 호출하면 이 960×600 좌표 그대로 나간다.
 const BASE_BOARD = { w: 960, h: 600 };
 const BASE_POPUP = { w: 560, h: 420 };
 
