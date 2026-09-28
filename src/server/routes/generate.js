@@ -6,28 +6,34 @@
 import { Router } from 'express';
 import { validateScreenDraft } from '../../shared/validate.js';
 import { deterministicResult } from '../../pipeline/deterministic.js';
+import { writeAuditLog } from '../audit-log.js';
 
 const router = Router();
 
 router.post('/generate', (req, res) => {
   const errors = validateScreenDraft(req.body);
   if (errors) {
-    return res.status(400).json({
+    const result = {
       status: 'error',
       error: { message: 'payload 가 screen-draft 스키마를 위반했습니다.', details: errors },
-    });
+    };
+    writeAuditLog({ payload: req.body, result });
+    return res.status(400).json(result);
   }
 
   try {
     const t0 = Date.now();
     const result = deterministicResult(req.body);
     result.report.elapsedMs = Date.now() - t0;
+    writeAuditLog({ payload: req.body, result });
     return res.json(result);
   } catch (err) {
-    return res.status(500).json({
+    const result = {
       status: 'error',
       error: { message: '변환 중 오류가 발생했습니다.', log: String(err?.stack || err) },
-    });
+    };
+    writeAuditLog({ payload: req.body, result });
+    return res.status(500).json(result);
   }
 });
 
