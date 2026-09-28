@@ -185,7 +185,7 @@ function buildCard(m, missing) {
   el.innerHTML =
     `<button type="button" class="chk${picked ? ' on' : ''}" role="checkbox" aria-checked="${picked}" aria-label="${esc(m.name)} 선택"><span class="ico">${icon('check')}</span></button>`
     + (trashed ? '' : `<button type="button" class="fav${m.favorite ? ' on' : ''}" aria-pressed="${!!m.favorite}" aria-label="${esc(m.name)} 즐겨찾기" title="${m.favorite ? '즐겨찾기 해제' : '즐겨찾기'}"><span class="ico">${icon('star')}</span></button>`)
-    + `<div class="thumb">${svg ? `<img alt="" loading="lazy" src="${svgDataUrl(svg)}">` : '<div class="ph"></div>'}</div>`
+    + `<div class="thumb">${svg ? `<img alt="" loading="lazy" draggable="false" src="${svgDataUrl(svg)}">` : '<div class="ph"></div>'}</div>`
     + '<div class="info">'
     + `<div class="ttl"><b class="name" title="${esc(m.name)}">${esc(m.name)}</b></div>`
     + `<button type="button" class="more" aria-haspopup="menu" aria-label="${esc(m.name)} 메뉴" title="더보기"><span class="ico">${icon('more')}</span></button>`
@@ -263,7 +263,7 @@ function fillMissingThumbs(ids) {
         store.setThumb(id, svg);
         store.setMeta(id, { hasBg: docPages(doc).some((pg) => !!pg.background) }); // 다음부터는 이 프로젝트를 다시 검사하지 않는다
         const th = grid.querySelector(`.card[data-id="${CSS.escape(id)}"] .thumb`);
-        if (th) th.innerHTML = `<img alt="" src="${svgDataUrl(svg)}">`;
+        if (th) th.innerHTML = `<img alt="" draggable="false" src="${svgDataUrl(svg)}">`;
       }
     } catch (e) { console.error(e); }
     setTimeout(step, 20);
@@ -636,7 +636,7 @@ function openWizard({ template = 'blank' } = {}) {
     const box = q('#wPv');
     const cap = q('#wCap');
     const sz = curSize();
-    box.innerHTML = `<img alt="선택한 화면 유형 미리보기" src="${tplThumb2(st.template, sz)}">`;
+    box.innerHTML = `<img alt="선택한 화면 유형 미리보기" draggable="false" src="${tplThumb2(st.template, sz)}">`;
     const nm = TPL_INFO.find((t) => t.key === st.template)?.name || '';
     cap.innerHTML = `${esc(nm)}<small>${sz.w} × ${sz.h}</small>`;
   }
@@ -648,7 +648,7 @@ function openWizard({ template = 'blank' } = {}) {
       b.type = 'button';
       b.className = 'tpl-opt' + (st.template === t.key ? ' on' : '');
       b.setAttribute('aria-pressed', String(st.template === t.key));
-      b.innerHTML = `<div class="pv"><img alt="" src="${tplThumb(t.key, st.systemId)}"></div><span>${esc(t.name)}</span>`;
+      b.innerHTML = `<div class="pv"><img alt="" draggable="false" src="${tplThumb(t.key, st.systemId)}"></div><span>${esc(t.name)}</span>`;
       b.addEventListener('click', () => { st.template = t.key; paintTpls(); paintSizes(); paintPreview(); });
       return b;
     }));
@@ -857,7 +857,7 @@ function initEvents() {
       b.className = 'tile';
       b.setAttribute('role', 'listitem');
       b.setAttribute('aria-label', `${t.name} — 바로 새 프로젝트 만들기`);
-      b.innerHTML = `<div class="pv"><img alt="" src="${tplThumb(t.key, lastSystem())}"></div><b>${esc(t.name)}</b><small>${esc(t.sub)}</small>`;
+      b.innerHTML = `<div class="pv"><img alt="" draggable="false" src="${tplThumb(t.key, lastSystem())}"></div><b>${esc(t.name)}</b><small>${esc(t.sub)}</small>`;
       b.addEventListener('click', () => quickCreate(t.key));
       return b;
     }),
