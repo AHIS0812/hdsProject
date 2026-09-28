@@ -157,7 +157,7 @@ export function shapeToXml(shape, n) {
   }
   if (m.tabItemTag && items.length) {
     const tabs = items
-      .map((c, i) => `  <${m.tabItemTag} id="tab${n}_${i + 1}" title="${esc(c)}"/>`)
+      .map((c, i) => `  <${m.tabItemTag} id="tab_${n}_${i + 1}" title="${esc(c)}"/>`)
       .join('\n');
     return `<${m.tag} ${attrs}>\n${tabs}\n</${m.tag}>`;
   }
@@ -586,7 +586,7 @@ function emitNode(shape, numOf, childrenOf, depth) {
   const pad = '  '.repeat(depth);
   const n = numOf.get(shape);
   if (shape.type === 'area') {
-    const m = MAPPING.area || { tag: 'w2:group', attrs: { id: 'grp{n}' } };
+    const m = MAPPING.area || { tag: 'w2:group', attrs: { id: 'grp_{n}' } };
     const attrs = attrString(m.attrs, n, shape.label || '');
     const kids = readingOrder(childrenOf.get(shape) || []);
     if (!kids.length) return `${pad}<${m.tag} ${attrs}/>`;

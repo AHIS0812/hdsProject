@@ -108,7 +108,7 @@ test('compileDeterministic — area 를 감싸고 필수를 전파한다', () =>
   });
   assert.equal(out.propagatedRequired, 1);
   // area 가 자식(성명 라벨/입력)을 감싼다
-  assert.match(out.websquareXml, /<w2:group id="grp1">[\s\S]*<w2:inputBox[^>]*w2input_essential[\s\S]*<\/w2:group>/);
+  assert.match(out.websquareXml, /<w2:group id="grp_1">[\s\S]*<w2:inputBox[^>]*w2input_essential[\s\S]*<\/w2:group>/);
   // 저장 버튼은 area 밖(screenRoot 직속)
   assert.match(out.websquareXml, /<\/w2:group>\n\s*<w2:trigger[^>]*value="저장"/);
 });
@@ -164,5 +164,36 @@ test('systemId 로 "constructor" 같은 Object.prototype 이름을 보내도 def
     const html = compileDeterministic(payloadFor(evil)).previewHtml;
     assert.match(html, new RegExp(`--hs-primary:${themes.default.primary}`), `systemId="${evil}"`);
     assert.doesNotMatch(html, /--hs-primary:undefined/, `systemId="${evil}"`);
+  }
+});
+
+// 사내 "웹스퀘어 개발가이드" 2.1 Naming Rule(컨트롤별 id 접두어)을 mapping.json 이 따르는지 확인.
+// 태그 → 사내 컨트롤명 → 접두어 매핑이 어긋나면(오타·리네임 실수) 이 테스트가 잡는다.
+test('mapping.json 의 id 접두어가 사내 WebSquare 명명 규칙(웹스퀘어 개발가이드 2.1)을 따른다', () => {
+  const mapping = readJson('catalog/websquare/mapping.json').default;
+  // WebSquare 태그 → 사내 컨트롤명 접두어(Naming Rule 표 2.1.1)
+  const prefixByTag = {
+    'w2:inputBox': 'ipt',      // InputBox
+    'w2:calendar': 'ipt',      // InputCalendar (날짜 입력) — 문서 예시(ipt_comment)를 그대로 따름
+    'w2:selectBox': 'cmb',     // SelectBox
+    'w2:radiobutton': 'rdo',   // Radio
+    'w2:checkbox': 'cbx',      // CheckBox
+    'w2:textarea': 'txt',      // Textarea
+    'w2:fileUpload': 'upl',    // Upload
+    'w2:gridView': 'grd',      // Grid
+    'w2:pagination': 'pag',    // PageList
+    'w2:tabControl': 'tab',    // TabControl
+    'w2:image': 'img',         // Image
+    'w2:trigger': 'btn',       // Trigger(button)
+    'w2:group': 'grp',         // Group
+    'w2:textbox': 'cap',       // Output(caption 개념 — 정적 문자열 표시)
+  };
+  for (const [type, def] of Object.entries(mapping)) {
+    const expected = prefixByTag[def.tag];
+    assert.ok(expected, `${type}(${def.tag}) — 명명 규칙표에 없는 태그, 표를 갱신할 것`);
+    assert.match(
+      def.attrs.id, new RegExp(`^${expected}_`),
+      `${type}(${def.tag}) 의 id="${def.attrs.id}" 는 "${expected}_" 로 시작해야 함`,
+    );
   }
 });
