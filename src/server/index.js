@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { exec } from 'node:child_process';
-import { ROOT, readJson } from '../shared/paths.js';
+import { ROOT, assetPath, readJson } from '../shared/paths.js';
 import metaRoutes from './routes/meta.js';
 import generateRoutes from './routes/generate.js';
 
@@ -21,18 +21,18 @@ app.use('/api', metaRoutes);
 app.use('/api', generateRoutes);
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 
-// 벤더 라이브러리 — 패키징된 .exe 배포본은 node_modules 가 없으므로 exe 옆의 vendor/ 를 먼저
+// 벤더 라이브러리 — 패키징된 .exe 는 node_modules 가 없으므로 exe 안에 넣어 둔 vendor/ 를 먼저
 // 찾고, 없으면(보통 실행 = npm 으로 설치된 상태) node_modules 에서 그대로 서빙한다.
-const useLocalVendor = existsSync(path.join(ROOT, 'vendor'));
+const useLocalVendor = existsSync(assetPath('vendor'));
 const html2canvasPath = useLocalVendor
-  ? path.join(ROOT, 'vendor/html2canvas.min.js')
-  : path.join(ROOT, 'node_modules/html2canvas/dist/html2canvas.min.js');
+  ? assetPath('vendor/html2canvas.min.js')
+  : assetPath('node_modules/html2canvas/dist/html2canvas.min.js');
 const fflatePath = useLocalVendor
-  ? path.join(ROOT, 'vendor/fflate.js')
-  : path.join(ROOT, 'node_modules/fflate/umd/index.js');
+  ? assetPath('vendor/fflate.js')
+  : assetPath('node_modules/fflate/umd/index.js');
 const pptxgenPath = useLocalVendor
-  ? path.join(ROOT, 'vendor/pptxgen.bundle.js')
-  : path.join(ROOT, 'node_modules/pptxgenjs/dist/pptxgen.bundle.js');
+  ? assetPath('vendor/pptxgen.bundle.js')
+  : assetPath('node_modules/pptxgenjs/dist/pptxgen.bundle.js');
 // 벤더 파일이 빠져 있으면(npm install 누락 등) 해당 기능(이미지 복사·zip·PPT 산출물)만 조용히 404 로
 // 죽어서 원인을 찾기 어려웠다 — 부팅할 때 한 번 알려 준다.
 for (const [name, p] of [['html2canvas', html2canvasPath], ['fflate', fflatePath], ['pptxgenjs', pptxgenPath]]) {
@@ -43,7 +43,7 @@ app.get('/vendor/fflate.js', (req, res) => res.sendFile(fflatePath));
 app.get('/vendor/pptxgen.js', (req, res) => res.sendFile(pptxgenPath));
 
 // 에디터 정적 파일 (src/web)
-app.use(express.static(path.join(ROOT, 'src/web')));
+app.use(express.static(assetPath('src/web')));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
